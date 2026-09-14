@@ -235,6 +235,9 @@ class OpenAIChat(LLMChat):
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                # Terminal Ctrl+C belongs to User.stop(), not to the transport
+                # child: killing it first would turn cancellation into FAILED.
+                start_new_session=True,
             )
         except OSError:
             raise OpenAITransportError("could not start HTTP worker") from None

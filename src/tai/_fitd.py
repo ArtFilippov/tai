@@ -16,7 +16,7 @@ from garak.attempt import Message as GarakMessage
 from garak.detectors.mitigation import Prefixes
 from garak.probes.fitd import FITD
 
-from tai._profile import FITD_PROFILE
+from tai._profile import FITD_PROFILE, _FITDProfile
 from tai.chats import ModelRole
 from tai.messages import Message
 
@@ -176,7 +176,9 @@ class _FITD(FITD):
         target: _Target,
         reset: _Reset,
         emit: _Emit,
+        profile: _FITDProfile,
     ) -> None:
+        self._profile = profile
         self._base = base
         self._send = send
         self._evaluate = evaluate
@@ -213,7 +215,7 @@ class _FITD(FITD):
         # mutable global run settings or loading site/provider configuration.
         for key, value in self.DEFAULT_PARAMS.items():
             setattr(self, key, deepcopy(value))
-        for key, value in asdict(FITD_PROFILE).items():
+        for key, value in asdict(self._profile).items():
             setattr(self, key, value)
         self.initial_prompt_count = 1
         self.follow_prompt_cap = False
@@ -388,9 +390,10 @@ def run_fitd(
     restore: _Restore,
     reset: _Reset,
     emit: _Emit,
+    profile: _FITDProfile = FITD_PROFILE,
 ) -> str:
     target = _Target(base, send, publish, checkpoint, restore, reset, emit)
-    probe = _FITD(base, send, evaluate, check_running, target, reset, emit)
+    probe = _FITD(base, send, evaluate, check_running, target, reset, emit, profile)
     probe.probe(target)
     # IterativeProbe catches GarakException. Never infer normal completion from
     # its returned attempts when an integration boundary recorded a failure.

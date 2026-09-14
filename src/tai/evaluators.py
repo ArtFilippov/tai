@@ -1,11 +1,16 @@
 """Evaluators judge a presented Message; the User decides when to stop."""
 
 from dataclasses import dataclass
+from typing import Any
 
 from tai.messages import Message
 
 
 class Evaluator:
+    def settings(self) -> dict[str, Any]:
+        """Configuration snapshot only; never evaluate a result here."""
+        return {"type": f"{type(self).__module__}.{type(self).__qualname__}"}
+
     def is_success(self, result: Message) -> bool:
         raise NotImplementedError
 
@@ -26,6 +31,9 @@ class ContainsTextEvaluator(Evaluator):
 
     def is_success(self, result: Message) -> bool:
         return self.criterion in result.to_string()
+
+    def settings(self) -> dict[str, Any]:
+        return {"type": "contains_text", "criterion": self.criterion}
 
     def reason(self, result: Message) -> str:
         outcome = "found" if self.is_success(result) else "not found"

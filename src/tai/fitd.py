@@ -18,7 +18,7 @@ from tai.users import Evaluation, Progress, RunEvent, User, UserState, UserStatu
 
 
 class FITDUser(User):
-    """Independent FITD experiments with at most ten library rounds each.
+    """Independent FITD experiments, defaulting to ten library rounds each.
 
     The presented text is the most recent Target response accepted for ladder
     progression in the retained conversation. Context kept for realignment is
@@ -33,6 +33,7 @@ class FITDUser(User):
         evaluator: Evaluator,
         *,
         artifacts_dir: str | Path = "runs",
+        max_calls_per_conv: int = 10,
     ) -> None:
         if target is attacker:
             raise ValueError(
@@ -42,6 +43,9 @@ class FITDUser(User):
         self._attacker = attacker
         self._base = base
         self._evaluator = evaluator
+        if type(max_calls_per_conv) is not int or max_calls_per_conv <= 0:
+            raise ValueError("max_calls_per_conv must be a positive integer")
+        self._profile = replace(FITD_PROFILE, max_calls_per_conv=max_calls_per_conv)
         self._artifacts_dir = Path(artifacts_dir)
         self._lock = Lock()
         self._execution = self._new_execution()
@@ -53,6 +57,7 @@ class FITDUser(User):
             self._base,
             self._evaluator,
             artifacts_dir=self._artifacts_dir,
+            max_calls_per_conv=self._profile.max_calls_per_conv,
         )
 
     def start(self) -> None:
@@ -104,6 +109,7 @@ class _Execution:
         evaluator: Evaluator,
         *,
         artifacts_dir: Path,
+        max_calls_per_conv: int,
     ) -> None:
         self._participants: dict[ModelRole, tuple[LLMChat, str]] = {
             "Target": (target, "target_calls"),
@@ -113,9 +119,10 @@ class _Execution:
         self._base = base
         self._evaluator = evaluator
         self._artifacts_dir = Path(artifacts_dir)
+        self._profile = replace(FITD_PROFILE, max_calls_per_conv=max_calls_per_conv)
         self._lock = Lock()
         self._status = UserStatus(
-            progress=Progress(max_calls_per_conv=FITD_PROFILE.max_calls_per_conv)
+            progress=Progress(max_calls_per_conv=self._profile.max_calls_per_conv)
         )
         self._result: Message | None = None
         self._events: list[RunEvent] = []
@@ -338,7 +345,8 @@ class _Execution:
 
                     settings = {
                         "garak_revision": GARAK_REVISION,
-                        **asdict(FITD_PROFILE),
+                        **asdict(self._profile),
+                        "evaluator": self._evaluator.settings(),
                         "base": json.loads(self._base.dump()),
                         **{
                             role: FITDUser._chat_settings(chat)
@@ -357,6 +365,7 @@ class _Execution:
                         restore=self._restore,
                         reset=self._reset,
                         emit=self._emit,
+                        profile=self._profile,
                     )
                 except Exception as exc:
                     if isinstance(exc, ChatCancelled) and self._stop_requested.is_set():

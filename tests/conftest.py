@@ -2,6 +2,7 @@ import inspect
 import os
 
 import pytest
+from http_peer import endpoint as endpoint
 
 
 def _guard_connections():
