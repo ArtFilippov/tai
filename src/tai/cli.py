@@ -5,7 +5,8 @@ import sys
 from pathlib import Path
 
 from tai import Message
-from tai._config import load_user
+from tai._config import load_profile
+from tai._preflight import run_preflight
 from tai.terminal import run_foreground
 
 
@@ -28,18 +29,30 @@ def main(argv: list[str] | None = None) -> int:
     source = fitd.add_mutually_exclusive_group(required=True)
     source.add_argument("--text", help="Базовый текст непосредственно")
     source.add_argument("--text-file", type=Path, help="Файл базового текста в UTF-8")
+    preflight = commands.add_parser(
+        "preflight", help="Проверить текстовый ответ каждой роли без запуска FITD"
+    )
+    preflight.add_argument(
+        "--config", type=Path, required=True, help="TOML-конфигурация"
+    )
+    preflight.add_argument("--report", type=Path, help="Сохранить JSON-диагностику")
     args = parser.parse_args(argv)
     try:
+        if args.command == "preflight":
+            return run_preflight(load_profile(args.config), args.report)
         text = (
             args.text_file.read_bytes().decode("utf-8")
             if args.text_file is not None
             else args.text
         )
-        user = load_user(args.config, Message(text), args.artifacts_dir)
+        profile = load_profile(args.config)
+        user = profile.create_user(Message(text), args.artifacts_dir)
     except UnicodeError:
         print("Ошибка: входной файл должен содержать корректный UTF-8", file=sys.stderr)
         return 2
     except (OSError, ValueError) as exc:
         print(f"Ошибка конфигурации или чтения: {exc}", file=sys.stderr)
         return 2
-    return run_foreground(user, artifacts_dir=args.artifacts_dir)
+    return run_foreground(
+        user, artifacts_dir=args.artifacts_dir, redact=profile.redactor().text
+    )

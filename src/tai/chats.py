@@ -5,6 +5,7 @@ from contextlib import ExitStack
 from dataclasses import dataclass
 from threading import Event, Lock
 from typing import Literal, Self
+from uuid import uuid4
 
 from tai._diagnostics import DiagnosticObject, DiagnosticRedactor
 from tai.messages import Message
@@ -55,6 +56,7 @@ class LLMChat:
             (ChatTurn("system", Message(system)),) if system else ()
         )
         self._system_turns = self._turns
+        self._conversation_id = str(uuid4())
         self._checkpoints: dict[object, tuple[ChatTurn, ...]] = {}
         self._lock = Lock()
         self._sending = Lock()
@@ -96,6 +98,12 @@ class LLMChat:
         with self._lock:
             return self._turns
 
+    @property
+    def conversation_id(self) -> str:
+        """Identity of the current conversation; only a successful reset rotates it."""
+        with self._lock:
+            return self._conversation_id
+
     def settings(self) -> DiagnosticObject:
         """Return a detached, JSON-serializable snapshot for run reproducibility.
 
@@ -107,11 +115,14 @@ class LLMChat:
     def _settings(self) -> dict[str, object]:
         import json
 
+        with self._lock:
+            conversation_id, turns = self._conversation_id, self._turns
         return {
             "model": self.model,
+            "conversation_id": conversation_id,
             "initial_history": [
                 {"role": turn.role, "message": json.loads(turn.message.dump())}
-                for turn in self.history()
+                for turn in turns
             ],
         }
 
@@ -159,6 +170,7 @@ class LLMChat:
             raise RuntimeError("LLMChat already has an active exchange")
         try:
             with self._lock:
+                self._conversation_id = str(uuid4())
                 self._turns = self._system_turns
                 self._checkpoints.clear()
         finally:

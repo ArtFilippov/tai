@@ -372,6 +372,8 @@ def test_repeated_commands_preserve_previous_run_and_allow_explicit_or_no_auth(
         ("[target]", "[target]\nunknown = true"),
         ("[target]", "[target]\ntimeout = 0"),
         ("[target]", "[target]\ntimeout = true"),
+        ("[target]", '[target]\nopencode_session = "true"'),
+        ("[target]", "[target]\nopencode_session = 1"),
         ("[target]", '[target]\ntimeout = "120"'),
         ("[target]", "[target]\ntimeout = inf"),
         ("[target]", "[target]\ngeneration = []"),

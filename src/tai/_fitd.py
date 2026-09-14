@@ -26,6 +26,7 @@ type _Send = Callable[[ModelRole, Message], Message]
 type _Checkpoint = Callable[[ModelRole], object]
 type _Restore = Callable[[ModelRole, object], None]
 type _Reset = Callable[[ModelRole], None]
+type _ConversationId = Callable[[ModelRole], str]
 type _Emit = Callable[..., None]
 type _History = tuple[tuple[str, str], ...]
 
@@ -67,6 +68,7 @@ class _Target:
         restore: _Restore,
         reset: _Reset,
         emit: _Emit,
+        conversation_id: _ConversationId,
     ) -> None:
         self._base = base
         self._send = send
@@ -77,7 +79,8 @@ class _Target:
         self._emit = emit
         self._history: _History = ()
         self._snapshots: dict[_History, _Snapshot] = {}
-        self._conversation_id = str(uuid4())
+        self._get_conversation_id = conversation_id
+        self._conversation_id = conversation_id("Target")
         self._save(None, None)
 
     @property
@@ -107,7 +110,7 @@ class _Target:
         if not prefix:
             self._reset("Target")
             old_conversation_id = self._conversation_id
-            self._conversation_id = str(uuid4())
+            self._conversation_id = self._get_conversation_id("Target")
             self._history = ()
             self._snapshots.clear()
             self._emit(
@@ -177,6 +180,7 @@ class _FITD(FITD):
         reset: _Reset,
         emit: _Emit,
         profile: _FITDProfile,
+        conversation_id: _ConversationId,
     ) -> None:
         self._profile = profile
         self._base = base
@@ -186,6 +190,7 @@ class _FITD(FITD):
         self._target = target
         self._reset = reset
         self._emit = emit
+        self._get_conversation_id = conversation_id
         self._attacker_conversation_id: str | None = None
         self._last_attacker_response_id: str | None = None
         self._attempt_id: str | None = None
@@ -238,7 +243,7 @@ class _FITD(FITD):
             # for each red-team request. Preserve that semantics via LLMChat.
             self._reset("Attacker")
             previous = self._attacker_conversation_id
-            self._attacker_conversation_id = str(uuid4())
+            self._attacker_conversation_id = self._get_conversation_id("Attacker")
             request = self._base.spawn(prompt)
             self._emit(
                 "history_reset",
@@ -389,11 +394,24 @@ def run_fitd(
     checkpoint: _Checkpoint,
     restore: _Restore,
     reset: _Reset,
+    conversation_id: _ConversationId,
     emit: _Emit,
     profile: _FITDProfile = FITD_PROFILE,
 ) -> str:
-    target = _Target(base, send, publish, checkpoint, restore, reset, emit)
-    probe = _FITD(base, send, evaluate, check_running, target, reset, emit, profile)
+    target = _Target(
+        base, send, publish, checkpoint, restore, reset, emit, conversation_id
+    )
+    probe = _FITD(
+        base,
+        send,
+        evaluate,
+        check_running,
+        target,
+        reset,
+        emit,
+        profile,
+        conversation_id,
+    )
     probe.probe(target)
     # IterativeProbe catches GarakException. Never infer normal completion from
     # its returned attempts when an integration boundary recorded a failure.

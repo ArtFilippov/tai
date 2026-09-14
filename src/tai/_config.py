@@ -2,10 +2,12 @@
 
 import os
 import tomllib
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from tai import ContainsTextEvaluator, FITDUser, Message, OpenAIChat
+from tai._diagnostics import DiagnosticRedactor
 
 
 def _table(value: Any, name: str, allowed: set[str]) -> dict[str, Any]:
@@ -36,9 +38,10 @@ def _chat(value: Any, role: str) -> OpenAIChat:
             "authorization",
             "api_key_env",
             "authorization_env",
+            "opencode_session",
         },
     )
-    kwargs = {
+    kwargs: dict[str, Any] = {
         key: _string(data.get(key, ""), f"{role}.{key}")
         for key in ("base_url", "model", "system")
     }
@@ -63,12 +66,41 @@ def _chat(value: Any, role: str) -> OpenAIChat:
     if not isinstance(generation, dict):
         raise ValueError(f"{role}.generation: требуется TOML-таблица")
     try:
-        return OpenAIChat(**kwargs, timeout=timeout, generation=generation)
+        return OpenAIChat(
+            **kwargs,
+            timeout=timeout,
+            generation=generation,
+            opencode_session=data.get("opencode_session", False),
+        )
     except ValueError as exc:
         raise ValueError(f"{role}: {exc}") from None
 
 
-def load_user(config: Path, base: Message, artifacts_dir: Path) -> FITDUser:
+@dataclass(frozen=True)
+class RoleProfile:
+    target: OpenAIChat
+    attacker: OpenAIChat
+    evaluator: ContainsTextEvaluator
+    max_calls_per_conv: int
+
+    def redactor(self) -> DiagnosticRedactor:
+        return DiagnosticRedactor.combine(
+            self.target._redactor, self.attacker._redactor
+        )
+
+    def create_user(self, base: Message, artifacts_dir: Path) -> FITDUser:
+        return FITDUser(
+            self.target,
+            self.attacker,
+            base,
+            self.evaluator,
+            artifacts_dir=artifacts_dir,
+            max_calls_per_conv=self.max_calls_per_conv,
+        )
+
+
+def load_profile(config: Path) -> RoleProfile:
+    """One validated profile shared by readiness and terminal experiments."""
     with config.open("rb") as source:
         try:
             document = tomllib.load(source)
@@ -90,11 +122,7 @@ def load_user(config: Path, base: Message, artifacts_dir: Path) -> FITDUser:
     generations = run.get("generations", 1)
     if type(generations) is not int or generations != 1:
         raise ValueError("run.generations: поддерживается только 1")
-    return FITDUser(
-        target,
-        attacker,
-        base,
-        evaluator,
-        artifacts_dir=artifacts_dir,
-        max_calls_per_conv=run.get("max_calls_per_conv", 10),
-    )
+    max_calls = run.get("max_calls_per_conv", 10)
+    if type(max_calls) is not int or max_calls <= 0:
+        raise ValueError("run.max_calls_per_conv: требуется положительное целое")
+    return RoleProfile(target, attacker, evaluator, max_calls)

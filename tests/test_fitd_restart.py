@@ -201,10 +201,13 @@ def test_terminal_user_starts_an_independent_actual_fitd_run(tmp_path, first_out
     assert old_result.dump() == old_dump
     assert snapshot_artifacts(tmp_path, old_status.run_id) == old_files
     new_files = assert_artifacts(user, tmp_path)
-    assert (
-        json.loads(new_files["metadata.json"])["settings"]
-        == json.loads(old_files["metadata.json"])["settings"]
-    )
+    new_settings = json.loads(new_files["metadata.json"])["settings"]
+    old_settings = json.loads(old_files["metadata.json"])["settings"]
+    for role in ("Target", "Attacker"):
+        assert new_settings[role].pop("conversation_id") != old_settings[role].pop(
+            "conversation_id"
+        )
+    assert new_settings == old_settings
     assert b"FIRST_ONLY" not in b"".join(new_files.values())
     assert b"OLD_FAILURE" not in b"".join(new_files.values())
     for model, offset, system in [

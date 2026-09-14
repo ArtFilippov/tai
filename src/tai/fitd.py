@@ -228,6 +228,7 @@ class _Execution:
                 "call_started",
                 role=role,
                 call_id=call_id,
+                conversation_id=chat.conversation_id,
                 input=json.loads(message.dump()),
             )
         self._flush_events()
@@ -282,6 +283,9 @@ class _Execution:
     def _reset(self, role: ModelRole) -> None:
         self._check_running()
         self._participants[role][0].reset()
+
+    def _conversation_id(self, role: ModelRole) -> str:
+        return self._participants[role][0].conversation_id
 
     def _publish(self, result: Message | None) -> None:
         with self._lock:
@@ -365,6 +369,7 @@ class _Execution:
                         checkpoint=self._checkpoint,
                         restore=self._restore,
                         reset=self._reset,
+                        conversation_id=self._conversation_id,
                         emit=self._emit,
                         profile=self._profile,
                     )

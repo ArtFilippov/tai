@@ -130,7 +130,10 @@ def test_real_fitd_applies_joint_policy_to_settings_and_entire_serialized_events
     settings = user.events()[0].data["settings"]
     target_settings = settings["Target"]
     if target_secret == "model":
-        assert target_settings[:2] == [["[REDACTED]", "puzzle"], ["[REDACTED]", []]]
+        assert [pair for pair in target_settings if pair[0] == "[REDACTED]"] == [
+            ["[REDACTED]", "puzzle"],
+            ["[REDACTED]", []],
+        ]
         generation_snapshot = next(
             value for key, value in target_settings if key == "generation"
         )

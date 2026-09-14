@@ -96,6 +96,7 @@ class OpenAIChat(LLMChat):
         system: str = "",
         generation: Mapping[str, Any] | None = None,
         timeout: float = 120.0,
+        opencode_session: bool = False,
     ) -> None:
         try:
             url = urlsplit(base_url)
@@ -119,6 +120,8 @@ class OpenAIChat(LLMChat):
             raise ValueError("model must be a nonempty string")
         if not isinstance(system, str):
             raise ValueError("system must be a string")
+        if not isinstance(opencode_session, bool):
+            raise ValueError("opencode_session must be a boolean")
         if not math.isfinite(timeout) or timeout <= 0:
             raise ValueError("timeout must be positive and finite")
         if api_key is not None and authorization is not None:
@@ -169,6 +172,7 @@ class OpenAIChat(LLMChat):
             else "none"
         )
         self._timeout = timeout
+        self._opencode_session = opencode_session
 
     def settings(self) -> DiagnosticObject:
         return self._diagnostic_settings(self._redactor)
@@ -182,6 +186,7 @@ class OpenAIChat(LLMChat):
             "base_url": self._base_url,
             "authorization": self._authorization_mode,
             "timeout": self._timeout,
+            "opencode_session": self._opencode_session,
             "generation": redactor.snapshot(
                 json.loads(self._generation_json), mask_fields=True
             ),
@@ -198,6 +203,10 @@ class OpenAIChat(LLMChat):
         }
         if self._authorization is not None:
             headers["Authorization"] = self._authorization
+        if self._opencode_session:
+            # send owns the exchange lock, so reset cannot rotate this identity
+            # until the entire HTTP exchange (including cleanup) has finished.
+            headers["x-opencode-session"] = self.conversation_id
         request = json.dumps(
             {
                 "url": self._base_url + "/chat/completions",

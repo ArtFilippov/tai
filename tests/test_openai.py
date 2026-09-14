@@ -36,6 +36,7 @@ def test_chat_posts_configuration_and_its_complete_immutable_dialogue(endpoint):
     assert path == "/v1/chat/completions"
     assert headers["Authorization"] == "Bearer synthetic-test-key"
     assert headers["User-Agent"] == f"tai/{version('tai')}"
+    assert "x-opencode-session" not in {key.lower() for key in headers}
     assert body == {
         "model": "fictional-puzzle",
         "messages": [
@@ -510,6 +511,8 @@ def test_real_fitd_realigns_and_uses_role_specific_http_chats_and_safe_settings(
         {"base_url": "http://localhost/v1?api_key=secret"},
         {"base_url": "file:///tmp/provider"},
         {"timeout": 0},
+        {"opencode_session": "true"},
+        {"opencode_session": 1},
         {"timeout": float("inf")},
         {"generation": {"messages": []}},
         {"generation": {"model": "other"}},
@@ -1133,6 +1136,10 @@ def test_same_user_restarts_actual_http_chats_with_fresh_history_and_safe_settin
     assert user.status().reason == "evaluator_success"
     assert user.result().to_string() == "KEY-FOUND new solution"
     _, metadata = artifacts(user, tmp_path)
+    for role in ("Target", "Attacker"):
+        assert metadata["settings"][role].pop("conversation_id") != old_metadata[
+            "settings"
+        ][role].pop("conversation_id")
     assert metadata["settings"] == old_metadata["settings"]
     assert old_result.dump() == old_dump
     assert {

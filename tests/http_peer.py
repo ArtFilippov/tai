@@ -36,6 +36,7 @@ class Endpoint:
             )
         }
         self.url = ""
+        self.require_session = False
 
 
 @pytest.fixture
@@ -47,6 +48,12 @@ def endpoint():
         def do_POST(self):
             body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             peer.requests.append((self.path, dict(self.headers), body))
+            if (
+                peer.require_session
+                and not self.headers.get("x-opencode-session", "").strip()
+            ):
+                self.send_error(400, "MissingSessionID")
+                return
             reply = peer.scripts[self.path].popleft()
             active.append(reply)
             if reply.disconnect:
