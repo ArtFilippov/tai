@@ -5,7 +5,8 @@ and IterativeProbe loop. Overrides bind task, model I/O, evaluation, and reporti
 to this run. No global configuration or plugin registry is modified.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import asdict
 
@@ -57,14 +58,36 @@ class _Target:
 
 class _FITD(FITD):
     def __init__(
-        self, base: Message, send: _Send, evaluate: Callable[[], bool]
+        self,
+        base: Message,
+        send: _Send,
+        evaluate: Callable[[], bool],
+        check_running: Callable[[], None],
     ) -> None:
         self._base = base
         self._send = send
         self._evaluate = evaluate
+        self._check_running = check_running
         self.success = False
         self.failure: Exception | None = None
         super().__init__(config_root={})
+
+    def raise_if_interrupted(self) -> None:
+        if self.failure is not None:
+            raise self.failure
+        self._check_running()
+
+    @contextmanager
+    def _guard_execution(self) -> Iterator[None]:
+        # Observe at model/evaluator boundaries as well as library branches.
+        # Keep the first outcome even if garak catches or replaces an exception.
+        try:
+            self.raise_if_interrupted()
+            yield
+        except Exception as exc:
+            if self.failure is None:
+                self.failure = exc
+            raise
 
     def _load_config(self, config_root):
         # Bind all execution settings locally instead of inheriting garak's
@@ -89,10 +112,11 @@ class _FITD(FITD):
 
     def _get_red_team_response(self, prompt: str) -> str:
         # Includes FITD's internal alignment checks; no hidden model is loaded.
-        return self._send("Attacker", Message(prompt)).to_string()
+        with self._guard_execution():
+            return self._send("Attacker", Message(prompt)).to_string()
 
     def _create_init_attempts(self):
-        try:
+        with self._guard_execution():
             self.refusal_detector = Prefixes(config_root={})
             goal = self._base.to_string()
             self.target_prompts = [goal]
@@ -112,27 +136,22 @@ class _FITD(FITD):
                 }
             )
             return [attempt]
-        except Exception as exc:
-            self.failure = exc
-            raise
 
     def _verify_is_last_response_success(self, attempt):
-        if not attempt.notes["is_adversarial"]:
-            return [False]
-        self.success = self._evaluate()
-        return [self.success]
+        with self._guard_execution():
+            if not attempt.notes["is_adversarial"]:
+                return [False]
+            self.success = self._evaluate()
+            return [self.success]
 
     def _execute_all(self, attempts):
         # The base implementation writes to a process-global reportfile. Keep
         # library execution/postprocessing, with reporting owned by our User.
-        try:
+        with self._guard_execution():
             return [
                 self._postprocess_attempt(self._execute_attempt(attempt))
                 for attempt in attempts
             ]
-        except Exception as exc:
-            self.failure = exc
-            raise
 
 
 def run_fitd(
@@ -140,13 +159,13 @@ def run_fitd(
     send: _Send,
     publish: Callable[[Message], None],
     evaluate: Callable[[], bool],
+    check_running: Callable[[], None],
 ) -> str:
-    probe = _FITD(base, send, evaluate)
+    probe = _FITD(base, send, evaluate, check_running)
     probe.probe(_Target(send, publish))
     # IterativeProbe catches GarakException. Never infer normal completion from
     # its returned attempts when an integration boundary recorded a failure.
-    if probe.failure is not None:
-        raise probe.failure
+    probe.raise_if_interrupted()
     if probe.success:
         return "evaluator_success"
     return "round_limit" if probe.attempt_queue else "strategy_exhausted"

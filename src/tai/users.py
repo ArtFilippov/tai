@@ -70,6 +70,10 @@ class User:
     def start(self) -> None:
         raise NotImplementedError
 
+    def stop(self) -> None:
+        """Request cancellation of active execution without waiting for it."""
+        raise NotImplementedError
+
     def status(self) -> UserStatus:
         raise NotImplementedError
 
