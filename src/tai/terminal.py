@@ -53,10 +53,13 @@ def run_foreground(user: User, *, artifacts_dir: Path) -> int:
             for event in user.events(after=cursor):
                 cursor = event.sequence
                 if event.kind == "call_started":
-                    print(
-                        f"Обращение: {event.data['role']} ({event.data['call_id']})",
-                        flush=True,
+                    data = event.data
+                    detail = (
+                        f"{data['role']} ({data['call_id']})"
+                        if isinstance(data, dict) and {"role", "call_id"} <= data.keys()
+                        else "диагностические поля скрыты"
                     )
+                    print(f"Обращение: {detail}", flush=True)
             if user.wait(0.05):
                 break
         final = user.status()

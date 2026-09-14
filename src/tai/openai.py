@@ -11,6 +11,7 @@ from time import monotonic
 from typing import Any
 from urllib.parse import urlsplit
 
+from tai._diagnostics import DiagnosticObject, DiagnosticRedactor
 from tai.chats import ChatCancelled, ChatTurn, LLMChat
 
 
@@ -150,7 +151,7 @@ class OpenAIChat(LLMChat):
         self._authorization = (
             f"Bearer {api_key}" if api_key is not None else authorization
         )
-        self._secrets = tuple(
+        self._redactor = DiagnosticRedactor(
             value
             for value in (
                 api_key,
@@ -168,42 +169,23 @@ class OpenAIChat(LLMChat):
         )
         self._timeout = timeout
 
-    def settings(self) -> dict[str, Any]:
-        def redact(value: Any) -> Any:
-            if isinstance(value, dict):
-                return {
-                    key: "[REDACTED]"
-                    if key.lower().replace("_", "").replace("-", "")
-                    in {
-                        "apikey",
-                        "authorization",
-                        "accesstoken",
-                        "password",
-                        "secret",
-                        "token",
-                    }
-                    else redact(item)
-                    for key, item in value.items()
-                }
-            if isinstance(value, list):
-                return [redact(item) for item in value]
-            if isinstance(value, str):
-                return self._redact_text(value)
-            return value
+    def settings(self) -> DiagnosticObject:
+        return self._diagnostic_settings(self._redactor)
 
-        return {
-            **redact(super().settings()),
+    def _diagnostic_settings(self, redactor: DiagnosticRedactor) -> DiagnosticObject:
+        # A run supplies both roles' credentials before any replacement, so
+        # overlapping credentials and resulting key collisions share one policy.
+        settings = {
+            **super()._settings(),
             "transport": "openai_chat_completions",
-            "base_url": redact(self._base_url),
+            "base_url": self._base_url,
             "authorization": self._authorization_mode,
             "timeout": self._timeout,
-            "generation": redact(json.loads(self._generation_json)),
+            "generation": redactor.snapshot(
+                json.loads(self._generation_json), mask_fields=True
+            ),
         }
-
-    def _redact_text(self, text: str) -> str:
-        for secret in self._secrets:
-            text = text.replace(secret, "[REDACTED]")
-        return text
+        return redactor.snapshot(settings)
 
     def _generate(self, turns: tuple[ChatTurn, ...], cancellation: Event) -> str:
         if cancellation.is_set():
@@ -302,7 +284,7 @@ class OpenAIChat(LLMChat):
             details: dict[str, Any] = {
                 "status_code": status,
                 "response_bytes": len(raw),
-                "response_fragment": self._redact_text(
+                "response_fragment": self._redactor.text(
                     raw.decode("utf-8", errors="replace")
                 )
                 if raw

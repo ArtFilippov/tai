@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from threading import Event, Lock
 from typing import Literal, Self
 
+from tai._diagnostics import DiagnosticObject, DiagnosticRedactor
 from tai.messages import Message
 
 type ModelRole = Literal["Target", "Attacker"]
@@ -59,6 +60,7 @@ class LLMChat:
         self._sending = Lock()
         self._active: Event | None = None
         self._owner: object | None = None
+        self._redactor = DiagnosticRedactor()
 
     @classmethod
     def cancellable(
@@ -94,12 +96,15 @@ class LLMChat:
         with self._lock:
             return self._turns
 
-    def settings(self) -> dict[str, object]:
+    def settings(self) -> DiagnosticObject:
         """Return a detached, JSON-serializable snapshot for run reproducibility.
 
         Transport subclasses include their configuration without credential
         values. The run records this snapshot before its first exchange.
         """
+        return self._settings()
+
+    def _settings(self) -> dict[str, object]:
         import json
 
         return {
@@ -109,6 +114,9 @@ class LLMChat:
                 for turn in self.history()
             ],
         }
+
+    def _diagnostic_settings(self, redactor: DiagnosticRedactor) -> DiagnosticObject:
+        return redactor.snapshot(self.settings())
 
     def checkpoint(self) -> object:
         """Snapshot completed exchanges in this conversation as an opaque token.

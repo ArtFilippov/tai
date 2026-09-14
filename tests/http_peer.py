@@ -21,6 +21,7 @@ class Reply:
     partial_bytes: int = 5
     disconnect: bool = False
     truncated: bool = False
+    echo_authorization: bool = False
     entered: Event = field(default_factory=Event)
     release: Event = field(default_factory=Event)
     disconnected: Event = field(default_factory=Event)
@@ -54,12 +55,11 @@ def endpoint():
                 return
             payload = reply.payload
             if payload is None:
+                text = reply.text
+                if reply.echo_authorization:
+                    text += self.headers["Authorization"]
                 payload = json.dumps(
-                    {
-                        "choices": [
-                            {"message": {"role": "assistant", "content": reply.text}}
-                        ]
-                    }
+                    {"choices": [{"message": {"role": "assistant", "content": text}}]}
                 ).encode()
 
             def headers():

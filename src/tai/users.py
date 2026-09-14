@@ -3,8 +3,8 @@
 import json
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any
 
+from tai._diagnostics import DiagnosticObject, DiagnosticRedactor
 from tai.messages import Message
 
 
@@ -47,21 +47,27 @@ class RunEvent:
     kind: str
     timestamp: str
     _data_json: str = field(repr=False)
+    _redactor: DiagnosticRedactor = field(
+        default_factory=DiagnosticRedactor, repr=False, compare=False
+    )
 
     @property
-    def data(self) -> dict[str, Any]:
-        """Return a detached value so consumers cannot mutate recorded events."""
+    def data(self) -> DiagnosticObject:
+        """Detached diagnostics; colliding object keys are retained as pairs."""
         return json.loads(self._data_json)
 
     def dump(self) -> str:
+        """Serialize a diagnostic copy, including redaction of envelope fields."""
         return json.dumps(
-            {
-                "run_id": self.run_id,
-                "sequence": self.sequence,
-                "kind": self.kind,
-                "timestamp": self.timestamp,
-                "data": self.data,
-            },
+            self._redactor.snapshot(
+                {
+                    "run_id": self.run_id,
+                    "sequence": self.sequence,
+                    "kind": self.kind,
+                    "timestamp": self.timestamp,
+                    "data": self.data,
+                }
+            ),
             ensure_ascii=False,
         )
 

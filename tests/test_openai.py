@@ -683,6 +683,97 @@ def test_settings_redact_credentials_even_when_repeated_in_generation_metadata(
     assert endpoint.requests[0][2]["metadata"]["label"] == "synthetic-secret"
 
 
+def test_settings_redact_credentials_in_dictionary_keys():
+    secret = "synthetic-review-key"
+    chat = OpenAIChat(
+        base_url="http://127.0.0.1/v1",
+        model="puzzle",
+        api_key=secret,
+        generation={"metadata": {"label": secret, secret: "run-label"}},
+    )
+    settings = chat.settings()
+    assert settings["generation"]["metadata"]["label"] == "[REDACTED]"
+    assert secret not in json.dumps(settings)
+    assert settings["generation"]["metadata"]["[REDACTED]"] == "run-label"
+
+
+@pytest.mark.parametrize("secret", ["[REDACTED]", "REDACTED", "D]["])
+def test_settings_never_reintroduce_a_credential_through_redaction_markers(secret):
+    chat = OpenAIChat(
+        base_url="http://127.0.0.1/v1",
+        model="puzzle",
+        api_key=secret,
+        generation={
+            "metadata": {
+                "repeat": secret + secret,
+                "token": "other synthetic value",
+                "keep": "unrelated data",
+            }
+        },
+    )
+    settings = chat.settings()
+    assert secret not in json.dumps(settings)
+    assert settings["generation"]["metadata"]["repeat"] == ""
+    assert settings["generation"]["metadata"]["keep"] == "unrelated data"
+    assert chat.settings() == settings
+
+
+@pytest.mark.parametrize("mode", ["api_key", "authorization"])
+def test_settings_preserve_colliding_entries_and_original_http_exchange(endpoint, mode):
+    secret = "synthetic-review-key"
+    credential = secret if mode == "api_key" else f"Custom {secret}"
+    header = f"Bearer {secret}" if mode == "api_key" else credential
+    metadata = {
+        "[REDACTED]": "literal marker",
+        secret: "credential key",
+        f"prefix {secret}": {"nested": [f"value {credential}", {secret: "leaf"}]},
+        "prefix [REDACTED]": "literal prefix",
+        "keep": {"label": "unrelated data", "api_key": "other synthetic value"},
+    }
+    endpoint.scripts["/v1/chat/completions"] = deque(
+        [Reply("CONTROL ", echo_authorization=True), Reply("Next answer")]
+    )
+    chat = OpenAIChat(
+        base_url=endpoint.url,
+        model=f"puzzle {secret}",
+        system=f"Instructions {credential}",
+        generation={"metadata": metadata},
+        **{mode: credential},
+    )
+    settings = chat.settings()
+    assert settings["generation"]["metadata"] == [
+        ["[REDACTED]", "literal marker"],
+        ["[REDACTED]", "credential key"],
+        ["prefix [REDACTED]", {"nested": ["value [REDACTED]", {"[REDACTED]": "leaf"}]}],
+        ["prefix [REDACTED]", "literal prefix"],
+        ["keep", {"label": "unrelated data", "api_key": "[REDACTED]"}],
+    ]
+    assert secret not in json.dumps(settings)
+    assert chat.settings() == settings
+    base = Message(f"Draft {credential}")
+    prepared = base.transform(str.replace, "Draft", "Prepared")
+    question = prepared.spawn(f"Question {secret}").transform(str.upper)
+    before = question.dump()
+    answer = chat.send(question)
+    assert answer.to_string() == f"CONTROL {header}"
+    assert chat.history()[-1].message is answer
+    assert json.loads(answer.dump())["origin"] == json.loads(before)
+    assert question.revert(1).base() == f"Question {secret}"
+    assert prepared.revert(1) is base
+    history = chat.history()
+    answer_dump = answer.dump()
+    assert secret not in json.dumps(chat.settings())
+    chat.send(Message("Next clue"))
+    assert question.dump() == before and answer.dump() == answer_dump
+    assert chat.history()[:-2] == history
+    for _, headers, body in endpoint.requests:
+        assert headers["Authorization"] == header
+        assert body["model"] == f"puzzle {secret}"
+        assert body["metadata"] == metadata
+        assert body["messages"][0]["content"] == f"Instructions {credential}"
+    assert endpoint.requests[-1][2]["messages"][-2]["content"] == f"CONTROL {header}"
+
+
 def test_external_providers_are_rejected_by_the_offline_guard_in_http_workers():
     chat = OpenAIChat(base_url="http://provider.invalid/v1", model="puzzle", timeout=2)
     with pytest.raises(tai.OpenAITransportError):

@@ -10,6 +10,7 @@ from threading import Event, Lock, Thread
 from typing import Any, TextIO
 from uuid import uuid4
 
+from tai._diagnostics import DiagnosticRedactor
 from tai._profile import FITD_PROFILE
 from tai.chats import ChatCancelled, LLMChat, ModelRole, _acquire_chats, _release_chats
 from tai.evaluators import Evaluator
@@ -89,10 +90,6 @@ class FITDUser(User):
             execution = self._execution
         return execution.wait(timeout)
 
-    @staticmethod
-    def _chat_settings(chat: LLMChat) -> dict[str, Any]:
-        return chat.settings()
-
 
 class _Execution:
     """One generation's state, callbacks, signals, and artifacts.
@@ -116,6 +113,9 @@ class _Execution:
             "Attacker": (attacker, "attacker_calls"),
         }
         self._chats = (target, attacker)
+        self._redactor = DiagnosticRedactor.combine(
+            *(chat._redactor for chat in self._chats)
+        )
         self._base = base
         self._evaluator = evaluator
         self._artifacts_dir = Path(artifacts_dir)
@@ -212,7 +212,8 @@ class _Execution:
             len(self._events) + 1,
             kind,
             datetime.now(UTC).isoformat(),
-            json.dumps(data, ensure_ascii=False),
+            json.dumps(self._redactor.snapshot(data), ensure_ascii=False),
+            self._redactor,
         )
         self._events.append(event)
 
@@ -349,7 +350,7 @@ class _Execution:
                         "evaluator": self._evaluator.settings(),
                         "base": json.loads(self._base.dump()),
                         **{
-                            role: FITDUser._chat_settings(chat)
+                            role: chat._diagnostic_settings(self._redactor)
                             for role, (chat, _) in self._participants.items()
                         },
                     }
@@ -414,7 +415,10 @@ class _Execution:
                     "settings": settings,
                 }
                 (run_dir / "metadata.json").write_text(
-                    json.dumps(metadata, ensure_ascii=False, indent=2) + "\n",
+                    json.dumps(
+                        self._redactor.snapshot(metadata), ensure_ascii=False, indent=2
+                    )
+                    + "\n",
                     encoding="utf-8",
                 )
             self._journal = None
