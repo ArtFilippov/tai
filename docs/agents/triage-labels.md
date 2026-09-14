@@ -1,6 +1,6 @@
 # Triage Labels
 
-This table maps canonical triage roles to `Status:` values in local implementation issues.
+This table maps canonical triage roles to GitHub issue labels.
 
 | Role | Label in our tracker | Meaning |
 | --- | --- | --- |
