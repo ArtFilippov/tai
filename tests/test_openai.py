@@ -6,6 +6,7 @@ import signal
 import subprocess
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
+from importlib.metadata import version
 from threading import Event, current_thread
 
 import pytest
@@ -34,6 +35,7 @@ def test_chat_posts_configuration_and_its_complete_immutable_dialogue(endpoint):
     path, headers, body = endpoint.requests[1]
     assert path == "/v1/chat/completions"
     assert headers["Authorization"] == "Bearer synthetic-test-key"
+    assert headers["User-Agent"] == f"tai/{version('tai')}"
     assert body == {
         "model": "fictional-puzzle",
         "messages": [

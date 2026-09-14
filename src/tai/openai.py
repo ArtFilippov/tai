@@ -5,6 +5,7 @@ import math
 import subprocess
 import sys
 from collections.abc import Mapping
+from importlib.metadata import version
 from pathlib import Path
 from threading import Event, Thread
 from time import monotonic
@@ -190,7 +191,11 @@ class OpenAIChat(LLMChat):
     def _generate(self, turns: tuple[ChatTurn, ...], cancellation: Event) -> str:
         if cancellation.is_set():
             raise ChatCancelled()
-        headers = {"Content-Type": "application/json", "Accept": "application/json"}
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": f"tai/{version('tai')}",
+        }
         if self._authorization is not None:
             headers["Authorization"] = self._authorization
         request = json.dumps(
