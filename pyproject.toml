@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tai"
+version = "0.1.0"
+description = "Textual LLM robustness experiments"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = ["garak"]
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.11", "mypy>=1.15"]
+
+[tool.uv.sources]
+garak = { git = "https://github.com/NVIDIA/garak.git", rev = "3f50ea5ff9cd7050099940647c15c39b07a93392" }
+
+# Runtime closure of the pinned FITD / Attempt / Prefixes text-only path.
+# garak's distribution makes every provider and GPU backend mandatory; this
+# application only supports its private text-only integration (see README).
+[[tool.uv.dependency-metadata]]
+name = "garak"
+version = "0.17.1.pre1"
+requires-python = ">=3.11"
+requires-dist = ["colorama>=0.4.3", "tqdm>=4.67.1", "PyYAML>=6", "xdg-base-dirs>=6.0.1"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src/tai"]
+check_untyped_defs = true
+ignore_missing_imports = true
