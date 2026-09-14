@@ -1,5 +1,7 @@
 """A background User running the pinned FITD strategy."""
 
+from __future__ import annotations
+
 import json
 from dataclasses import asdict, replace
 from datetime import UTC, datetime
@@ -9,17 +11,18 @@ from typing import Any, TextIO
 from uuid import uuid4
 
 from tai._profile import FITD_PROFILE
-from tai.chats import ChatCancelled, LLMChat, ModelRole
+from tai.chats import ChatCancelled, LLMChat, ModelRole, _acquire_chats, _release_chats
 from tai.evaluators import Evaluator
 from tai.messages import Message
 from tai.users import Evaluation, Progress, RunEvent, User, UserState, UserStatus
 
 
 class FITDUser(User):
-    """One FITD experiment with one task and at most ten library rounds.
+    """Independent FITD experiments with at most ten library rounds each.
 
-    The presented text is the most recent Target response in the retained
-    conversation. This is FITDUser's composition policy, not a User constraint.
+    The presented text is the most recent Target response accepted for ladder
+    progression in the retained conversation. Context kept for realignment is
+    diagnostic until accepted. This composition policy is specific to FITDUser.
     """
 
     def __init__(
@@ -35,10 +38,78 @@ class FITDUser(User):
             raise ValueError(
                 "Target and Attacker must be independent LLMChat instances"
             )
+        self._target = target
+        self._attacker = attacker
+        self._base = base
+        self._evaluator = evaluator
+        self._artifacts_dir = Path(artifacts_dir)
+        self._lock = Lock()
+        self._execution = self._new_execution()
+
+    def _new_execution(self) -> _Execution:
+        return _Execution(
+            self._target,
+            self._attacker,
+            self._base,
+            self._evaluator,
+            artifacts_dir=self._artifacts_dir,
+        )
+
+    def start(self) -> None:
+        with self._lock:
+            if self._execution.is_active():
+                raise RuntimeError("User already has an active run")
+            execution = self._new_execution()
+            execution.start()
+            self._execution = execution
+
+    def stop(self) -> None:
+        with self._lock:
+            self._execution.stop()
+
+    def status(self) -> UserStatus:
+        with self._lock:
+            return self._execution.status()
+
+    def result(self) -> Message | None:
+        with self._lock:
+            return self._execution.result()
+
+    def events(self, after: int = 0) -> tuple[RunEvent, ...]:
+        with self._lock:
+            return self._execution.events(after)
+
+    def wait(self, timeout: float | None = None) -> bool:
+        with self._lock:
+            execution = self._execution
+        return execution.wait(timeout)
+
+    @staticmethod
+    def _chat_settings(chat: LLMChat) -> dict[str, Any]:
+        return chat.settings()
+
+
+class _Execution:
+    """One generation's state, callbacks, signals, and artifacts.
+
+    Callbacks retain this execution, never the User's current execution. Even a
+    retained callback cannot address a subsequent run's result or event journal.
+    """
+
+    def __init__(
+        self,
+        target: LLMChat,
+        attacker: LLMChat,
+        base: Message,
+        evaluator: Evaluator,
+        *,
+        artifacts_dir: Path,
+    ) -> None:
         self._participants: dict[ModelRole, tuple[LLMChat, str]] = {
             "Target": (target, "target_calls"),
             "Attacker": (attacker, "attacker_calls"),
         }
+        self._chats = (target, attacker)
         self._base = base
         self._evaluator = evaluator
         self._artifacts_dir = Path(artifacts_dir)
@@ -49,21 +120,33 @@ class FITDUser(User):
         self._result: Message | None = None
         self._events: list[RunEvent] = []
         self._flushed_events = 0
-        self._done = Event()
+        self._worker: Thread | None = None
         self._stop_requested = Event()
         self._stop_revision = 0
         self._journal: TextIO | None = None
         self._run_dir: Path | None = None
+        self._closed = False
 
     def start(self) -> None:
         with self._lock:
-            if self._status.state is not UserState.IDLE:
-                raise RuntimeError("User has already started")
-            self._status = replace(
-                self._status, state=UserState.RUNNING, run_id=str(uuid4())
+            _acquire_chats(self._chats, self)
+            try:
+                self._status = replace(
+                    self._status, state=UserState.RUNNING, run_id=str(uuid4())
+                )
+                self._worker = Thread(
+                    target=self._run, name=f"fitd-{self._status.run_id}"
+                )
+                self._worker.start()
+            except Exception:
+                _release_chats(self._chats, self)
+                raise
+
+    def is_active(self) -> bool:
+        with self._lock:
+            return self._status.state in (UserState.RUNNING, UserState.STOPPING) or (
+                self._worker is not None and self._worker.is_alive()
             )
-            worker = Thread(target=self._run, name=f"fitd-{self._status.run_id}")
-            worker.start()
 
     def stop(self) -> None:
         with self._lock:
@@ -89,10 +172,17 @@ class FITDUser(User):
             return tuple(self._events[after:])
 
     def wait(self, timeout: float | None = None) -> bool:
-        return self._done.wait(timeout)
+        with self._lock:
+            worker = self._worker
+        if worker is None:
+            return False
+        worker.join(timeout)
+        return not worker.is_alive()
 
     def _emit(self, kind: str, **data: Any) -> None:
         with self._lock:
+            if self._closed:
+                return
             self._record_event(kind, **data)
         self._flush_events()
 
@@ -143,14 +233,19 @@ class FITDUser(User):
                 response=json.loads(exc.response.dump())
                 if exc.response is not None
                 else None,
+                **(
+                    {"diagnostic": exc.diagnostic} if exc.diagnostic is not None else {}
+                ),
             )
             raise
         except Exception as exc:
+            diagnostic = getattr(exc, "diagnostic", None)
             self._emit(
                 "call_failed",
                 role=role,
                 call_id=call_id,
                 error=f"{type(exc).__name__}: {exc}",
+                **({"diagnostic": diagnostic} if diagnostic is not None else {}),
             )
             raise
         # Persist each completed exchange before FITD does any further work.
@@ -168,18 +263,38 @@ class FITDUser(User):
             )
         return response
 
-    def _publish(self, result: Message) -> None:
+    def _checkpoint(self, role: ModelRole) -> object:
+        self._check_running()
+        return self._participants[role][0].checkpoint()
+
+    def _restore(self, role: ModelRole, checkpoint: object) -> None:
+        self._check_running()
+        self._participants[role][0].restore(checkpoint)
+
+    def _reset(self, role: ModelRole) -> None:
+        self._check_running()
+        self._participants[role][0].reset()
+
+    def _publish(self, result: Message | None) -> None:
         with self._lock:
-            if self._result is result:
+            if self._closed or self._result is result:
                 return
             self._result = result
-            self._status = replace(self._status, result_id=result.id, evaluation=None)
-        self._emit("result_published", result=json.loads(result.dump()))
+            self._status = replace(
+                self._status,
+                result_id=result.id if result is not None else None,
+                evaluation=None,
+            )
         assert self._run_dir is not None
+        if result is None:
+            self._emit("result_withdrawn")
+            (self._run_dir / "result.txt").unlink(missing_ok=True)
+            return
+        self._emit("result_published", result=json.loads(result.dump()))
         (self._run_dir / "result.txt").write_text(result.to_string(), encoding="utf-8")
 
     def _check_running(self) -> None:
-        if self._stop_requested.is_set():
+        if self._closed or self._stop_requested.is_set():
             raise ChatCancelled()
 
     def _evaluate(self) -> bool:
@@ -217,6 +332,8 @@ class FITDUser(User):
             with (run_dir / "events.jsonl").open("w", encoding="utf-8") as journal:
                 self._journal = journal
                 try:
+                    for chat, _ in self._participants.values():
+                        chat.reset()
                     from tai._fitd import GARAK_REVISION, run_fitd
 
                     settings = {
@@ -224,7 +341,7 @@ class FITDUser(User):
                         **asdict(FITD_PROFILE),
                         "base": json.loads(self._base.dump()),
                         **{
-                            role: self._chat_settings(chat)
+                            role: FITDUser._chat_settings(chat)
                             for role, (chat, _) in self._participants.items()
                         },
                     }
@@ -236,6 +353,10 @@ class FITDUser(User):
                         self._publish,
                         self._evaluate,
                         self._check_running,
+                        checkpoint=self._checkpoint,
+                        restore=self._restore,
+                        reset=self._reset,
+                        emit=self._emit,
                     )
                 except Exception as exc:
                     if isinstance(exc, ChatCancelled) and self._stop_requested.is_set():
@@ -254,7 +375,9 @@ class FITDUser(User):
                 )
         finally:
             self._journal = None
-            self._done.set()
+            with self._lock:
+                self._closed = True
+            _release_chats(self._chats, self)
 
     def _finalize(
         self,
@@ -293,13 +416,3 @@ class FITDUser(User):
                 if revision == self._stop_revision:
                     self._status = final_status
                     return
-
-    @staticmethod
-    def _chat_settings(chat: LLMChat) -> dict[str, Any]:
-        return {
-            "model": chat.model,
-            "initial_history": [
-                {"role": turn.role, "message": json.loads(turn.message.dump())}
-                for turn in chat.history()
-            ],
-        }

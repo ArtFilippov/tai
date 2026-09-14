@@ -82,3 +82,113 @@ def test_cancelled_owner_prevents_admission_to_a_new_exchange():
     assert chat.history() == ()
     # The cancelled owner's signal does not poison independent exchanges.
     assert chat.send(Message("Independent")).to_string() == "Response"
+
+
+def test_checkpoints_restore_immutable_branches_and_reset_preserves_system():
+    requests = []
+    chat = LLMChat(
+        lambda turns: requests.append(turns) or "Puzzle answer", system="Puzzle rules"
+    )
+    initial = chat.checkpoint()
+    chat.send(Message("First clue"))
+    first_history = chat.history()
+    first = chat.checkpoint()
+    chat.send(Message("Discarded clue"))
+    discarded_history = chat.history()
+    discarded = chat.checkpoint()
+
+    assert chat.restore(first) is None
+    chat.send(Message("Alternative clue"))
+    assert requests[-1][:-1] == first_history
+    assert chat.restore(discarded) is None
+    assert chat.history() == discarded_history
+    assert chat.restore(initial) is None
+    assert chat.history() == first_history[:1]
+    # Branching and reading do not mutate snapshots or execute the model again.
+    assert len(requests) == 3
+    assert chat.restore(first) is None
+    assert chat.history() == first_history
+
+    assert chat.reset() is None
+    assert chat.history() == first_history[:1]
+    for invalid in (initial, first, discarded, object(), [], None):
+        with pytest.raises(ValueError, match="checkpoint"):
+            chat.restore(invalid)
+    foreign = LLMChat(lambda turns: "other").checkpoint()
+    with pytest.raises(ValueError, match="checkpoint"):
+        chat.restore(foreign)
+    current = chat.checkpoint()
+    chat.send(Message("New puzzle"))
+    assert [(t.role, t.message.to_string()) for t in requests[-1]] == [
+        ("system", "Puzzle rules"),
+        ("user", "New puzzle"),
+    ]
+    assert chat.restore(current) is None
+    assert chat.history() == first_history[:1]
+
+
+@pytest.mark.parametrize("finish", ["complete", "cancel", "fail"])
+def test_history_controls_cannot_overwrite_a_send_or_its_cancellation_cleanup(finish):
+    entered, release = Event(), Event()
+    requests = []
+
+    def generate(turns, cancellation):
+        requests.append(turns)
+        if len(requests) == 1:
+            return "First answer"
+        entered.set()
+        assert release.wait(5), "test did not release generation"
+        if finish == "fail":
+            raise ValueError("model failed")
+        return "Second answer"
+
+    chat = LLMChat.cancellable(generate, system="Stable instructions")
+    initial = chat.checkpoint()
+    chat.send(Message("First clue"))
+    history = chat.history()
+    with ThreadPoolExecutor() as worker:
+        sending = worker.submit(chat.send, Message("Held clue"))
+        try:
+            assert entered.wait(5)
+            completed = chat.checkpoint()
+            if finish == "cancel":
+                chat.cancel()
+            for mutate in (chat.reset, lambda: chat.restore(initial)):
+                with pytest.raises(RuntimeError, match="active exchange"):
+                    mutate()
+                assert chat.history() == history
+        finally:
+            release.set()
+        if finish == "complete":
+            assert sending.result(timeout=1).to_string() == "Second answer"
+            assert len(chat.history()) == len(history) + 2
+        else:
+            expected = ChatCancelled if finish == "cancel" else ValueError
+            with pytest.raises(expected):
+                sending.result(timeout=1)
+            assert chat.history() == history
+    # A checkpoint taken during send contains only completed exchanges. It and
+    # the initial snapshot survive rejected attempts at reset and restore.
+    chat.restore(completed)
+    assert chat.history() == history
+    chat.restore(initial)
+    assert chat.history() == history[:1]
+    chat.reset()
+    with pytest.raises(ValueError, match="checkpoint"):
+        chat.restore(completed)
+
+
+def test_empty_system_and_foreign_identical_history_do_not_share_checkpoints():
+    first = LLMChat(lambda turns: "answer")
+    other = LLMChat(lambda turns: "answer")
+    first.send(Message("same"))
+    other.send(Message("same"))
+    point = first.checkpoint()
+    with pytest.raises((AttributeError, TypeError)):
+        point.turns = ()
+    before = other.history()
+    with pytest.raises(ValueError, match="checkpoint"):
+        other.restore(point)
+    assert other.history() == before
+    first.reset()
+    assert first.history() == ()

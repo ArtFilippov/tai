@@ -1,6 +1,7 @@
 """Synchronous model exchanges with history owned by each LLMChat."""
 
 from collections.abc import Callable
+from contextlib import ExitStack
 from dataclasses import dataclass
 from threading import Event, Lock
 from typing import Literal, Self
@@ -19,9 +20,16 @@ class ChatTurn:
 class ChatCancelled(RuntimeError):
     """An exchange was cancelled; an observed response is diagnostic only."""
 
-    def __init__(self, response: Message | None = None) -> None:
+    def __init__(
+        self,
+        response: Message | None = None,
+        *,
+        diagnostic: dict[str, object] | None = None,
+    ) -> None:
         super().__init__("LLMChat exchange cancelled")
         self.response = response
+        # Incomplete transport data is separate from an observed full Message.
+        self.diagnostic = diagnostic.copy() if diagnostic is not None else None
 
 
 class LLMChat:
@@ -45,9 +53,12 @@ class LLMChat:
         self._turns: tuple[ChatTurn, ...] = (
             (ChatTurn("system", Message(system)),) if system else ()
         )
+        self._system_turns = self._turns
+        self._checkpoints: dict[object, tuple[ChatTurn, ...]] = {}
         self._lock = Lock()
         self._sending = Lock()
         self._active: Event | None = None
+        self._owner: object | None = None
 
     @classmethod
     def cancellable(
@@ -83,6 +94,68 @@ class LLMChat:
         with self._lock:
             return self._turns
 
+    def settings(self) -> dict[str, object]:
+        """Return a detached, JSON-serializable snapshot for run reproducibility.
+
+        Transport subclasses include their configuration without credential
+        values. The run records this snapshot before its first exchange.
+        """
+        import json
+
+        return {
+            "model": self.model,
+            "initial_history": [
+                {"role": turn.role, "message": json.loads(turn.message.dump())}
+                for turn in self.history()
+            ],
+        }
+
+    def checkpoint(self) -> object:
+        """Snapshot completed exchanges in this conversation as an opaque token.
+
+        During send, the snapshot contains only the previously completed history.
+        Restoring another branch does not invalidate this snapshot; reset does.
+        """
+        with self._lock:
+            token = object()
+            self._checkpoints[token] = self._turns
+            return token
+
+    def restore(self, checkpoint: object) -> None:
+        """Restore a snapshot from this chat's current conversation.
+
+        Raises ValueError for foreign/stale tokens and RuntimeError while send is
+        still active, including cancellation cleanup. Finish or cancel and await
+        that send before retrying; no conversation mutation occurs on failure.
+        """
+        if not self._sending.acquire(blocking=False):
+            raise RuntimeError("LLMChat already has an active exchange")
+        try:
+            with self._lock:
+                if (
+                    type(checkpoint) is not object
+                    or checkpoint not in self._checkpoints
+                ):
+                    raise ValueError("Foreign or stale LLMChat checkpoint")
+                self._turns = self._checkpoints[checkpoint]
+        finally:
+            self._sending.release()
+
+    def reset(self) -> None:
+        """Start a clean conversation, preserving system instructions.
+
+        All earlier checkpoints become stale. An active send must finish (or be
+        cancelled and awaited) first; reset never clears an active stop signal.
+        """
+        if not self._sending.acquire(blocking=False):
+            raise RuntimeError("LLMChat already has an active exchange")
+        try:
+            with self._lock:
+                self._turns = self._system_turns
+                self._checkpoints.clear()
+        finally:
+            self._sending.release()
+
     def send(self, message: Message, *, cancellation: Event | None = None) -> Message:
         """Complete one exchange, optionally governed by an owner's stop signal."""
         if not self._sending.acquire(blocking=False):
@@ -94,7 +167,7 @@ class LLMChat:
                     raise ChatCancelled()
                 self._active = cancellation
                 request = self._turns + (ChatTurn("user", message),)
-            response = Message(self._generate(request, cancellation))
+            response = message.spawn(self._generate(request, cancellation))
             with self._lock:
                 if cancellation.is_set():
                     raise ChatCancelled(response)
@@ -105,3 +178,24 @@ class LLMChat:
             with self._lock:
                 self._active = None
             self._sending.release()
+
+
+def _acquire_chats(chats: tuple[LLMChat, ...], owner: object) -> None:
+    """Reserve a whole participant set before changing either conversation."""
+    with ExitStack() as locks:
+        for chat in sorted(chats, key=id):
+            locks.enter_context(chat._lock)
+        if any(chat._owner is not None or chat._sending.locked() for chat in chats):
+            raise RuntimeError("LLMChat already belongs to an active execution")
+        for chat in chats:
+            chat._owner = owner
+
+
+def _release_chats(chats: tuple[LLMChat, ...], owner: object) -> None:
+    """Release only this generation's reservations, together and after cleanup."""
+    with ExitStack() as locks:
+        for chat in sorted(chats, key=id):
+            locks.enter_context(chat._lock)
+        for chat in chats:
+            if chat._owner is owner:
+                chat._owner = None

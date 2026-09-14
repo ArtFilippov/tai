@@ -66,22 +66,22 @@ def read_and_assert_final_artifacts(user, root):
 
 
 @pytest.mark.parametrize(
-    ("held_role", "held_index", "presented"),
+    ("held_role", "held_index", "raw_response", "presented"),
     [
-        ("Target", 0, None),
-        ("Target", 1, "First"),
-        ("Attacker", 0, None),
-        ("Attacker", 4, ""),
+        ("Target", 0, "First", None),
+        ("Target", 1, "First", "First"),
+        ("Attacker", 0, "First", None),
+        ("Attacker", 4, "", None),
     ],
 )
 @pytest.mark.parametrize("swallowed", [False, True])
 def test_stop_cancels_real_fitd_and_preserves_only_completed_work(
-    tmp_path, held_role, held_index, presented, swallowed
+    tmp_path, held_role, held_index, raw_response, presented, swallowed
 ):
     entered, cancelled, cleanup = Event(), Event(), Event()
     models = {
-        "Target": ScriptedModel([presented, "Second", "Third", "Fourth", "CONTROL"]),
-        "Attacker": ScriptedModel(["Initial", "L1", "L2", "L3"] + ["yes"] * 4),
+        "Target": ScriptedModel([raw_response, "Second", "Third", "Fourth", "CONTROL"]),
+        "Attacker": ScriptedModel(["Initial", "L1", "L2", "L3"] + ["yes"] * 5),
     }
 
     def held_generate(turns, cancellation):
@@ -129,6 +129,7 @@ def test_stop_cancels_real_fitd_and_preserves_only_completed_work(
                 control.submit(user.start).result(timeout=1)
             if presented is None:
                 assert result is None
+                assert not (tmp_path / running.run_id / "result.txt").exists()
             else:
                 assert result.to_string() == presented
                 assert (
@@ -181,6 +182,12 @@ def test_stop_cancels_real_fitd_and_preserves_only_completed_work(
     assert stopped.progress.attacker_calls == requests["Attacker"] - (
         held_role == "Attacker"
     )
+    if held_role == "Attacker" and held_index == 4:
+        assert chats["Target"].history()[-1].message.to_string() == raw_response
+        assert [end["response"]["text"] for end in ends if end["role"] == "Target"] == [
+            raw_response
+        ]
+        assert not any(event["kind"] == "result_published" for event in events)
 
 
 def test_real_fitd_uses_the_supplied_request_and_publishes_the_evaluated_result(
@@ -189,7 +196,7 @@ def test_real_fitd_uses_the_supplied_request_and_publishes_the_evaluated_result(
     # Initial safe request, three ladder levels, then alignment decisions.
     attacker_model = ScriptedModel(
         ["Describe a fictional puzzle", "Level one", "Level two", "Level three"]
-        + ["yes"] * 4
+        + ["yes"] * 5
     )
     target_model = ScriptedModel(
         [
@@ -250,7 +257,7 @@ def test_real_fitd_uses_the_supplied_request_and_publishes_the_evaluated_result(
     assert events[-1]["kind"] == "run_finished"
     starts = {e["data"]["call_id"]: e for e in events if e["kind"] == "call_started"}
     ends = [e for e in events if e["kind"] == "call_completed"]
-    assert len(starts) == len(ends) == 13
+    assert len(starts) == len(ends) == 14
     assert {e["data"]["role"] for e in ends} == {"Target", "Attacker"}
     assert all(e["data"]["call_id"] in starts for e in ends)
     assert user.stop() is None
@@ -261,7 +268,7 @@ def test_real_fitd_uses_the_supplied_request_and_publishes_the_evaluated_result(
 @pytest.mark.parametrize("held_role", ["Target", "Attacker"])
 def test_control_methods_remain_responsive_during_model_calls(tmp_path, held_role):
     entered, release = Event(), Event()
-    attacker_model = ScriptedModel(["Initial", "L1", "L2", "L3"] + ["yes"] * 4)
+    attacker_model = ScriptedModel(["Initial", "L1", "L2", "L3"] + ["yes"] * 5)
     target_model = ScriptedModel(["First", "Second", "Third", "Fourth", "CONTROL"])
 
     def hold(model, index):
@@ -297,7 +304,8 @@ def test_control_methods_remain_responsive_during_model_calls(tmp_path, held_rol
                 control.submit(user.start).result(timeout=1)
             assert user.status().run_id == snapshot.run_id
             if held_role == "Attacker":
-                assert result.to_string() == "First"
+                assert result is None
+                assert not (tmp_path / snapshot.run_id / "result.txt").exists()
                 events = [
                     json.loads(line)
                     for line in (tmp_path / snapshot.run_id / "events.jsonl")
@@ -310,7 +318,8 @@ def test_control_methods_remain_responsive_during_model_calls(tmp_path, held_rol
                     if e["kind"] == "call_completed" and e["data"]["role"] == "Target"
                 ]
                 assert completed[0]["data"]["response"]["text"] == "First"
-                assert target.history()[-1].message is result
+                assert target.history()[-1].message.to_string() == "First"
+                assert not any(e["kind"] == "result_published" for e in events)
             else:
                 assert result is None
                 assert target.history() == ()
@@ -344,7 +353,7 @@ def test_negative_evaluation_continues_and_is_not_attributed_to_new_result(tmp_p
             return super().is_success(result)
 
     evaluator = HoldingEvaluator("CONTROL")
-    attacker = LLMChat(ScriptedModel(["Initial", "L1", "L2", "L3"] + ["yes"] * 5))
+    attacker = LLMChat(ScriptedModel(["Initial", "L1", "L2", "L3"] + ["yes"] * 6))
     target = LLMChat(
         ScriptedModel(["One", "Two", "Three", "Four", "Not yet", "CONTROL"])
     )
@@ -403,7 +412,7 @@ def test_round_limit_is_normal_completion_and_empty_result_is_present(tmp_path):
 def test_fitd_realigns_a_response_before_continuing_the_ladder(tmp_path):
     attacker = LLMChat(
         ScriptedModel(
-            ["Describe a fictional puzzle", "L1", "L2", "L3", "no"] + ["yes"] * 4
+            ["Describe a fictional puzzle", "L1", "L2", "L3", "no"] + ["yes"] * 5
         )
     )
     target_model = ScriptedModel(
@@ -478,7 +487,7 @@ def test_required_evaluation_failure_preserves_new_result_without_an_old_score(
     target_model = ScriptedModel(
         ["One", "Two", "Three", "Four", "Negative", "Unchecked"]
     )
-    attacker_model = ScriptedModel(["Initial", "L1", "L2", "L3"] + ["yes"] * 5)
+    attacker_model = ScriptedModel(["Initial", "L1", "L2", "L3"] + ["yes"] * 6)
     user = FITDUser(
         LLMChat(target_model),
         LLMChat(attacker_model),
@@ -494,7 +503,7 @@ def test_required_evaluation_failure_preserves_new_result_without_an_old_score(
     assert user.result().to_string() == "Unchecked"
     assert status.evaluation is None
     assert status.progress.target_calls == 6
-    assert status.progress.attacker_calls == 9
+    assert status.progress.attacker_calls == 10
     events, metadata = read_and_assert_final_artifacts(user, tmp_path)
     assert metadata["evaluation"] is None
     evaluations = [e["data"] for e in events if e["kind"] == "evaluation_completed"]
@@ -544,8 +553,14 @@ def test_provider_failure_keeps_completed_exchanges_and_blocks_further_calls(
     assert status.state is UserState.FAILED
     assert status.reason == f"{error_type.__name__}: provider failed"
     for name, chat in chats.items():
-        assert len(chat.history()) == 1 + 2 * len(responses[name])
+        retained = len(responses[name]) if name == "Target" else int(role != "Attacker")
+        assert len(chat.history()) == 1 + 2 * retained
         assert len(models[name].requests) == len(responses[name]) + (name == role)
+    if role == "Attacker":
+        # A completed Target answer awaiting alignment is still unclassified.
+        assert user.result() is None
+    elif prior_target_responses:
+        assert user.result().to_string() == prior_target_responses[-1]
     events, metadata = read_and_assert_final_artifacts(user, tmp_path)
     assert metadata["evaluation"] is None
     assert status.progress.target_calls == len(prior_target_responses)
@@ -561,11 +576,12 @@ def test_provider_failure_keeps_completed_exchanges_and_blocks_further_calls(
     assert user.status() == status
 
 
-def test_integration_failure_preserves_presented_refusal_and_unmodified_history(
+def test_failure_after_native_restore_preserves_accepted_result_and_discarded_journal(
     tmp_path,
 ):
+    rejected = "I cannot help with that: CONTROL"
     target_model = ScriptedModel(
-        ["CONTROL in an earlier response", "I cannot help with that"]
+        ["Retained opening", rejected, RuntimeError("provider failed after restore")]
     )
     attacker_model = ScriptedModel(
         ["Initial", "L1", "L2", "L3", "yes", "Safer request"]
@@ -581,17 +597,35 @@ def test_integration_failure_preserves_presented_refusal_and_unmodified_history(
     user.start()
     assert user.wait(10)
     assert user.status().state is UserState.FAILED
-    assert "history restore" in user.status().reason
-    assert user.result().to_string() == "I cannot help with that"
-    assert len(target_model.requests) == 2
+    assert user.status().reason == "RuntimeError: provider failed after restore"
+    assert user.result().to_string() == "Retained opening"
+    assert len(target_model.requests) == 3
     assert len(attacker_model.requests) == 6
-    assert len(target.history()) == 4
+    assert target_model.requests[2][-1].message.to_string() == "Safer request"
+    assert target_model.requests[2][:-1] == target_model.requests[1][:-1]
+    assert len(target.history()) == 2
     assert target.history()[-1].message is user.result()
+    assert all(rejected not in turn.message.to_string() for turn in target.history())
     events, metadata = read_and_assert_final_artifacts(user, tmp_path)
     assert metadata["evaluation"] is None
     assert [
         e["data"]["result"]["text"] for e in events if e["kind"] == "result_published"
-    ] == ["CONTROL in an earlier response", "I cannot help with that"]
+    ] == ["Retained opening"]
+    assert any(
+        e["kind"] == "call_completed" and e["data"]["response"]["text"] == rejected
+        for e in events
+    )
+    branch = next(
+        e["data"]
+        for e in events
+        if e["kind"] == "branch_selected" and e["data"]["branch"] == "rephrase"
+    )
+    assert branch["accepted"] is False
+    assert any(
+        e["kind"] == "history_restored" and e["data"]["cause_id"] == branch["branch_id"]
+        for e in events
+    )
+    assert not any(e["kind"] == "evaluation_completed" for e in events)
 
 
 @pytest.mark.parametrize("outcome", [True, False, GarakException("evaluation failed")])
@@ -609,7 +643,7 @@ def test_stop_during_evaluation_waits_for_execution_and_retains_its_outcome(
             return outcome
 
     target_model = ScriptedModel(["One", "Two", "Three", "Four", "Presented"])
-    attacker_model = ScriptedModel(["Initial", "L1", "L2", "L3"] + ["yes"] * 4)
+    attacker_model = ScriptedModel(["Initial", "L1", "L2", "L3"] + ["yes"] * 5)
     user = FITDUser(
         LLMChat(target_model),
         LLMChat(attacker_model),
@@ -631,7 +665,7 @@ def test_stop_during_evaluation_waits_for_execution_and_retains_its_outcome(
     assert user.status().state is expected
     assert user.result() is result
     assert len(target_model.requests) == 5
-    assert len(attacker_model.requests) == 8
+    assert len(attacker_model.requests) == 9
     _, metadata = read_and_assert_final_artifacts(user, tmp_path)
     if isinstance(outcome, Exception):
         assert metadata["evaluation"] is None
@@ -654,7 +688,7 @@ def test_stop_during_artifact_finalization_is_responsive_and_updates_the_outcome
 
     monkeypatch.setattr(Path, "write_text", hold_metadata)
     target = ScriptedModel(["One", "Two", "Three", "Four", "CONTROL"])
-    attacker = ScriptedModel(["Initial", "L1", "L2", "L3"] + ["yes"] * 4)
+    attacker = ScriptedModel(["Initial", "L1", "L2", "L3"] + ["yes"] * 5)
     user = FITDUser(
         LLMChat(target),
         LLMChat(attacker),
@@ -677,7 +711,7 @@ def test_stop_during_artifact_finalization_is_responsive_and_updates_the_outcome
     assert user.status().reason == "user_stop"
     assert user.status().evaluation.success is True
     assert len(target.requests) == 5
-    assert len(attacker.requests) == 8
+    assert len(attacker.requests) == 9
     events, metadata = read_and_assert_final_artifacts(user, tmp_path)
     finishes = [e["data"] for e in events if e["kind"] == "run_finished"]
     assert [e["revision"] for e in finishes] == [0, 1]

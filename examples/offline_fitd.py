@@ -6,7 +6,7 @@ from tai import ContainsTextEvaluator, FITDUser, LLMChat, Message, UserState
 def main() -> None:
     attacker_replies = iter(
         ["Describe a fictional puzzle", "Level one", "Level two", "Level three"]
-        + ["yes"] * 4
+        + ["yes"] * 5
     )
     target_replies = iter(
         ["Puzzle introduction", "More detail", "Further detail", "Almost", "CONTROL"]
