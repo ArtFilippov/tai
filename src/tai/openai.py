@@ -182,6 +182,7 @@ class OpenAIChat(LLMChat):
         # overlapping credentials and resulting key collisions share one policy.
         settings = {
             **super()._settings(),
+            "backend": "openai",
             "transport": "openai_chat_completions",
             "base_url": self._base_url,
             "authorization": self._authorization_mode,

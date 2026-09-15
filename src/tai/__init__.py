@@ -16,6 +16,7 @@ from tai.openai import (
     OpenAITimeoutError,
     OpenAITransportError,
 )
+from tai.qwen import QwenChat, QwenContextError, QwenError
 from tai.users import Evaluation, Progress, RunEvent, User, UserState, UserStatus
 
 __all__ = [
@@ -39,6 +40,9 @@ __all__ = [
     "OpenAITimeoutError",
     "OpenAITransportError",
     "Progress",
+    "QwenChat",
+    "QwenContextError",
+    "QwenError",
     "RunEvent",
     "User",
     "UserState",

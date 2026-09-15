@@ -418,6 +418,10 @@ class _Execution:
                     "finalization_revision": revision,
                     "result": json.loads(result.dump()) if result is not None else None,
                     "settings": settings,
+                    "final_settings": {
+                        role: chat._diagnostic_settings(self._redactor)
+                        for role, (chat, _) in self._participants.items()
+                    },
                 }
                 (run_dir / "metadata.json").write_text(
                     json.dumps(

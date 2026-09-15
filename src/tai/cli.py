@@ -15,7 +15,7 @@ def main(argv: list[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     fitd = commands.add_parser(
         "fitd",
-        help="Запустить FITD через прямой OpenAI-совместимый API",
+        help="Запустить FITD через локальный Qwen или OpenAI-совместимый API",
         description=(
             "Один базовый запрос, generations=1. max_calls_per_conv (по умолчанию 10) "
             "— библиотечный лимит раундов FITD, а не общий бюджет обращений. "

@@ -10,6 +10,13 @@ readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = ["garak"]
 
+[project.optional-dependencies]
+qwen = [
+    "transformers==4.51.3",
+    "torch==2.5.1+cu121; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "huggingface-hub[cli]==0.34.4",
+]
+
 [project.scripts]
 tai = "tai.cli:main"
 
@@ -18,6 +25,12 @@ dev = ["pytest>=8", "ruff>=0.11", "mypy>=1.15"]
 
 [tool.uv.sources]
 garak = { git = "https://github.com/NVIDIA/garak.git", rev = "3f50ea5ff9cd7050099940647c15c39b07a93392" }
+torch = { index = "pytorch-cu121", extra = "qwen" }
+
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
 
 # Runtime closure of the pinned FITD / Attempt / Prefixes text-only path.
 # garak's distribution makes every provider and GPU backend mandatory; this

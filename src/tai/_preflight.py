@@ -38,6 +38,7 @@ def run_preflight(profile: RoleProfile, report: Path | None = None) -> int:
                 diagnostic=getattr(exc, "diagnostic", None),
             )
         result["elapsed_seconds"] = round(monotonic() - start, 3)
+        result["final_settings"] = chat._diagnostic_settings(redactor)
         ready = ready and ok
         results.append(result)
     data = redactor.snapshot(

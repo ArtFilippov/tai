@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from tai import ContainsTextEvaluator, FITDUser, Message, OpenAIChat
+from tai import ContainsTextEvaluator, FITDUser, LLMChat, Message, OpenAIChat, QwenChat
 from tai._diagnostics import DiagnosticRedactor
 
 
@@ -24,11 +24,51 @@ def _string(value: Any, name: str) -> str:
     return value
 
 
-def _chat(value: Any, role: str) -> OpenAIChat:
+def _chat(value: Any, role: str) -> LLMChat:
+    if not isinstance(value, dict):
+        raise ValueError(f"{role}: требуется TOML-таблица")
+    backend = value.get("backend", "openai")
+    if backend == "qwen":
+        data = _table(
+            value,
+            role,
+            {
+                "backend",
+                "model",
+                "revision",
+                "cache_dir",
+                "device",
+                "dtype",
+                "system",
+                "generation",
+            },
+        )
+        kwargs = {
+            key: _string(data.get(key, ""), f"{role}.{key}")
+            for key in ("model", "revision", "cache_dir", "device", "system")
+        }
+        generation = data.get("generation", {})
+        if not isinstance(generation, dict):
+            raise ValueError(f"{role}.generation: требуется TOML-таблица")
+        try:
+            return QwenChat(
+                **kwargs,
+                dtype=data.get("dtype", "float16"),
+                generation=generation,
+            )
+        except ValueError as exc:
+            raise ValueError(f"{role}: {exc}") from None
+    if backend != "openai":
+        raise ValueError(f"{role}.backend: поддерживается openai или qwen")
+    return _openai_chat(value, role)
+
+
+def _openai_chat(value: Any, role: str) -> OpenAIChat:
     data = _table(
         value,
         role,
         {
+            "backend",
             "base_url",
             "model",
             "system",
@@ -78,8 +118,8 @@ def _chat(value: Any, role: str) -> OpenAIChat:
 
 @dataclass(frozen=True)
 class RoleProfile:
-    target: OpenAIChat
-    attacker: OpenAIChat
+    target: LLMChat
+    attacker: LLMChat
     evaluator: ContainsTextEvaluator
     max_calls_per_conv: int
 
