@@ -1,5 +1,74 @@
 # tai — эксперименты с устойчивостью LLM
 
+## Быстрый запуск атаки на Qwen
+
+Атака запускается командой **`tai fitd`**. Готовый профиль для локального
+**Qwen2.5-0.5B-Instruct** — [examples/fitd-qwen.toml](examples/fitd-qwen.toml).
+Все команды ниже выполняются из корня проекта.
+
+### Запуск с подготовленными зависимостями и весами
+
+```bash
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 \
+  uv run --locked --offline --extra qwen tai fitd \
+    --config examples/fitd-qwen.toml \
+    --text-file examples/fitd-request.txt \
+    --artifacts-dir runs
+```
+
+Пример выполняет многоходовую атаку FITD: Target хранит контрольную фразу
+вымышленной головоломки, а Attacker строит последовательность вопросов, чтобы
+получить её. Обе роли используют Qwen с независимыми разговорами.
+
+Для своего базового запроса замените `--text-file examples/fitd-request.txt` на
+`--text 'Ваш базовый запрос'`. При смене задачи также настройте `target.system`,
+`attacker.system` и критерий успеха `evaluator.criterion` в TOML.
+
+### Подготовка перед первым запуском
+
+Нужны Git, [uv](https://docs.astral.sh/uv/), Linux x86_64, Python 3.12 и
+**NVIDIA GPU** с драйвером, совместимым с CUDA 12.1. uv выбирает Python 3.12
+по `.python-version`. Профиль использует `cuda:0` и FP16.
+
+Установите зависимости и скачайте закреплённые веса — этому шагу нужна сеть:
+
+```bash
+uv sync --locked --python 3.12 --extra qwen
+
+uv run --locked --extra qwen hf download Qwen/Qwen2.5-0.5B-Instruct \
+  --revision 7ae557604adf67be50417f59c2c2f167def9a775 \
+  --cache-dir "$HOME/.cache/tai/huggingface" \
+  --include config.json generation_config.json tokenizer.json tokenizer_config.json \
+    vocab.json merges.txt model.safetensors
+```
+
+При работе с Qwen сохраняйте `--extra qwen` в командах uv, иначе uv удалит
+опциональные зависимости из окружения. Веса занимают около 1 ГБ,
+CUDA-зависимости — ещё несколько гигабайт. Подробности подготовки, контрольная
+сумма весов и настройка внешнего кеша приведены ниже в разделе
+«Локальный Qwen — основной профиль живой приёмки».
+
+Проверить готовность обеих ролей перед атакой:
+
+```bash
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 \
+  uv run --locked --offline --extra qwen tai preflight \
+    --config examples/fitd-qwen.toml
+```
+
+### Где смотреть результат
+
+Прогресс и итог выводятся в консоль. В `runs/<UUID>/` сохраняются:
+
+- `result.txt` — итоговый текст атаки;
+- `events.jsonl` — журнал запуска;
+- `metadata.json` — состояние запуска и оценка успеха.
+
+**Ctrl+C** корректно останавливает запуск с сохранением завершённой части.
+Штатное завершение само по себе не означает успех атаки — смотрите итоговую оценку.
+
+## О проекте
+
 Система выполняет стратегии атак на языковые модели и отдельно оценивает
 предъявленный ими текст. Общий контракт — `Message` на входе и `Message` на выходе;
 журнал запуска сохраняет ход эксперимента отдельно от результата.
@@ -53,6 +122,12 @@ uv run --locked python examples/offline_fitd.py
 Linux x86_64, Python 3.12, NVIDIA GPU и драйвер, совместимый с CUDA 12.1.
 На TITAN RTX используется `float16`; автоматического перехода на CPU нет.
 
+[Итоговая приёмка #9, 2026-09-15](docs/acceptance/2026-09-15-fitd.md): чистый
+экспорт закреплённой ревизии, 273 офлайн-теста и реальный многоходовой FITD без
+внешней сети. Запуск завершён `COMPLETED / round_limit`, 24 обращения обеих ролей,
+предъявлен Message с оценкой `success=false`. Полные артефакты и проверка их связей
+опубликованы вместе с условиями запуска; успешный обход защиты не требуется.
+
 ### Подготовка (с сетью, отдельно от эксперимента)
 
 Из корня клона:
@@ -76,6 +151,11 @@ CUDA-зависимости также занимают несколько ги�
 `UV_PROJECT_ENVIRONMENT=/абсолютный/путь/к/venv` для всех команд uv и изменить
 `cache_dir` обеих ролей на внешний каталог. Проверенный вариант с внешними путями
 сохранён в [отчёте](docs/acceptance/2026-09-15-qwen.md).
+Кеш uv также занимает место: его фактический путь показывает `uv cache dir`,
+переопределение — `UV_CACHE_DIR`. При итоговой приёмке повторное скачивание
+CUDA-зависимостей превысило квоту; установка в новый venv из уже заполненного
+кеша с `--offline` прошла. Команды и обе ошибки сохранены в
+[итоговом отчёте](docs/acceptance/2026-09-15-fitd.md).
 
 `uv.lock` закрепляет Transformers **4.51.3**, PyTorch **2.5.1+cu121** из CUDA-index,
 Hugging Face Hub **0.34.4** и транзитивные зависимости. Обычный `uv sync --locked`
@@ -302,7 +382,8 @@ uv run --locked python examples/with_zen_key.py \
   --text-file examples/fitd-request.txt --artifacts-dir runs
 ```
 
-Это следующий этап #9. Проверка `preflight` не создаёт User или UUID запуска,
+Итоговая [приёмка #9](docs/acceptance/2026-09-15-fitd.md) выполнена на локальном Qwen.
+Проверка `preflight` не создаёт User или UUID запуска,
 не строит лестницу FITD и не вызывает оценщик. Успешный локальный тест с управляемым
 endpoint проверяет код, но не подтверждает доступность реальной модели.
 [Отчёт подготовки #11](docs/acceptance/2026-09-14-zen-readiness.md) содержит

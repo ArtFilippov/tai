@@ -1,0 +1,21 @@
+{
+  "command": [
+    "/usr/local/bin/uv",
+    "run",
+    "--locked",
+    "--offline",
+    "python",
+    "examples/offline_fitd.py"
+  ],
+  "cwd": "/29a_fil/.opencode/tmp/interactive/opencode/tai-issue-9-source",
+  "environment": {
+    "HOME": "/root",
+    "PATH": "/usr/local/bin:/usr/bin:/bin",
+    "UV_CACHE_DIR": "/29a_fil/.opencode/tmp/interactive/opencode/tai-issue-9-uv-cache"
+  },
+  "started_at": "2026-09-15T09:23:36.163392+00:00",
+  "elapsed_seconds": 0.283,
+  "returncode": 0,
+  "stdout": "Run: de26293c-0f50-43f3-94a3-cdd969cc0747\nState: COMPLETED\nReason: evaluator_success\nResult: CONTROL\nEvaluation: Evaluation(result_id='8867dd90-c0f5-4fb9-be27-c7aaa69242cf', success=True)\nArtifacts: runs/de26293c-0f50-43f3-94a3-cdd969cc0747/\n",
+  "stderr": ""
+}

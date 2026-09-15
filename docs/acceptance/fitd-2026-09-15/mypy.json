@@ -1,0 +1,20 @@
+{
+  "command": [
+    "/usr/local/bin/uv",
+    "run",
+    "--locked",
+    "--offline",
+    "mypy"
+  ],
+  "cwd": "/29a_fil/.opencode/tmp/interactive/opencode/tai-issue-9-source",
+  "environment": {
+    "HOME": "/root",
+    "PATH": "/usr/local/bin:/usr/bin:/bin",
+    "UV_CACHE_DIR": "/29a_fil/.opencode/tmp/interactive/opencode/tai-issue-9-uv-cache"
+  },
+  "started_at": "2026-09-15T09:23:34.244011+00:00",
+  "elapsed_seconds": 1.919,
+  "returncode": 0,
+  "stdout": "Success: no issues found in 16 source files\n",
+  "stderr": ""
+}

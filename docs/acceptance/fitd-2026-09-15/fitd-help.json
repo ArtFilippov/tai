@@ -1,0 +1,22 @@
+{
+  "command": [
+    "/usr/local/bin/uv",
+    "run",
+    "--locked",
+    "--offline",
+    "tai",
+    "fitd",
+    "--help"
+  ],
+  "cwd": "/29a_fil/.opencode/tmp/interactive/opencode/tai-issue-9-source",
+  "environment": {
+    "HOME": "/root",
+    "PATH": "/usr/local/bin:/usr/bin:/bin",
+    "UV_CACHE_DIR": "/29a_fil/.opencode/tmp/interactive/opencode/tai-issue-9-uv-cache"
+  },
+  "started_at": "2026-09-15T09:23:36.447230+00:00",
+  "elapsed_seconds": 0.185,
+  "returncode": 0,
+  "stdout": "usage: tai fitd [-h] --config CONFIG --artifacts-dir ARTIFACTS_DIR\n                (--text TEXT | --text-file TEXT_FILE)\n\nОдин базовый запрос, generations=1. max_calls_per_conv (по умолчанию 10) —\nбиблиотечный лимит раундов FITD, а не общий бюджет обращений. HTTP-таймаут\nкаждой роли по умолчанию 120 секунд.\n\noptions:\n  -h, --help            show this help message and exit\n  --config CONFIG       TOML-конфигурация\n  --artifacts-dir ARTIFACTS_DIR\n                        Каталог артефактов запусков\n  --text TEXT           Базовый текст непосредственно\n  --text-file TEXT_FILE\n                        Файл базового текста в UTF-8\n",
+  "stderr": ""
+}

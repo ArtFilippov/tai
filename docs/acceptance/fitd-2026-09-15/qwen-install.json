@@ -1,0 +1,23 @@
+{
+  "command": [
+    "/usr/local/bin/uv",
+    "sync",
+    "--locked",
+    "--python",
+    "3.12",
+    "--extra",
+    "qwen"
+  ],
+  "cwd": "/29a_fil/.opencode/tmp/interactive/opencode/tai-issue-9-source",
+  "environment": {
+    "HOME": "/root",
+    "PATH": "/usr/local/bin:/usr/bin:/bin",
+    "UV_CACHE_DIR": "/root/.cache/uv",
+    "UV_PROJECT_ENVIRONMENT": "/29a_fil/.opencode/tmp/interactive/opencode/tai-issue-9-qwen-venv"
+  },
+  "started_at": "2026-09-15T09:21:29.119879+00:00",
+  "elapsed_seconds": 43.092,
+  "returncode": 1,
+  "stdout": "",
+  "stderr": "Using CPython 3.12.13\nCreating virtual environment at: /29a_fil/.opencode/tmp/interactive/opencode/tai-issue-9-qwen-venv\nResolved 56 packages in 2ms\n   Building tai @ file:///29a_fil/.opencode/tmp/interactive/opencode/tai-issue-9-source\n   Updating https://github.com/NVIDIA/garak.git (3f50ea5ff9cd7050099940647c15c39b07a93392)\nDownloading ast-serialize (1.3MiB)\nDownloading nvidia-cusolver-cu12 (118.4MiB)\nDownloading nvidia-curand-cu12 (53.9MiB)\nDownloading nvidia-cublas-cu12 (391.6MiB)\nDownloading nvidia-cufft-cu12 (116.0MiB)\nDownloading triton (199.8MiB)\nDownloading nvidia-cudnn-cu12 (634.0MiB)\nDownloading sympy (5.9MiB)\nDownloading nvidia-nccl-cu12 (179.9MiB)\nDownloading hf-xet (4.3MiB)\nDownloading networkx (2.0MiB)\nDownloading numpy (15.9MiB)\nDownloading pygments (1.2MiB)\nDownloading mypy (14.6MiB)\nDownloading ruff (9.9MiB)\nDownloading nvidia-cuda-cupti-cu12 (13.5MiB)\nDownloading nvidia-nvjitlink-cu12 (37.9MiB)\nDownloading nvidia-cusparse-cu12 (186.9MiB)\nDownloading transformers (9.9MiB)\nDownloading tokenizers (3.0MiB)\nDownloading nvidia-cuda-nvrtc-cu12 (22.6MiB)\n Downloaded ast-serialize\n Downloaded pygments\n      Built tai @ file:///29a_fil/.opencode/tmp/interactive/opencode/tai-issue-9-source\n Downloaded tokenizers\n Downloaded networkx\nDownloading torch (744.2MiB)\n Downloaded hf-xet\n Downloaded sympy\n Downloaded transformers\n Downloaded ruff\n Downloaded nvidia-cuda-cupti-cu12\n    Updated https://github.com/NVIDIA/garak.git (3f50ea5ff9cd7050099940647c15c39b07a93392)\n   Building garak @ git+https://github.com/NVIDIA/garak.git@3f50ea5ff9cd7050099940647c15c39b07a93392\n Downloaded mypy\n Downloaded numpy\n      Built garak @ git+https://github.com/NVIDIA/garak.git@3f50ea5ff9cd7050099940647c15c39b07a93392\n Downloaded nvidia-cuda-nvrtc-cu12\n Downloaded torch\n Downloaded nvidia-nvjitlink-cu12\n  × Failed to download `nvidia-nccl-cu12==2.21.5`\n  ├─▶ Failed to extract archive:\n  │   nvidia_nccl_cu12-2.21.5-py3-none-manylinux2014_x86_64.whl\n  ├─▶ I/O operation failed during extraction\n  ╰─▶ failed to flush file\n      `/root/.cache/uv/.tmpKkCZ3s/nvidia/nccl/lib/libnccl.so.2`: Disk quota\n      exceeded (os error 122)\n\nhint: `nvidia-nccl-cu12` (v2.21.5) was included because `tai[qwen]` (v0.1.0) depends on `torch` (v2.5.1+cu121) which depends on `nvidia-nccl-cu12`"
+}

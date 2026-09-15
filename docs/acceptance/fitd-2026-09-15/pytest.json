@@ -1,0 +1,20 @@
+{
+  "command": [
+    "/usr/local/bin/uv",
+    "run",
+    "--locked",
+    "--offline",
+    "pytest"
+  ],
+  "cwd": "/29a_fil/.opencode/tmp/interactive/opencode/tai-issue-9-source",
+  "environment": {
+    "HOME": "/root",
+    "PATH": "/usr/local/bin:/usr/bin:/bin",
+    "UV_CACHE_DIR": "/29a_fil/.opencode/tmp/interactive/opencode/tai-issue-9-uv-cache"
+  },
+  "started_at": "2026-09-15T09:21:29.001210+00:00",
+  "elapsed_seconds": 125.08,
+  "returncode": 0,
+  "stdout": "============================= test session starts ==============================\nplatform linux -- Python 3.12.13, pytest-9.1.1, pluggy-1.6.0\nrootdir: /29a_fil/.opencode/tmp/interactive/opencode/tai-issue-9-source\nconfigfile: pyproject.toml\ntestpaths: tests\ncollected 273 items\n\ntests/test_authorization_diagnostics.py ...........                      [  4%]\ntests/test_chats.py ........                                             [  6%]\ntests/test_cli.py .........................................              [ 21%]\ntests/test_evaluators.py .............                                   [ 26%]\ntests/test_fitd.py .................................                     [ 38%]\ntests/test_fitd_adaptation.py ......                                     [ 41%]\ntests/test_fitd_restart.py ............                                  [ 45%]\ntests/test_messages.py ..........                                        [ 49%]\ntests/test_openai.py ................................................... [ 67%]\n..............                                                           [ 72%]\ntests/test_preflight.py ......................                           [ 80%]\ntests/test_provenance.py ...                                             [ 82%]\ntests/test_qwen.py ............................................          [ 98%]\ntests/test_terminal.py .                                                 [ 98%]\ntests/test_zen_sessions.py ....                                          [100%]\n\n======================= 273 passed in 124.19s (0:02:04) ========================\n",
+  "stderr": ""
+}

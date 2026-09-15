@@ -1,0 +1,20 @@
+{
+  "command": [
+    "/usr/local/bin/uv",
+    "sync",
+    "--locked",
+    "--python",
+    "3.12"
+  ],
+  "cwd": "/29a_fil/.opencode/tmp/interactive/opencode/tai-issue-9-source",
+  "environment": {
+    "HOME": "/root",
+    "PATH": "/usr/local/bin:/usr/bin:/bin",
+    "UV_CACHE_DIR": "/29a_fil/.opencode/tmp/interactive/opencode/tai-issue-9-uv-cache"
+  },
+  "started_at": "2026-09-15T09:21:11.917659+00:00",
+  "elapsed_seconds": 5.519,
+  "returncode": 0,
+  "stdout": "",
+  "stderr": "Downloading cpython-3.12.13-linux-x86_64-gnu (download) (32.6MiB)\n Downloaded cpython-3.12.13-linux-x86_64-gnu (download)\nUsing CPython 3.12.13\nCreating virtual environment at: .venv\nResolved 56 packages in 2ms\n   Building tai @ file:///29a_fil/.opencode/tmp/interactive/opencode/tai-issue-9-source\n   Updating https://github.com/NVIDIA/garak.git (3f50ea5ff9cd7050099940647c15c39b07a93392)\nDownloading pygments (1.2MiB)\nDownloading ast-serialize (1.3MiB)\nDownloading mypy (14.6MiB)\nDownloading ruff (9.9MiB)\n Downloaded ast-serialize\n Downloaded ruff\n Downloaded pygments\n Downloaded mypy\n      Built tai @ file:///29a_fil/.opencode/tmp/interactive/opencode/tai-issue-9-source\n    Updated https://github.com/NVIDIA/garak.git (3f50ea5ff9cd7050099940647c15c39b07a93392)\n   Building garak @ git+https://github.com/NVIDIA/garak.git@3f50ea5ff9cd7050099940647c15c39b07a93392\n      Built garak @ git+https://github.com/NVIDIA/garak.git@3f50ea5ff9cd7050099940647c15c39b07a93392\nPrepared 18 packages in 3.48s\nInstalled 18 packages in 28ms\n + ast-serialize==0.11.2\n + colorama==0.4.6\n + garak==0.17.1rc1 (from git+https://github.com/NVIDIA/garak.git@3f50ea5ff9cd7050099940647c15c39b07a93392)\n + iniconfig==2.3.0\n + librt==0.15.0\n + mypy==2.3.1\n + mypy-extensions==1.1.0\n + packaging==26.3\n + pathspec==1.1.1\n + pluggy==1.6.0\n + pygments==2.21.0\n + pytest==9.1.1\n + pyyaml==6.0.3\n + ruff==0.16.7\n + tai==0.1.0 (from file:///29a_fil/.opencode/tmp/interactive/opencode/tai-issue-9-source)\n + tqdm==4.70.1\n + typing-extensions==4.16.0\n + xdg-base-dirs==6.0.2\n"
+}
