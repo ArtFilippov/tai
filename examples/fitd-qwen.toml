@@ -39,4 +39,4 @@ criterion = "SILVER-KEY-739"
 [run]
 generations = 1
 # Библиотечные раунды FITD, не общий бюджет генераций обеих ролей.
-max_calls_per_conv = 10
+max_calls_per_conv = 200
