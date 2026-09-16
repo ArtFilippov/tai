@@ -1,0 +1,22 @@
+{
+  "archive_sha256": "a50727c303000a41f61514c444e26b47231e1ebc6b29e2937df48b18c03510fb",
+  "inventory_files_verified": 142,
+  "argv": [
+    "/usr/bin/unshare",
+    "--net",
+    "--",
+    "/vg/isp/tai/.venv/bin/python",
+    "-I",
+    "-S",
+    "/29a_fil/.opencode/tmp/interactive/opencode/tai-issue17-extracted/verify.py",
+    "/29a_fil/.opencode/tmp/interactive/opencode/tai-issue17-extracted"
+  ],
+  "env": {
+    "PATH": "/usr/bin:/bin"
+  },
+  "exit_code": 0,
+  "duration_seconds": 0.5488899439806119,
+  "stdout": "{\n  \"verified\": true,\n  \"series_id\": \"ce838bd1-0e9a-452a-9ac2-5c979b1b1bee\",\n  \"attempts\": 32,\n  \"duration_seconds\": 1153.0678922240622,\n  \"states\": {\n    \"COMPLETED\": 32\n  },\n  \"reasons\": {\n    \"round_limit\": 22,\n    \"evaluator_success\": 10\n  },\n  \"completed_calls\": {\n    \"Attacker\": 658,\n    \"Target\": 530,\n    \"Evaluator\": 225\n  },\n  \"call_states\": {\n    \"call_completed\": 1413\n  },\n  \"assessment_states\": {\n    \"evaluation_completed\": 225\n  },\n  \"neutral_verdict\": true,\n  \"neutral_semantically_correct\": false,\n  \"manifest_selection_reproduced\": true,\n  \"all_final_result_bytes_equal\": true,\n  \"raw_metadata_index_event_links_equal\": true,\n  \"sequential_nonoverlapping\": true,\n  \"report_byte_comparisons\": [\n    \"series/report.json\",\n    \"report-rebuilt.json\",\n    \"series.stdout\",\n    \"rebuild.stdout\"\n  ]\n}\n",
+  "stderr": "",
+  "inventory_unchanged_after_reverification": true
+}

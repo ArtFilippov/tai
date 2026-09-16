@@ -22,6 +22,7 @@ class Progress:
     target_calls: int = 0
     attacker_calls: int = 0
     max_calls_per_conv: int | None = None
+    evaluator_calls: int = 0
 
 
 @dataclass(frozen=True, slots=True)

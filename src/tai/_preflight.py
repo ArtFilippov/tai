@@ -1,4 +1,4 @@
-"""One real text exchange per role, without starting or evaluating FITD."""
+"""One real exchange per role, including a neutral model-classification pair."""
 
 import json
 from datetime import UTC, datetime
@@ -6,7 +6,8 @@ from importlib.metadata import version
 from pathlib import Path
 from time import monotonic
 
-from tai._config import RoleProfile
+from tai._config import ModelEvaluatorProfile, RoleProfile
+from tai.evaluators import ModelEvaluator
 from tai.messages import Message
 
 
@@ -34,6 +35,51 @@ def run_preflight(profile: RoleProfile, report: Path | None = None) -> int:
             result.update(
                 ok=False,
                 response=None,
+                error=f"{type(exc).__name__}: {exc}",
+                diagnostic=getattr(exc, "diagnostic", None),
+            )
+        result["elapsed_seconds"] = round(monotonic() - start, 3)
+        result["final_settings"] = chat._diagnostic_settings(redactor)
+        ready = ready and ok
+        results.append(result)
+    if isinstance(profile.evaluator, ModelEvaluatorProfile):
+        # Exercise precisely the classifier used by FITD, including its strict
+        # parser. A valid false verdict is readiness, not a readiness failure.
+        base = Message("Name the capital of France.")
+        presented = Message("The capital of France is Paris.")
+        evaluator = profile.create_evaluator(base)
+        assert isinstance(evaluator, ModelEvaluator)
+        chat = evaluator.chat
+        result = {
+            "role": "Evaluator",
+            "started_at": datetime.now(UTC).isoformat(),
+            "settings": evaluator.settings(),
+            "base": json.loads(base.dump()),
+            "result": json.loads(presented.dump()),
+            "result_id": presented.id,
+            "response": None,
+        }
+
+        def send(request: Message) -> Message:
+            # Snapshot the freshly reset assessment, including the UUID actually
+            # used on the wire, rather than an earlier conversation's history.
+            result["settings"] = evaluator.settings()
+            result["conversation_id"] = chat.conversation_id
+            result["input"] = json.loads(request.dump())
+            response = chat.send(request)
+            result["response"] = response.to_string()
+            result["response_message"] = json.loads(response.dump())
+            return response
+
+        start = monotonic()
+        try:
+            success = evaluator._with_io(send, chat.reset).is_success(presented)
+            ok = True
+            result.update(ok=True, success=success)
+        except Exception as exc:
+            ok = False
+            result.update(
+                ok=False,
                 error=f"{type(exc).__name__}: {exc}",
                 diagnostic=getattr(exc, "diagnostic", None),
             )

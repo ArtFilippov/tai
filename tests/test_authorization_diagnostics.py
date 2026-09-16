@@ -9,6 +9,7 @@ import pytest
 from http_peer import Reply
 
 from tai import ContainsTextEvaluator, FITDUser, Message, OpenAIChat, UserState
+from tai._diagnostics import DiagnosticRedactor
 from tai.terminal import run_foreground
 
 TARGET_SECRET = "synthetic-target-secret"
@@ -322,3 +323,43 @@ def test_real_fitd_redacts_echoes_before_writing_but_evaluates_full_message(
         target_calls[0]["messages"][-1]["content"] == f"Opening {headers['Attacker']}"
     )
     assert target_calls[1]["messages"][2]["content"] == f"Hint\n{headers['Target']}"
+
+
+def test_json_escaped_redaction_preserves_longest_match_and_colliding_keys():
+    secret = 'synthetic"\\credential'
+    encoded = json.dumps(secret, ensure_ascii=False)[1:-1]
+    redactor = DiagnosticRedactor.combine(
+        DiagnosticRedactor(['synthetic"']), DiagnosticRedactor([secret])
+    )
+    original = {
+        secret: "raw key",
+        encoded: {"nested": [secret, encoded]},
+        "[REDACTED]": "literal marker key",
+    }
+    snapshot = redactor.snapshot(original)
+    assert snapshot == [
+        ["[REDACTED]", "raw key"],
+        ["[REDACTED]", {"nested": ["[REDACTED]", "[REDACTED]"]}],
+        ["[REDACTED]", "literal marker key"],
+    ]
+    assert original[encoded]["nested"] == [secret, encoded]
+    assert redactor.snapshot(snapshot) == snapshot
+    assert redactor.snapshot({"token": "unrelated"}, mask_fields=True) == {
+        "token": "[REDACTED]"
+    }
+
+
+@pytest.mark.parametrize("marker_secret", ["[REDACTED]", "REDACTED", "D]["])
+def test_json_escaped_redaction_never_recreates_credentials_through_markers(
+    marker_secret,
+):
+    secret = 'synthetic"\\credential'
+    encoded = json.dumps(secret, ensure_ascii=False)[1:-1]
+    redactor = DiagnosticRedactor([secret, marker_secret])
+    assert redactor.text(encoded + encoded) == ""
+    assert redactor.snapshot(
+        {encoded + encoded: "first", secret + secret: "second"}
+    ) == [
+        ["", "first"],
+        ["", "second"],
+    ]

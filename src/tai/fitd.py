@@ -13,7 +13,7 @@ from uuid import uuid4
 from tai._diagnostics import DiagnosticRedactor
 from tai._profile import FITD_PROFILE
 from tai.chats import ChatCancelled, LLMChat, ModelRole, _acquire_chats, _release_chats
-from tai.evaluators import Evaluator
+from tai.evaluators import Evaluator, ModelEvaluator
 from tai.messages import Message
 from tai.users import Evaluation, Progress, RunEvent, User, UserState, UserStatus
 
@@ -40,6 +40,11 @@ class FITDUser(User):
             raise ValueError(
                 "Target and Attacker must be independent LLMChat instances"
             )
+        if isinstance(evaluator, ModelEvaluator):
+            if evaluator.chat is target or evaluator.chat is attacker:
+                raise ValueError("Evaluator must use an independent LLMChat instance")
+            if evaluator.base.id != base.id:
+                raise ValueError("Evaluator must be bound to this run's base Message")
         self._target = target
         self._attacker = attacker
         self._base = base
@@ -112,7 +117,9 @@ class _Execution:
             "Target": (target, "target_calls"),
             "Attacker": (attacker, "attacker_calls"),
         }
-        self._chats = (target, attacker)
+        if isinstance(evaluator, ModelEvaluator):
+            self._participants["Evaluator"] = (evaluator.chat, "evaluator_calls")
+        self._chats = tuple(chat for chat, _ in self._participants.values())
         self._redactor = DiagnosticRedactor.combine(
             *(chat._redactor for chat in self._chats)
         )
@@ -217,11 +224,14 @@ class _Execution:
         )
         self._events.append(event)
 
-    def _send(self, role: ModelRole, message: Message) -> Message:
+    def _send(
+        self, role: ModelRole, message: Message, *, result_id: str | None = None
+    ) -> Message:
         chat, counter = self._participants[role]
         call_id = str(uuid4())
+        link = {"result_id": result_id} if result_id is not None else {}
         with self._lock:
-            # Admission is serialized with stop for both roles. Work already
+            # Admission is serialized with stop for all roles. Work already
             # admitted shares the stop signal even before entering chat.send.
             self._check_running()
             self._record_event(
@@ -230,6 +240,7 @@ class _Execution:
                 call_id=call_id,
                 conversation_id=chat.conversation_id,
                 input=json.loads(message.dump()),
+                **link,
             )
         self._flush_events()
         try:
@@ -239,6 +250,7 @@ class _Execution:
                 "call_cancelled",
                 role=role,
                 call_id=call_id,
+                **link,
                 response=json.loads(exc.response.dump())
                 if exc.response is not None
                 else None,
@@ -254,6 +266,7 @@ class _Execution:
                 role=role,
                 call_id=call_id,
                 error=f"{type(exc).__name__}: {exc}",
+                **link,
                 **({"diagnostic": diagnostic} if diagnostic is not None else {}),
             )
             raise
@@ -263,6 +276,7 @@ class _Execution:
             role=role,
             call_id=call_id,
             response=json.loads(response.dump()),
+            **link,
         )
         with self._lock:
             progress = self._status.progress
@@ -310,15 +324,27 @@ class _Execution:
             raise ChatCancelled()
 
     def _evaluate(self) -> bool:
-        self._check_running()
-        result = self.result()
-        if result is None:
-            raise RuntimeError("FITD requested evaluation without a result")
-        self._emit("evaluation_started", result_id=result.id)
+        with self._lock:
+            self._check_running()
+            result = self._result
+            if result is None:
+                raise RuntimeError("FITD requested evaluation without a result")
+            self._status = replace(self._status, evaluation=None)
+            self._record_event("evaluation_started", result_id=result.id)
+        self._flush_events()
+        evaluator = self._evaluator
+        if isinstance(evaluator, ModelEvaluator):
+            evaluator = evaluator._with_io(
+                lambda message: self._send("Evaluator", message, result_id=result.id),
+                lambda: self._reset("Evaluator"),
+            )
         try:
-            success = self._evaluator.is_success(result)
+            success = evaluator.is_success(result)
             if not isinstance(success, bool):
                 raise TypeError("Evaluator.is_success must return bool")
+        except ChatCancelled:
+            self._emit("evaluation_cancelled", result_id=result.id)
+            raise
         except Exception as exc:
             self._emit(
                 "evaluation_failed",

@@ -1,0 +1,19 @@
+{
+  "publication_status": "Repository-ready local files; uncommitted, no remote publication",
+  "archive": {
+    "file": "evidence.tar.gz",
+    "bytes": 5262803,
+    "sha256": "a50727c303000a41f61514c444e26b47231e1ebc6b29e2937df48b18c03510fb",
+    "members": 143
+  },
+  "files": {
+    "report.json": "cda20586220a1d9099616831050dbe4b731cc4153230f40c2bf435beb9c4357e",
+    "manifest.json": "fb398308890b68f2ad1565cb46d9277189289315775a7c4bc05c3c8fb3a2b42b",
+    "profile.toml": "cbe42f877ab29a9de49d7de29b9b9d0edc3a2a5048e51f75d33cb1837256214d",
+    "verify.py": "b7bdea07cf9c8a61b850eb1ac8fe18c8a72fa8cd269996311916fd321da1551a",
+    "record.py": "a824fa1da5876356968b7b5a03702856719d955068f3b75415deff5a2e8b0cbb",
+    "package.py": "7d03d292807b4800cfad3ee7befa1b19870504b0f6b9719b43372e788ea0b5dd",
+    "extraction-check.json": "d7c38b2265b832aa46a28175d511fb8d6bb2e3464ca7d0202c2d71470e1a5612"
+  },
+  "all_archive_member_bytes_verified": true
+}

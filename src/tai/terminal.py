@@ -12,7 +12,8 @@ def _status(status: UserStatus) -> str:
     return (
         f"Состояние: {status.state}; завершённые обращения: "
         f"Target={status.progress.target_calls}, "
-        f"Attacker={status.progress.attacker_calls}"
+        f"Attacker={status.progress.attacker_calls}, "
+        f"Evaluator={status.progress.evaluator_calls}"
     )
 
 

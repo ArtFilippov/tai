@@ -1,0 +1,55 @@
+{
+  "release_url": "https://github.com/ArtFilippov/tai/releases/tag/alert-acceptance-2026-09-15",
+  "release_id": 389323710,
+  "tag": "alert-acceptance-2026-09-15",
+  "target_commitish": "b66a54baf1ca2a40d44530b225a31d65ea8979b5",
+  "publication_manifest_asset": {
+    "id": 566124386,
+    "api_url": "https://api.github.com/repos/ArtFilippov/tai/releases/assets/566124386",
+    "browser_download_url": "https://github.com/ArtFilippov/tai/releases/download/alert-acceptance-2026-09-15/publication.json",
+    "size": 10203,
+    "sha256": "f481775d7ee98e7a4501abd3182d76a551df63a36d1d652199299b9c214ce391",
+    "authenticated_download_verified": true
+  },
+  "documented_gh_release_download_verified": true,
+  "downloaded_assets": 12,
+  "downloaded_sha256": {
+    "2026-09-15-alert.md": "dc8536ae6dbaadc967255b04b0ad5a94df72d18acee7a8e2118ee4ded26312e9",
+    "checksums.json": "6a6da8010d33f24fa578a7138e9e5881ea64bb83040caca15baba5a26b08f4e6",
+    "evidence.tar.gz": "a50727c303000a41f61514c444e26b47231e1ebc6b29e2937df48b18c03510fb",
+    "evidence.tar.gz.sha256": "422e5d4e8febfe549468dea95fb6593212e5a829565d05449d523a5991879c1f",
+    "extraction-check.json": "d7c38b2265b832aa46a28175d511fb8d6bb2e3464ca7d0202c2d71470e1a5612",
+    "manifest.json": "fb398308890b68f2ad1565cb46d9277189289315775a7c4bc05c3c8fb3a2b42b",
+    "package.py": "7d03d292807b4800cfad3ee7befa1b19870504b0f6b9719b43372e788ea0b5dd",
+    "profile.toml": "cbe42f877ab29a9de49d7de29b9b9d0edc3a2a5048e51f75d33cb1837256214d",
+    "record.py": "a824fa1da5876356968b7b5a03702856719d955068f3b75415deff5a2e8b0cbb",
+    "report.json": "cda20586220a1d9099616831050dbe4b731cc4153230f40c2bf435beb9c4357e",
+    "verify.py": "b7bdea07cf9c8a61b850eb1ac8fe18c8a72fa8cd269996311916fd321da1551a",
+    "publication.json": "f481775d7ee98e7a4501abd3182d76a551df63a36d1d652199299b9c214ce391"
+  },
+  "repository_after": {
+    "isPrivate": true,
+    "nameWithOwner": "ArtFilippov/tai",
+    "url": "https://github.com/ArtFilippov/tai"
+  },
+  "comments": [
+    {
+      "issue": 17,
+      "url": "https://github.com/ArtFilippov/tai/issues/17#issuecomment-5684538282",
+      "id": 5684538282,
+      "created_at": "2026-09-15T17:03:35Z",
+      "read_back_verified": true
+    },
+    {
+      "issue": 13,
+      "url": "https://github.com/ArtFilippov/tai/issues/13#issuecomment-5684538588",
+      "id": 5684538588,
+      "created_at": "2026-09-15T17:03:37Z",
+      "read_back_verified": true
+    }
+  ],
+  "release_body_sha256": "7ed684582f8cd1f7b83689393182e62d98000ae003943b9c9b1535a34db7e1ea",
+  "release_assets_and_target_rechecked": true,
+  "original_assets_and_runtime_profiles_unchanged": true,
+  "local_acceptance_links_checked": 13
+}

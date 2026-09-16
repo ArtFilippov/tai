@@ -17,6 +17,8 @@ from tai import (
     ContainsTextEvaluator,
     FITDUser,
     Message,
+    ModelEvaluationError,
+    ModelEvaluator,
     QwenChat,
     QwenContextError,
     QwenError,
@@ -462,7 +464,9 @@ def test_import_and_observation_do_not_import_optional_libraries():
             "-c",
             "from tai._config import load_profile; "
             "from pathlib import Path; import sys; "
-            "p = load_profile(Path('examples/fitd-qwen.toml')); p.target.settings(); "
+            "p = load_profile(Path('examples/fitd-alert-qwen.toml')); "
+            "from tai import Message; p.create_evaluator(Message('base')).settings(); "
+            "p.target.settings(); "
             "assert not {'torch', 'transformers', 'huggingface_hub'} "
             "& sys.modules.keys()",
         ],
@@ -592,3 +596,56 @@ criterion="key"
 """)
         assert load_profile(config).target.settings()["backend"] == "openai"
     assert not lib.imports
+
+
+def test_three_role_preflight_and_real_fitd_reuse_one_load_across_base_requests(
+    local, tmp_path
+):
+    lib, kwargs, snapshot = local
+    text = Path("examples/fitd-alert-qwen.toml").read_text()
+    text = text.replace("Qwen/Qwen2.5-0.5B-Instruct", kwargs["model"])
+    text = text.replace("7ae557604adf67be50417f59c2c2f167def9a775", kwargs["revision"])
+    text = text.replace("~/.cache/tai/huggingface", str(kwargs["cache_dir"]))
+    config = tmp_path / "alert.toml"
+    config.write_text(text)
+    profile = load_profile(config)
+    lib.responses.extend(["READY", "READY", '{"success": false}'])
+    report = tmp_path / "preflight.json"
+    assert run_preflight(profile, report) == 0
+    data = json.loads(report.read_text())
+    assert [r["role"] for r in data["roles"]] == ["Target", "Attacker", "Evaluator"]
+    assert all(r["final_settings"]["actual_dtype"] == "float16" for r in data["roles"])
+    assert len({r["conversation_id"] for r in data["roles"]}) == 3
+    for base in (Message("First base"), Message("Second base")):
+        lib.responses.extend(["Initial", "L1", "L2", "L3"])
+        for response in ("One", "Two", "Three", "Four", "Presented"):
+            lib.responses.extend([response, "yes"])
+        lib.responses.append('{"success": true}')
+        user = profile.create_user(base, tmp_path / "runs")
+        user.start()
+        assert user.wait(10)
+        assert user.status().state is UserState.COMPLETED, user.status().reason
+        assert user.status().evaluation.success is True
+        assert user.status().progress.evaluator_calls == 1
+        assert user.status().progress.max_calls_per_conv == 20
+        assert len(lib.requests[-1]) == 2
+        sent = json.loads(lib.requests[-1][-1]["content"].split("INPUT_JSON:\n")[1])
+        assert sent == {"base_request": base.to_string(), "result": "Presented"}
+    assert lib.loads == [("tokenizer", str(snapshot)), ("model", str(snapshot))]
+    assert len(lib.generations) == 33
+    assert not lib.responses
+
+
+def test_evaluator_qwen_context_overflow_is_not_truncated_or_scored(local):
+    lib, kwargs, _ = local
+    lib.input_length = 32760
+    chat = QwenChat(**kwargs, generation={"max_new_tokens": 32})
+    evaluator = ModelEvaluator(chat, Message("Explicit base"))
+    full = "Complete result π\n" * 3000
+    with pytest.raises(
+        ModelEvaluationError, match="QwenContextError.*no messages were truncated"
+    ):
+        evaluator.is_success(Message(full))
+    assert not lib.generations and not chat.history()
+    sent = json.loads(lib.requests[-1][-1]["content"].split("INPUT_JSON:\n")[1])
+    assert sent == {"base_request": "Explicit base", "result": full}

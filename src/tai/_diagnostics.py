@@ -24,9 +24,18 @@ class DiagnosticRedactor:
         self._secrets = tuple(
             sorted(set(filter(None, secrets)), key=lambda s: (-len(s), s))
         )
+        # Model-evaluator Messages contain JSON *inside* their text. Normalizing
+        # the outer snapshot does not unescape that payload. Match the canonical
+        # JSON-string spelling as well, including in response origins/history.
+        # Keep original secrets for combine(), so composing policies never adds
+        # more encoding layers. Both spellings share the same one-pass rules.
+        encoded = {
+            json.dumps(secret, ensure_ascii=False)[1:-1] for secret in self._secrets
+        }
+        spellings = sorted(set(self._secrets) | encoded, key=lambda s: (-len(s), s))
         self._pattern = (
-            re.compile("|".join(re.escape(secret) for secret in self._secrets))
-            if self._secrets
+            re.compile("|".join(re.escape(secret) for secret in spellings))
+            if spellings
             else None
         )
 

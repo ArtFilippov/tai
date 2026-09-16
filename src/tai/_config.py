@@ -6,8 +6,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from tai import ContainsTextEvaluator, FITDUser, LLMChat, Message, OpenAIChat, QwenChat
+from tai import (
+    ContainsTextEvaluator,
+    Evaluator,
+    FITDUser,
+    LLMChat,
+    Message,
+    ModelEvaluator,
+    OpenAIChat,
+    QwenChat,
+)
 from tai._diagnostics import DiagnosticRedactor
+from tai.evaluators import MODEL_RUBRIC_VERSION
 
 
 def _table(value: Any, name: str, allowed: set[str]) -> dict[str, Any]:
@@ -117,23 +127,39 @@ def _openai_chat(value: Any, role: str) -> OpenAIChat:
 
 
 @dataclass(frozen=True)
+class ModelEvaluatorProfile:
+    """Unbound classifier configuration; each base gets its own Evaluator."""
+
+    chat: LLMChat
+    rubric_version: str
+
+
+@dataclass(frozen=True)
 class RoleProfile:
     target: LLMChat
     attacker: LLMChat
-    evaluator: ContainsTextEvaluator
+    evaluator: ContainsTextEvaluator | ModelEvaluatorProfile
     max_calls_per_conv: int
 
     def redactor(self) -> DiagnosticRedactor:
-        return DiagnosticRedactor.combine(
-            self.target._redactor, self.attacker._redactor
-        )
+        chats = [self.target, self.attacker]
+        if isinstance(self.evaluator, ModelEvaluatorProfile):
+            chats.append(self.evaluator.chat)
+        return DiagnosticRedactor.combine(*(chat._redactor for chat in chats))
+
+    def create_evaluator(self, base: Message) -> Evaluator:
+        if isinstance(self.evaluator, ModelEvaluatorProfile):
+            return ModelEvaluator(
+                self.evaluator.chat, base, self.evaluator.rubric_version
+            )
+        return self.evaluator
 
     def create_user(self, base: Message, artifacts_dir: Path) -> FITDUser:
         return FITDUser(
             self.target,
             self.attacker,
             base,
-            self.evaluator,
+            self.create_evaluator(base),
             artifacts_dir=artifacts_dir,
             max_calls_per_conv=self.max_calls_per_conv,
         )
@@ -152,12 +178,29 @@ def load_profile(config: Path) -> RoleProfile:
     data = _table(document, "config", {"target", "attacker", "evaluator", "run"})
     target = _chat(data.get("target"), "target")
     attacker = _chat(data.get("attacker"), "attacker")
-    evaluation = _table(data.get("evaluator"), "evaluator", {"type", "criterion"})
-    if evaluation.get("type") != "contains_text":
-        raise ValueError("evaluator.type: поддерживается contains_text")
-    evaluator = ContainsTextEvaluator(
-        _string(evaluation.get("criterion"), "evaluator.criterion")
-    )
+    evaluation = data.get("evaluator")
+    if not isinstance(evaluation, dict):
+        raise ValueError("evaluator: требуется TOML-таблица")
+    evaluator: ContainsTextEvaluator | ModelEvaluatorProfile
+    if evaluation.get("type") == "contains_text":
+        evaluation = _table(evaluation, "evaluator", {"type", "criterion"})
+        evaluator = ContainsTextEvaluator(
+            _string(evaluation.get("criterion"), "evaluator.criterion")
+        )
+    elif evaluation.get("type") == "model":
+        evaluation = _table(evaluation, "evaluator", {"type", "rubric_version", "chat"})
+        rubric_version = _string(
+            evaluation.get("rubric_version"), "evaluator.rubric_version"
+        )
+        if rubric_version != MODEL_RUBRIC_VERSION:
+            raise ValueError(
+                f"evaluator.rubric_version: требуется {MODEL_RUBRIC_VERSION}"
+            )
+        evaluator = ModelEvaluatorProfile(
+            _chat(evaluation.get("chat"), "evaluator.chat"), rubric_version
+        )
+    else:
+        raise ValueError("evaluator.type: поддерживается contains_text или model")
     run = _table(data.get("run", {}), "run", {"generations", "max_calls_per_conv"})
     generations = run.get("generations", 1)
     if type(generations) is not int or generations != 1:

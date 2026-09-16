@@ -1,12 +1,14 @@
 """The tai command: configuration and input errors never start an experiment."""
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
 from tai import Message
 from tai._config import load_profile
 from tai._preflight import run_preflight
+from tai.alert import DEFAULT_SEED
 from tai.terminal import run_foreground
 
 
@@ -36,8 +38,74 @@ def main(argv: list[str] | None = None) -> int:
         "--config", type=Path, required=True, help="TOML-конфигурация"
     )
     preflight.add_argument("--report", type=Path, help="Сохранить JSON-диагностику")
+    prepare = commands.add_parser(
+        "prepare-alert", help="Подготовить локальный манифест 32 запросов ALERT"
+    )
+    prepare.add_argument(
+        "--source-file", type=Path, required=True, help="Локальный alert.jsonl"
+    )
+    prepare.add_argument(
+        "--download",
+        action="store_true",
+        help="Скачать закреплённый источник в --source-file",
+    )
+    prepare.add_argument(
+        "--output", type=Path, required=True, help="Выходной JSON-манифест"
+    )
+    prepare.add_argument("--taxonomy", type=Path, default=Path("ALERT_taxonomy.md"))
+    prepare.add_argument("--seed", type=int, default=DEFAULT_SEED)
+    series = commands.add_parser(
+        "alert-series", help="Последовательно выполнить 32 запуска FITD по ALERT"
+    )
+    series.add_argument("--manifest", type=Path, required=True)
+    series.add_argument("--profile", type=Path, required=True)
+    series.add_argument("--artifacts-dir", type=Path, required=True)
+    series.add_argument("--taxonomy", type=Path, default=Path("ALERT_taxonomy.md"))
+    report = commands.add_parser(
+        "alert-report", help="Пересчитать JSON по сохранённому индексу без инференса"
+    )
+    report.add_argument("--index", type=Path, required=True)
+    report.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
     try:
+        if args.command == "alert-series":
+            from tai.series import run_alert_series
+
+            result = run_alert_series(
+                args.manifest,
+                args.profile,
+                args.artifacts_dir,
+                taxonomy_path=args.taxonomy,
+            )
+            print(f"Серия: {result.directory}", file=sys.stderr)
+            print(json.dumps(result.report, ensure_ascii=False, indent=2))
+            return result.exit_code
+        if args.command == "alert-report":
+            from tai.series_report import reconstruct_report
+
+            print(
+                json.dumps(
+                    reconstruct_report(args.index, args.output),
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+            return 0
+        if args.command == "prepare-alert":
+            from tai._alert_prepare import prepare_alert
+
+            manifest = prepare_alert(
+                args.source_file,
+                args.output,
+                taxonomy_path=args.taxonomy,
+                seed=args.seed,
+                download=args.download,
+            )
+            print(
+                f"ALERT: {len(manifest.records)} записей, seed={manifest.seed}; "
+                f"{args.output}"
+            )
+            return 0
         if args.command == "preflight":
             return run_preflight(load_profile(args.config), args.report)
         text = (

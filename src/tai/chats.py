@@ -10,7 +10,7 @@ from uuid import uuid4
 from tai._diagnostics import DiagnosticObject, DiagnosticRedactor
 from tai.messages import Message
 
-type ModelRole = Literal["Target", "Attacker"]
+type ModelRole = Literal["Target", "Attacker", "Evaluator"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,7 +37,7 @@ class ChatCancelled(RuntimeError):
 class LLMChat:
     """A text model callable receives an immutable, complete request history.
 
-    Use independent instances for Target and Attacker, even with one model.
+    Use independent instances for each role, even with one model.
     The callable performs one generation and returns its complete text.
     """
 
