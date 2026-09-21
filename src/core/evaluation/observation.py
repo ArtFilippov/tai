@@ -7,10 +7,10 @@ from dataclasses import dataclass
 from typing import override
 from uuid import uuid4
 
-from tai.core.chats import LLMChat
-from tai.core.primitives.messages import Message
-from tai.core.runs.journal import RunJournal
-from tai.core.runs.operations import Context, ConversationChange, Exchange
+from core.chats import LLMChat
+from core.primitives.messages import Message
+from core.runs.journal import RunJournal
+from core.runs.operations import Context, ConversationChange, Exchange
 
 from .evaluator import EvaluationChat
 

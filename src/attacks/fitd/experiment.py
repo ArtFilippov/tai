@@ -10,14 +10,14 @@ from dataclasses import asdict
 from functools import wraps
 from pathlib import Path
 
-from tai.core.chats import LLMChat
-from tai.core.evaluation import Evaluator
-from tai.core.evaluation.assembly import EvaluatorSetup
-from tai.core.evaluation.observation import observe_evaluation
-from tai.core.primitives.diagnostics import DiagnosticRedactor
-from tai.core.primitives.messages import Message
-from tai.core.runs.journal import RunJournal
-from tai.core.runs.operations import WorkerOutcome
+from core.chats import LLMChat
+from core.evaluation import Evaluator
+from core.evaluation.assembly import EvaluatorSetup
+from core.evaluation.observation import observe_evaluation
+from core.primitives.diagnostics import DiagnosticRedactor
+from core.primitives.messages import Message
+from core.runs.journal import RunJournal
+from core.runs.operations import WorkerOutcome
 
 from .user import FITDUser, _Execution
 

@@ -2,7 +2,7 @@
 
 from typing import Protocol
 
-from tai.core.primitives.messages import Message
+from core.primitives.messages import Message
 
 
 class Evaluator(Protocol):

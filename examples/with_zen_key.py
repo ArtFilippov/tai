@@ -6,7 +6,7 @@ import os
 import sys
 from pathlib import Path
 
-from tai.app.cli import main as tai_main
+from app.cli import main as tai_main
 
 
 def main() -> int:

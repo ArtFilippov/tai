@@ -15,9 +15,9 @@ from tai import (
     Message,
     UserState,
 )
-from tai.app.configuration import RoleProfile
-from tai.app.preflight import run_preflight
-from tai.app.series import run_alert_series
+from app.configuration import RoleProfile
+from app.preflight import run_preflight
+from app.series import run_alert_series
 
 
 def participants(repeats=1):
@@ -180,7 +180,7 @@ def test_series_uses_the_assembled_one_operation_evaluator(tmp_path, monkeypatch
             return True
 
     profile = RoleProfile(*participants(32), EvaluatorSetup(CustomEvaluator()), 20)
-    monkeypatch.setattr("tai.app.series.load_profile", lambda *args, **kwargs: profile)
+    monkeypatch.setattr("app.series.load_profile", lambda *args, **kwargs: profile)
     series = run_alert_series(
         Path("examples/alert-manifest.json"),
         Path("examples/fitd-alert-qwen.toml"),

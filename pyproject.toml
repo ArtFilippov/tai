@@ -18,7 +18,11 @@ qwen = [
 ]
 
 [project.scripts]
-tai = "tai.app.cli:main"
+tai = "app.cli:main"
+
+[tool.hatch.build.targets.wheel]
+only-include = ["src"]
+sources = ["src"]
 
 [dependency-groups]
 dev = [
@@ -179,7 +183,7 @@ auto-regenerate-baseline = false
 [tool.clean-arch]
 project_type = "generic"
 visibility_enforcement = true
-infrastructure_modules = ["tai.alert.preparation", "tai.attacks.fitd.garak_adapter", "tai.core.chats.http_worker", "tai.core.chats.openai", "tai.core.chats.qwen", "tai.core.evaluation.observation", "tai.core.runs.journal", "tai.core.runs.storage"]
+infrastructure_modules = ["alert.preparation", "attacks.fitd.garak_adapter", "core.chats.http_worker", "core.chats.openai", "core.chats.qwen", "core.evaluation.observation", "core.runs.journal", "core.runs.storage"]
 
 [tool.clean-arch.layer_map]
 Domain = ["domain"]
@@ -188,163 +192,163 @@ Infrastructure = ["infrastructure", "adapters"]
 Interface = ["interfaces", "interface", "bootstrap", "composition"]
 
 [[tool.clean-arch.layers]]
-module = "tai.core.primitives.diagnostics.redaction"
+module = "core.primitives.diagnostics.redaction"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
-module = "tai.core.primitives.messages.message"
+module = "core.primitives.messages.message"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
-module = "tai.core.evaluation.model_evaluator"
+module = "core.evaluation.model_evaluator"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
-module = "tai.core.evaluation.text_evaluator"
+module = "core.evaluation.text_evaluator"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
-module = "tai.core.evaluation.observation"
+module = "core.evaluation.observation"
 name = "Infrastructure"
 
 [[tool.clean-arch.layers]]
-module = "tai.core.primitives.diagnostics"
+module = "core.primitives.diagnostics"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
-module = "tai.attacks.fitd.garak_adapter"
+module = "attacks.fitd.garak_adapter"
 name = "Infrastructure"
 
 [[tool.clean-arch.layers]]
-module = "tai.core.evaluation.evaluator"
+module = "core.evaluation.evaluator"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
-module = "tai.core.evaluation.assembly"
+module = "core.evaluation.assembly"
 name = "Interface"
 
 [[tool.clean-arch.layers]]
-module = "tai.core.primitives.messages"
+module = "core.primitives.messages"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
-module = "tai.attacks.fitd.experiment"
+module = "attacks.fitd.experiment"
 name = "Interface"
 
 [[tool.clean-arch.layers]]
-module = "tai.core.chats.conversation"
+module = "core.chats.conversation"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
-module = "tai.core.chats.http_worker"
+module = "core.chats.http_worker"
 name = "Infrastructure"
 
 [[tool.clean-arch.layers]]
-module = "tai.attacks.fitd.profile"
+module = "attacks.fitd.profile"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
-module = "tai.core.runs.operations"
+module = "core.runs.operations"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
-module = "tai.alert.preparation"
+module = "alert.preparation"
 name = "Infrastructure"
 
 [[tool.clean-arch.layers]]
-module = "tai.app.configuration"
+module = "app.configuration"
 name = "Interface"
 
 [[tool.clean-arch.layers]]
-module = "tai.attacks.fitd.user"
+module = "attacks.fitd.user"
 name = "UseCase"
 
 [[tool.clean-arch.layers]]
-module = "tai.core.chats.openai"
+module = "core.chats.openai"
 name = "Infrastructure"
 
 [[tool.clean-arch.layers]]
-module = "tai.core.runs.journal"
+module = "core.runs.journal"
 name = "Infrastructure"
 
 [[tool.clean-arch.layers]]
-module = "tai.core.runs.storage"
+module = "core.runs.storage"
 name = "Infrastructure"
 
 [[tool.clean-arch.layers]]
-module = "tai.core.runs.status"
+module = "core.runs.status"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
-module = "tai.core.chats.qwen"
+module = "core.chats.qwen"
 name = "Infrastructure"
 
 [[tool.clean-arch.layers]]
-module = "tai.core.evaluation"
+module = "core.evaluation"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
-module = "tai.core.primitives"
+module = "core.primitives"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
-module = "tai.alert.manifest"
+module = "alert.manifest"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
-module = "tai.alert.taxonomy"
+module = "alert.taxonomy"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
-module = "tai.core.runs.user"
+module = "core.runs.user"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
-module = "tai.app.preflight"
+module = "app.preflight"
 name = "UseCase"
 
 [[tool.clean-arch.layers]]
-module = "tai.alert.report"
+module = "alert.report"
 name = "UseCase"
 
 [[tool.clean-arch.layers]]
-module = "tai.app.terminal"
+module = "app.terminal"
 name = "Interface"
 
 [[tool.clean-arch.layers]]
-module = "tai.attacks.fitd"
+module = "attacks.fitd"
 name = "Interface"
 
 [[tool.clean-arch.layers]]
-module = "tai.app.series"
+module = "app.series"
 name = "UseCase"
 
 [[tool.clean-arch.layers]]
-module = "tai.core.chats"
+module = "core.chats"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
-module = "tai.core.runs"
+module = "core.runs"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
-module = "tai.app.cli"
+module = "app.cli"
 name = "Interface"
 
 [[tool.clean-arch.layers]]
-module = "tai.attacks"
+module = "attacks"
 name = "Interface"
 
 [[tool.clean-arch.layers]]
-module = "tai.alert"
+module = "alert"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
-module = "tai.core"
+module = "core"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
-module = "tai.app"
+module = "app"
 name = "Interface"
 
 [[tool.clean-arch.layers]]

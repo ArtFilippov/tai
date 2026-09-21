@@ -20,9 +20,9 @@ from tai import (
 from tai import (
     FITDExperiment as FITDUser,
 )
-from tai.attacks.fitd.garak_adapter import _FITD, _Target
-from tai.attacks.fitd.user import _Execution
-from tai.core.runs.operations import Cause
+from attacks.fitd.garak_adapter import _FITD, _Target
+from attacks.fitd.user import _Execution
+from core.runs.operations import Cause
 
 
 class Observations:
@@ -445,7 +445,7 @@ def test_worker_returns_actual_failures_including_errors_caught_by_garak(
 def test_start_return_is_distinct_from_work_and_resource_cleanup(
     tmp_path, observed, monkeypatch, stop, cleanup_failure
 ):
-    import tai.attacks.fitd.user as implementation
+    import attacks.fitd.user as implementation
 
     entered, allow_response = Event(), Event()
     releasing, allow_release = Event(), Event()

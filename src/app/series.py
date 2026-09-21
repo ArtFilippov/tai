@@ -12,14 +12,14 @@ from types import FrameType
 from typing import Any
 from uuid import uuid4
 
-from tai.alert import load_alert_manifest
-from tai.alert.report import build_series_report, classify_outcome
-from tai.attacks.fitd import FITDExperiment
-from tai.attacks.fitd.profile import FITD_PROFILE
-from tai.core.primitives.diagnostics import DiagnosticRedactor
-from tai.core.primitives.messages import Message
-from tai.core.runs import RunSnapshot
-from tai.core.runs.storage import _write_json, capture_run, save_run
+from alert import load_alert_manifest
+from alert.report import build_series_report, classify_outcome
+from attacks.fitd import FITDExperiment
+from attacks.fitd.profile import FITD_PROFILE
+from core.primitives.diagnostics import DiagnosticRedactor
+from core.primitives.messages import Message
+from core.runs import RunSnapshot
+from core.runs.storage import _write_json, capture_run, save_run
 
 from .configuration import RoleProfile, load_profile
 
@@ -36,7 +36,7 @@ def _now() -> str:
 
 
 def _settings(profile: RoleProfile) -> dict[str, Any]:
-    from tai.attacks.fitd.garak_adapter import GARAK_REVISION
+    from attacks.fitd.garak_adapter import GARAK_REVISION
 
     return {
         "tai_version": version("tai"),

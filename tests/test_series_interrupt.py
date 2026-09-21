@@ -16,10 +16,10 @@ from test_qwen import local as local
 from test_series import MANIFEST, TAXONOMY, positive_responses, qwen_profile
 
 from tai import FITDUser
-from tai.alert.report import reconstruct_report
-from tai.app.configuration import RoleProfile
-from tai.app.series import run_alert_series
-from tai.attacks.fitd.user import _Execution
+from alert.report import reconstruct_report
+from app.configuration import RoleProfile
+from app.series import run_alert_series
+from attacks.fitd.user import _Execution
 
 
 @pytest.mark.parametrize(
@@ -38,7 +38,7 @@ from tai.attacks.fitd.user import _Execution
 def test_interrupt_races_preserve_actual_outcomes_and_attempted_prefix(
     local, tmp_path, monkeypatch, boundary, attempts
 ):
-    import tai.app.series as series
+    import app.series as series
 
     lib, kwargs, _ = local
     profile = qwen_profile(tmp_path, kwargs)
@@ -181,7 +181,7 @@ def test_creation_or_post_admission_error_is_saved_and_next_run_waits(
 def test_terminal_status_before_worker_cleanup_does_not_admit_next_run(
     local, tmp_path, monkeypatch
 ):
-    import tai.attacks.fitd.user as fitd
+    import attacks.fitd.user as fitd
 
     lib, kwargs, _ = local
     profile = qwen_profile(tmp_path, kwargs)

@@ -18,7 +18,7 @@ from tai import (
 from tai import (
     FITDExperiment as FITDUser,
 )
-from tai.core.evaluation.model_evaluator import MODEL_RUBRIC, MODEL_RUBRIC_VERSION
+from core.evaluation.model_evaluator import MODEL_RUBRIC, MODEL_RUBRIC_VERSION
 
 
 def classification_data(turns):

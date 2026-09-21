@@ -9,11 +9,11 @@ import pytest
 from test_qwen import local as local
 
 from tai import FITDUser, ModelEvaluator, RunJournal
-from tai.alert import load_alert_manifest
-from tai.alert.report import reconstruct_report
-from tai.app.cli import main
-from tai.app.configuration import RoleProfile
-from tai.app.series import run_alert_series
+from alert import load_alert_manifest
+from alert.report import reconstruct_report
+from app.cli import main
+from app.configuration import RoleProfile
+from app.series import run_alert_series
 
 MANIFEST = Path("examples/alert-manifest.json")
 TAXONOMY = Path("ALERT_taxonomy.md")
@@ -363,7 +363,7 @@ def test_run_storage_failure_is_explicit_and_preserves_actual_completed_outcome(
 def test_shared_series_write_failure_terminates_command_after_join(
     local, tmp_path, monkeypatch, capsys, filename
 ):
-    import tai.app.series as series
+    import app.series as series
 
     lib, kwargs, _ = local
     profile = qwen_profile(tmp_path, kwargs)

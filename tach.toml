@@ -14,329 +14,329 @@ exclude = [".git/**", "**/.git/**", ".venv/**", "**/.venv/**", "venv/**", "**/ve
 path = "tai"
 layer = "Bootstrap"
 depends_on = [
-    "tai.alert",
-    "tai.attacks.fitd",
-    "tai.core.chats",
-    "tai.core.chats.openai",
-    "tai.core.chats.qwen",
-    "tai.core.evaluation",
-    "tai.core.evaluation.assembly",
-    "tai.core.evaluation.model_evaluator",
-    "tai.core.evaluation.text_evaluator",
-    "tai.core.primitives.messages",
-    "tai.core.runs",
-    "tai.core.runs.journal",
-    "tai.core.runs.storage",
+    "alert",
+    "attacks.fitd",
+    "core.chats",
+    "core.chats.openai",
+    "core.chats.qwen",
+    "core.evaluation",
+    "core.evaluation.assembly",
+    "core.evaluation.model_evaluator",
+    "core.evaluation.text_evaluator",
+    "core.primitives.messages",
+    "core.runs",
+    "core.runs.journal",
+    "core.runs.storage",
 ]
 
 [[modules]]
-path = "tai.alert"
+path = "alert"
 layer = "Domain"
-depends_on = ["tai.alert.manifest"]
+depends_on = ["alert.manifest"]
 
 [[modules]]
-path = "tai.alert.manifest"
+path = "alert.manifest"
 layer = "Domain"
-depends_on = ["tai.alert.taxonomy"]
+depends_on = ["alert.taxonomy"]
 
 [[modules]]
-path = "tai.alert.preparation"
+path = "alert.preparation"
 layer = "Infrastructure"
-cannot_depend_on = ["tai.alert.report", "tai.app.preflight", "tai.app.series", "tai.attacks.fitd.user"]
-depends_on = ["tai.alert.manifest"]
+cannot_depend_on = ["alert.report", "app.preflight", "app.series", "attacks.fitd.user"]
+depends_on = ["alert.manifest"]
 
 [[modules]]
-path = "tai.alert.report"
+path = "alert.report"
 layer = "UseCase"
-depends_on = ["tai.alert.manifest", "tai.alert.taxonomy", "tai.core.runs.storage"]
+depends_on = ["alert.manifest", "alert.taxonomy", "core.runs.storage"]
 
 [[modules]]
-path = "tai.alert.taxonomy"
+path = "alert.taxonomy"
 layer = "Domain"
 depends_on = []
 
 [[modules]]
-path = "tai.app"
+path = "app"
 layer = "Bootstrap"
 depends_on = []
 
 [[modules]]
-path = "tai.app.cli"
+path = "app.cli"
 layer = "Bootstrap"
 depends_on = [
-    "tai.alert.manifest",
-    "tai.alert.preparation",
-    "tai.alert.report",
-    "tai.app.configuration",
-    "tai.app.preflight",
-    "tai.app.series",
-    "tai.app.terminal",
-    "tai.core.primitives.messages",
+    "alert.manifest",
+    "alert.preparation",
+    "alert.report",
+    "app.configuration",
+    "app.preflight",
+    "app.series",
+    "app.terminal",
+    "core.primitives.messages",
 ]
 
 [[modules]]
-path = "tai.app.configuration"
+path = "app.configuration"
 layer = "Bootstrap"
 depends_on = [
-    "tai.attacks.fitd",
-    "tai.core.chats",
-    "tai.core.chats.openai",
-    "tai.core.chats.qwen",
-    "tai.core.evaluation.assembly",
-    "tai.core.evaluation.model_evaluator",
-    "tai.core.primitives.diagnostics",
-    "tai.core.primitives.messages",
+    "attacks.fitd",
+    "core.chats",
+    "core.chats.openai",
+    "core.chats.qwen",
+    "core.evaluation.assembly",
+    "core.evaluation.model_evaluator",
+    "core.primitives.diagnostics",
+    "core.primitives.messages",
 ]
 
 [[modules]]
-path = "tai.app.preflight"
+path = "app.preflight"
 layer = "UseCase"
 depends_on = [
-    "tai.app.configuration",
-    "tai.core.chats",
-    "tai.core.chats.conversation",
-    "tai.core.evaluation",
-    "tai.core.evaluation.observation",
-    "tai.core.primitives.messages",
-    "tai.core.runs",
-    "tai.core.runs.journal",
-    "tai.core.runs.operations",
+    "app.configuration",
+    "core.chats",
+    "core.chats.conversation",
+    "core.evaluation",
+    "core.evaluation.observation",
+    "core.primitives.messages",
+    "core.runs",
+    "core.runs.journal",
+    "core.runs.operations",
 ]
 
 [[modules]]
-path = "tai.app.series"
+path = "app.series"
 layer = "UseCase"
 depends_on = [
-    "tai.alert",
-    "tai.alert.report",
-    "tai.app.configuration",
-    "tai.attacks.fitd",
-    "tai.attacks.fitd.garak_adapter",
-    "tai.attacks.fitd.profile",
-    "tai.core.primitives.diagnostics",
-    "tai.core.primitives.messages",
-    "tai.core.runs",
-    "tai.core.runs.storage",
+    "alert",
+    "alert.report",
+    "app.configuration",
+    "attacks.fitd",
+    "attacks.fitd.garak_adapter",
+    "attacks.fitd.profile",
+    "core.primitives.diagnostics",
+    "core.primitives.messages",
+    "core.runs",
+    "core.runs.storage",
 ]
 
 [[modules]]
-path = "tai.app.terminal"
+path = "app.terminal"
 layer = "Interface"
 cannot_depend_on = [
-    "tai.alert.preparation",
-    "tai.attacks.fitd.garak_adapter",
-    "tai.core.chats.http_worker",
-    "tai.core.chats.openai",
-    "tai.core.chats.qwen",
-    "tai.core.evaluation.observation",
-    "tai.core.runs.journal",
-    "tai.core.runs.storage",
+    "alert.preparation",
+    "attacks.fitd.garak_adapter",
+    "core.chats.http_worker",
+    "core.chats.openai",
+    "core.chats.qwen",
+    "core.evaluation.observation",
+    "core.runs.journal",
+    "core.runs.storage",
 ]
-depends_on = ["tai.attacks.fitd", "tai.core.runs", "tai.core.runs.storage"]
+depends_on = ["attacks.fitd", "core.runs", "core.runs.storage"]
 
 [[modules]]
-path = "tai.attacks"
+path = "attacks"
 layer = "Bootstrap"
 depends_on = []
 
 [[modules]]
-path = "tai.attacks.fitd"
+path = "attacks.fitd"
 layer = "Bootstrap"
-depends_on = ["tai.attacks.fitd.experiment", "tai.attacks.fitd.user"]
+depends_on = ["attacks.fitd.experiment", "attacks.fitd.user"]
 
 [[modules]]
-path = "tai.attacks.fitd.experiment"
+path = "attacks.fitd.experiment"
 layer = "Bootstrap"
 depends_on = [
-    "tai.attacks.fitd.garak_adapter",
-    "tai.attacks.fitd.user",
-    "tai.core.chats",
-    "tai.core.evaluation",
-    "tai.core.evaluation.assembly",
-    "tai.core.evaluation.observation",
-    "tai.core.primitives.diagnostics",
-    "tai.core.primitives.messages",
-    "tai.core.runs.journal",
-    "tai.core.runs.operations",
+    "attacks.fitd.garak_adapter",
+    "attacks.fitd.user",
+    "core.chats",
+    "core.evaluation",
+    "core.evaluation.assembly",
+    "core.evaluation.observation",
+    "core.primitives.diagnostics",
+    "core.primitives.messages",
+    "core.runs.journal",
+    "core.runs.operations",
 ]
 
 [[modules]]
-path = "tai.attacks.fitd.garak_adapter"
+path = "attacks.fitd.garak_adapter"
 layer = "Infrastructure"
-cannot_depend_on = ["tai.alert.report", "tai.app.preflight", "tai.app.series", "tai.attacks.fitd.user"]
+cannot_depend_on = ["alert.report", "app.preflight", "app.series", "attacks.fitd.user"]
 depends_on = [
-    "tai.attacks.fitd.profile",
-    "tai.core.chats",
-    "tai.core.primitives.messages",
-    "tai.core.runs.operations",
+    "attacks.fitd.profile",
+    "core.chats",
+    "core.primitives.messages",
+    "core.runs.operations",
 ]
 
 [[modules]]
-path = "tai.attacks.fitd.profile"
+path = "attacks.fitd.profile"
 layer = "Domain"
 depends_on = []
 
 [[modules]]
-path = "tai.attacks.fitd.user"
+path = "attacks.fitd.user"
 layer = "UseCase"
 depends_on = [
-    "tai.attacks.fitd.garak_adapter",
-    "tai.attacks.fitd.profile",
-    "tai.core.chats",
-    "tai.core.chats.conversation",
-    "tai.core.evaluation",
-    "tai.core.evaluation.assembly",
-    "tai.core.primitives.messages",
-    "tai.core.runs",
-    "tai.core.runs.operations",
+    "attacks.fitd.garak_adapter",
+    "attacks.fitd.profile",
+    "core.chats",
+    "core.chats.conversation",
+    "core.evaluation",
+    "core.evaluation.assembly",
+    "core.primitives.messages",
+    "core.runs",
+    "core.runs.operations",
 ]
 
 [[modules]]
-path = "tai.core"
+path = "core"
 layer = "Domain"
 depends_on = []
 
 [[modules]]
-path = "tai.core.chats"
+path = "core.chats"
 layer = "Domain"
-depends_on = ["tai.core.chats.conversation"]
+depends_on = ["core.chats.conversation"]
 
 [[modules]]
-path = "tai.core.chats.conversation"
+path = "core.chats.conversation"
 layer = "Domain"
-depends_on = ["tai.core.primitives.diagnostics", "tai.core.primitives.messages"]
+depends_on = ["core.primitives.diagnostics", "core.primitives.messages"]
 
 # OpenAI launches the adjacent http_worker.py by filename, not by Python import.
 [[modules]]
-path = "tai.core.chats.http_worker"
+path = "core.chats.http_worker"
 layer = "Infrastructure"
-cannot_depend_on = ["tai.alert.report", "tai.app.preflight", "tai.app.series", "tai.attacks.fitd.user"]
+cannot_depend_on = ["alert.report", "app.preflight", "app.series", "attacks.fitd.user"]
 depends_on = []
 
 [[modules]]
-path = "tai.core.chats.openai"
+path = "core.chats.openai"
 layer = "Infrastructure"
-cannot_depend_on = ["tai.alert.report", "tai.app.preflight", "tai.app.series", "tai.attacks.fitd.user"]
-depends_on = ["tai.core.chats.conversation", "tai.core.primitives.diagnostics"]
+cannot_depend_on = ["alert.report", "app.preflight", "app.series", "attacks.fitd.user"]
+depends_on = ["core.chats.conversation", "core.primitives.diagnostics"]
 
 [[modules]]
-path = "tai.core.chats.qwen"
+path = "core.chats.qwen"
 layer = "Infrastructure"
-cannot_depend_on = ["tai.alert.report", "tai.app.preflight", "tai.app.series", "tai.attacks.fitd.user"]
-depends_on = ["tai.core.chats.conversation", "tai.core.primitives.diagnostics"]
+cannot_depend_on = ["alert.report", "app.preflight", "app.series", "attacks.fitd.user"]
+depends_on = ["core.chats.conversation", "core.primitives.diagnostics"]
 
 [[modules]]
-path = "tai.core.evaluation"
+path = "core.evaluation"
 layer = "Domain"
-depends_on = ["tai.core.evaluation.evaluator"]
+depends_on = ["core.evaluation.evaluator"]
 
 [[modules]]
-path = "tai.core.evaluation.assembly"
+path = "core.evaluation.assembly"
 layer = "Bootstrap"
 depends_on = [
-    "tai.core.chats",
-    "tai.core.evaluation.evaluator",
-    "tai.core.evaluation.model_evaluator",
-    "tai.core.evaluation.observation",
-    "tai.core.evaluation.text_evaluator",
+    "core.chats",
+    "core.evaluation.evaluator",
+    "core.evaluation.model_evaluator",
+    "core.evaluation.observation",
+    "core.evaluation.text_evaluator",
 ]
 
 [[modules]]
-path = "tai.core.evaluation.evaluator"
+path = "core.evaluation.evaluator"
 layer = "Domain"
-depends_on = ["tai.core.primitives.messages"]
+depends_on = ["core.primitives.messages"]
 
 [[modules]]
-path = "tai.core.evaluation.model_evaluator"
+path = "core.evaluation.model_evaluator"
 layer = "Domain"
-depends_on = ["tai.core.chats", "tai.core.evaluation.evaluator", "tai.core.primitives.messages"]
+depends_on = ["core.chats", "core.evaluation.evaluator", "core.primitives.messages"]
 
 [[modules]]
-path = "tai.core.evaluation.observation"
+path = "core.evaluation.observation"
 layer = "Infrastructure"
-cannot_depend_on = ["tai.alert.report", "tai.app.preflight", "tai.app.series", "tai.attacks.fitd.user"]
+cannot_depend_on = ["alert.report", "app.preflight", "app.series", "attacks.fitd.user"]
 depends_on = [
-    "tai.core.chats",
-    "tai.core.evaluation.evaluator",
-    "tai.core.primitives.messages",
-    "tai.core.runs.journal",
-    "tai.core.runs.operations",
+    "core.chats",
+    "core.evaluation.evaluator",
+    "core.primitives.messages",
+    "core.runs.journal",
+    "core.runs.operations",
 ]
 
 [[modules]]
-path = "tai.core.evaluation.text_evaluator"
+path = "core.evaluation.text_evaluator"
 layer = "Domain"
-depends_on = ["tai.core.evaluation.evaluator", "tai.core.primitives.messages"]
+depends_on = ["core.evaluation.evaluator", "core.primitives.messages"]
 
 [[modules]]
-path = "tai.core.primitives"
+path = "core.primitives"
 layer = "Domain"
 depends_on = []
 
 [[modules]]
-path = "tai.core.primitives.diagnostics"
+path = "core.primitives.diagnostics"
 layer = "Domain"
-depends_on = ["tai.core.primitives.diagnostics.redaction"]
+depends_on = ["core.primitives.diagnostics.redaction"]
 
 [[modules]]
-path = "tai.core.primitives.diagnostics.redaction"
-layer = "Domain"
-depends_on = []
-
-[[modules]]
-path = "tai.core.primitives.messages"
-layer = "Domain"
-depends_on = ["tai.core.primitives.messages.message"]
-
-[[modules]]
-path = "tai.core.primitives.messages.message"
+path = "core.primitives.diagnostics.redaction"
 layer = "Domain"
 depends_on = []
 
 [[modules]]
-path = "tai.core.runs"
+path = "core.primitives.messages"
 layer = "Domain"
-depends_on = ["tai.core.runs.status", "tai.core.runs.user"]
+depends_on = ["core.primitives.messages.message"]
 
 [[modules]]
-path = "tai.core.runs.journal"
+path = "core.primitives.messages.message"
+layer = "Domain"
+depends_on = []
+
+[[modules]]
+path = "core.runs"
+layer = "Domain"
+depends_on = ["core.runs.status", "core.runs.user"]
+
+[[modules]]
+path = "core.runs.journal"
 layer = "Infrastructure"
-cannot_depend_on = ["tai.alert.report", "tai.app.preflight", "tai.app.series", "tai.attacks.fitd.user"]
+cannot_depend_on = ["alert.report", "app.preflight", "app.series", "attacks.fitd.user"]
 depends_on = [
-    "tai.core.chats",
-    "tai.core.primitives.diagnostics",
-    "tai.core.primitives.messages",
-    "tai.core.runs.operations",
-    "tai.core.runs.status",
+    "core.chats",
+    "core.primitives.diagnostics",
+    "core.primitives.messages",
+    "core.runs.operations",
+    "core.runs.status",
 ]
 
 [[modules]]
-path = "tai.core.runs.operations"
+path = "core.runs.operations"
 layer = "Domain"
-depends_on = ["tai.core.chats", "tai.core.primitives.messages", "tai.core.runs.status"]
+depends_on = ["core.chats", "core.primitives.messages", "core.runs.status"]
 
 [[modules]]
-path = "tai.core.runs.status"
+path = "core.runs.status"
 layer = "Domain"
-depends_on = ["tai.core.primitives.messages"]
+depends_on = ["core.primitives.messages"]
 
 [[modules]]
-path = "tai.core.runs.storage"
+path = "core.runs.storage"
 layer = "Infrastructure"
-cannot_depend_on = ["tai.alert.report", "tai.app.preflight", "tai.app.series", "tai.attacks.fitd.user"]
+cannot_depend_on = ["alert.report", "app.preflight", "app.series", "attacks.fitd.user"]
 depends_on = [
-    "tai.core.primitives.diagnostics",
-    "tai.core.runs.journal",
-    "tai.core.runs.status",
-    "tai.core.runs.user",
+    "core.primitives.diagnostics",
+    "core.runs.journal",
+    "core.runs.status",
+    "core.runs.user",
 ]
 
 [[modules]]
-path = "tai.core.runs.user"
+path = "core.runs.user"
 layer = "Domain"
-depends_on = ["tai.core.primitives.messages", "tai.core.runs.status"]
+depends_on = ["core.primitives.messages", "core.runs.status"]
 
-# The root facade exposes exactly the documented src/tai/__init__.py API.
+# The facade exposes exactly the documented src/tai.py API.
 [[interfaces]]
 from = ['^tai$']
 expose = [
@@ -385,46 +385,46 @@ expose = [
 
 # Each component's package interface matches its explicit __all__.
 [[interfaces]]
-from = ['^tai\.alert$']
+from = ['^alert$']
 expose = ['^AlertManifest$', '^AlertRecord$', '^load_alert_manifest$', '^select_alert_records$']
 
 [[interfaces]]
-from = ['^tai\.attacks\.fitd$']
+from = ['^attacks\.fitd$']
 expose = ['^FITDExperiment$', '^FITDUser$']
 
 [[interfaces]]
-from = ['^tai\.core\.chats$']
+from = ['^core\.chats$']
 expose = ['^ChatCancelled$', '^ChatTurn$', '^LLMChat$', '^ModelRole$']
 
 [[interfaces]]
-from = ['^tai\.core\.evaluation$']
+from = ['^core\.evaluation$']
 expose = ['^EvaluationChat$', '^Evaluator$', '^evaluate$']
 
 [[interfaces]]
-from = ['^tai\.core\.runs$']
+from = ['^core\.runs$']
 expose = ['^Evaluation$', '^Progress$', '^RunSnapshot$', '^User$', '^UserState$', '^UserStatus$']
 
 [[interfaces]]
-from = ['^tai\.core\.primitives\.messages$']
+from = ['^core\.primitives\.messages$']
 expose = ['^Message$']
 
 [[interfaces]]
-from = ['^tai\.core\.primitives\.diagnostics$']
+from = ['^core\.primitives\.diagnostics$']
 expose = ['^DiagnosticObject$', '^DiagnosticRedactor$']
 
 # Namespace containers have no symbol facade of their own.
 [[interfaces]]
-from = ['^tai\.app$', '^tai\.attacks$', '^tai\.core$', '^tai\.core\.primitives$']
+from = ['^app$', '^attacks$', '^core$', '^core\.primitives$']
 expose = []
 
 # Descriptive leaf modules retain the public-symbol rule at every used depth.
 [[interfaces]]
 from = [
-    '^tai\.app\.[^.]+$',
-    '^tai\.alert\.[^.]+$',
-    '^tai\.attacks\.fitd\.[^.]+$',
-    '^tai\.core\.(chats|evaluation|runs)\.[^.]+$',
-    '^tai\.core\.primitives\.(messages|diagnostics)\.[^.]+$',
+    '^app\.[^.]+$',
+    '^alert\.[^.]+$',
+    '^attacks\.fitd\.[^.]+$',
+    '^core\.(chats|evaluation|runs)\.[^.]+$',
+    '^core\.primitives\.(messages|diagnostics)\.[^.]+$',
 ]
 expose = ['^[A-Za-z][A-Za-z0-9_]*$']
 

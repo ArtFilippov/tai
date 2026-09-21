@@ -2,7 +2,7 @@
 
 from tai import Evaluator, LLMChat, Message
 from tai import FITDExperiment as FITDUser
-from tai.app.terminal import run_foreground
+from app.terminal import run_foreground
 
 
 def test_terminal_does_not_reevaluate_or_attribute_old_score_to_new_result(

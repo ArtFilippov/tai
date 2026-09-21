@@ -7,13 +7,13 @@ from threading import Event, Lock, Thread
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from tai.core.chats import LLMChat, ModelRole
-from tai.core.chats.conversation import _acquire_chats, _release_chats
-from tai.core.evaluation import Evaluator, evaluate
-from tai.core.evaluation.assembly import EvaluatorSetup, evaluator_setup
-from tai.core.primitives.messages import Message
-from tai.core.runs import Evaluation, Progress, RunSnapshot, User, UserState, UserStatus
-from tai.core.runs.operations import (
+from core.chats import LLMChat, ModelRole
+from core.chats.conversation import _acquire_chats, _release_chats
+from core.evaluation import Evaluator, evaluate
+from core.evaluation.assembly import EvaluatorSetup, evaluator_setup
+from core.primitives.messages import Message
+from core.runs import Evaluation, Progress, RunSnapshot, User, UserState, UserStatus
+from core.runs.operations import (
     Cause,
     Checkpoint,
     Context,

@@ -6,14 +6,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from tai.attacks.fitd import FITDExperiment
-from tai.core.chats import LLMChat, ModelRole
-from tai.core.chats.openai import OpenAIChat
-from tai.core.chats.qwen import QwenChat
-from tai.core.evaluation.assembly import EvaluatorSetup
-from tai.core.evaluation.model_evaluator import MODEL_RUBRIC_VERSION
-from tai.core.primitives.diagnostics import DiagnosticRedactor
-from tai.core.primitives.messages import Message
+from attacks.fitd import FITDExperiment
+from core.chats import LLMChat, ModelRole
+from core.chats.openai import OpenAIChat
+from core.chats.qwen import QwenChat
+from core.evaluation.assembly import EvaluatorSetup
+from core.evaluation.model_evaluator import MODEL_RUBRIC_VERSION
+from core.primitives.diagnostics import DiagnosticRedactor
+from core.primitives.messages import Message
 
 
 def _table(value: Any, name: str, allowed: set[str]) -> dict[str, Any]:

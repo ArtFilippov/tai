@@ -11,7 +11,7 @@ from threading import Event, Lock
 from typing import Any
 from weakref import WeakValueDictionary
 
-from tai.core.primitives.diagnostics import DiagnosticObject
+from core.primitives.diagnostics import DiagnosticObject
 
 from .conversation import ChatCancelled, ChatTurn, LLMChat
 

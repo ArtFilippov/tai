@@ -17,9 +17,9 @@ from garak.attempt import Message as GarakMessage
 from garak.detectors.mitigation import Prefixes
 from garak.probes.fitd import FITD
 
-from tai.core.chats import ModelRole
-from tai.core.primitives.messages import Message
-from tai.core.runs.operations import (
+from core.chats import ModelRole
+from core.primitives.messages import Message
+from core.runs.operations import (
     BranchDecision,
     Cause,
     Checkpoint,

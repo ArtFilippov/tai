@@ -1,14 +1,14 @@
 """Public contracts for textual LLM robustness experiments."""
 
-from tai.alert import (
+from alert import (
     AlertManifest,
     AlertRecord,
     load_alert_manifest,
     select_alert_records,
 )
-from tai.attacks.fitd import FITDExperiment, FITDUser
-from tai.core.chats import ChatCancelled, ChatTurn, LLMChat, ModelRole
-from tai.core.chats.openai import (
+from attacks.fitd import FITDExperiment, FITDUser
+from core.chats import ChatCancelled, ChatTurn, LLMChat, ModelRole
+from core.chats.openai import (
     OpenAIAuthenticationError,
     OpenAIChat,
     OpenAIContentError,
@@ -20,19 +20,19 @@ from tai.core.chats.openai import (
     OpenAITimeoutError,
     OpenAITransportError,
 )
-from tai.core.chats.qwen import QwenChat, QwenContextError, QwenError
-from tai.core.evaluation import Evaluator
-from tai.core.evaluation.assembly import EvaluatorSetup
-from tai.core.evaluation.model_evaluator import (
+from core.chats.qwen import QwenChat, QwenContextError, QwenError
+from core.evaluation import Evaluator
+from core.evaluation.assembly import EvaluatorSetup
+from core.evaluation.model_evaluator import (
     ModelEvaluationError,
     ModelEvaluator,
     ModelVerdictError,
 )
-from tai.core.evaluation.text_evaluator import ContainsTextEvaluator
-from tai.core.primitives.messages import Message
-from tai.core.runs import Evaluation, Progress, RunSnapshot, User, UserState, UserStatus
-from tai.core.runs.journal import RunEvent, RunJournal
-from tai.core.runs.storage import RunRecord, capture_run, save_run
+from core.evaluation.text_evaluator import ContainsTextEvaluator
+from core.primitives.messages import Message
+from core.runs import Evaluation, Progress, RunSnapshot, User, UserState, UserStatus
+from core.runs.journal import RunEvent, RunJournal
+from core.runs.storage import RunRecord, capture_run, save_run
 
 __all__ = [
     "AlertManifest",

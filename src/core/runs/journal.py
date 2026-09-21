@@ -15,9 +15,9 @@ from pathlib import Path
 from threading import Event, Lock
 from typing import Any, TextIO
 
-from tai.core.chats import ChatCancelled
-from tai.core.primitives.diagnostics import DiagnosticObject, DiagnosticRedactor
-from tai.core.primitives.messages import Message
+from core.chats import ChatCancelled
+from core.primitives.diagnostics import DiagnosticObject, DiagnosticRedactor
+from core.primitives.messages import Message
 
 from .operations import (
     BranchDecision,

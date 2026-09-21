@@ -7,8 +7,8 @@ from threading import Event, Lock
 from typing import Literal, Self
 from uuid import uuid4
 
-from tai.core.primitives.diagnostics import DiagnosticObject, DiagnosticRedactor
-from tai.core.primitives.messages import Message
+from core.primitives.diagnostics import DiagnosticObject, DiagnosticRedactor
+from core.primitives.messages import Message
 
 type ModelRole = Literal["Target", "Attacker", "Evaluator"]
 

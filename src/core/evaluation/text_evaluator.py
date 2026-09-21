@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from tai.core.primitives.messages import Message
+from core.primitives.messages import Message
 
 from .evaluator import Evaluator
 

@@ -164,8 +164,8 @@ uv run --locked --group dev python -m unittest discover -s quality/tests
 прикладных сценариев, а базовые компоненты — в `core/primitives/`:
 
 ```text
-src/tai/
-  __init__.py                 # пользовательский API
+src/
+  tai.py                      # пользовательский API
   app/                        # CLI, конфигурация, preflight, одиночный запуск и серия
   attacks/fitd/                # FITD User, garak-адаптер, профиль и сборка эксперимента
   alert/                      # манифест, таксономия, подготовка и отчёт ALERT
@@ -183,16 +183,16 @@ src/tai/
 `__init__.py` с явным `__all__` задаёт интерфейс компонента. Например:
 
 ```python
-from tai.attacks.fitd import FITDExperiment, FITDUser
-from tai.core.chats import LLMChat
-from tai.core.chats.openai import OpenAIChat
-from tai.core.primitives.messages import Message
+from attacks.fitd import FITDExperiment, FITDUser
+from core.chats import LLMChat
+from core.chats.openai import OpenAIChat
+from core.primitives.messages import Message
 ```
 
 Контрактные интерфейсы `chats`, `evaluation` и `runs` экспортируют общие типы
 и операции; конкретные адаптеры, сборка и хранение импортируются из именованных
-модулей. Корневой API `from tai import ...` сохраняется. Старые пути плоских
-модулей заменены новыми; entry point команды `tai` — `tai.app.cli:main`.
+модулей. Общий API `from tai import ...` находится в `src/tai.py`.
+Пакеты импортируются напрямую из `src/`; entry point команды `tai` — `app.cli:main`.
 HTTP-worker находится рядом с `openai.py` и запускается по имени файла
 `http_worker.py`; эта связь исполнения дополняет граф Python-импортов.
 
@@ -664,7 +664,7 @@ CLI обрабатывает Ctrl+C: обработчик только выст�
 
 Повтор команды создаёт новый UUID и каталог, сохраняя прежние файлы. Журнал пишет
 независимый `RunJournal`, подключённый обёртками в `FITDExperiment`. Итоговые
-метаданные и полный результат сохраняет `tai.core.runs.storage` после ожидания User.
+метаданные и полный результат сохраняет `core.runs.storage` после ожидания User.
 Терминал читает этот же журнал. В диагностике
 сохраняются режим авторизации и редактированные снимки настроек и сообщений
 (правила — в разделе «Авторизация в диагностических снимках» ниже).

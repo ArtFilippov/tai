@@ -20,10 +20,10 @@ from tai import (
     capture_run,
     save_run,
 )
-from tai.app.configuration import RoleProfile
-from tai.app.preflight import run_preflight
-from tai.app.terminal import run_foreground
-from tai.core.evaluation.model_evaluator import MODEL_RUBRIC_VERSION
+from app.configuration import RoleProfile
+from app.preflight import run_preflight
+from app.terminal import run_foreground
+from core.evaluation.model_evaluator import MODEL_RUBRIC_VERSION
 
 
 def participants(targets, continuations, verdicts=(' {"success": true}',)):
@@ -314,7 +314,7 @@ def test_storage_failure_prevents_next_work_and_survives_library_handlers_and_cl
 def test_completion_follows_resource_release_and_retained_journal_is_independent(
     tmp_path, monkeypatch
 ):
-    import tai.attacks.fitd.user as implementation
+    import attacks.fitd.user as implementation
 
     entered, release = Event(), Event()
     release_chats = implementation._release_chats
@@ -400,7 +400,7 @@ def test_cli_and_preflight_fail_on_journal_errors_without_extra_calls(tmp_path, 
 
 
 def test_cleanup_failure_is_the_final_journal_outcome(tmp_path, monkeypatch):
-    import tai.attacks.fitd.user as implementation
+    import attacks.fitd.user as implementation
 
     release_chats = implementation._release_chats
 

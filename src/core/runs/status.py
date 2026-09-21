@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from tai.core.primitives.messages import Message
+from core.primitives.messages import Message
 
 
 class UserState(StrEnum):

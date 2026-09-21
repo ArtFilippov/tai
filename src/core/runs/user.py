@@ -1,6 +1,6 @@
 """The strategy-independent lifecycle of a User executing attack runs."""
 
-from tai.core.primitives.messages import Message
+from core.primitives.messages import Message
 
 from .status import RunSnapshot, UserStatus
 

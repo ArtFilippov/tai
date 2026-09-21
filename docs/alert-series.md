@@ -186,8 +186,8 @@ uv run --locked --offline --extra qwen tai alert-report \
 
 ```python
 from pathlib import Path
-from tai.app.series import run_alert_series
-from tai.alert.report import build_series_report, classify_outcome, reconstruct_report
+from app.series import run_alert_series
+from alert.report import build_series_report, classify_outcome, reconstruct_report
 
 series = run_alert_series(
     Path("examples/alert-manifest.json"),

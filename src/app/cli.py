@@ -5,8 +5,8 @@ import json
 import sys
 from pathlib import Path
 
-from tai.alert.manifest import DEFAULT_SEED
-from tai.core.primitives.messages import Message
+from alert.manifest import DEFAULT_SEED
+from core.primitives.messages import Message
 
 from .configuration import load_profile
 from .preflight import run_preflight
@@ -87,7 +87,7 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(result.report, ensure_ascii=False, indent=2))
             return result.exit_code
         if args.command == "alert-report":
-            from tai.alert.report import reconstruct_report
+            from alert.report import reconstruct_report
 
             print(
                 json.dumps(
@@ -98,7 +98,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 0
         if args.command == "prepare-alert":
-            from tai.alert.preparation import prepare_alert
+            from alert.preparation import prepare_alert
 
             manifest = prepare_alert(
                 args.source_file,

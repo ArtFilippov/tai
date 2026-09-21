@@ -7,8 +7,8 @@ checkpoint tokens remain opaque and are only interpreted by their LLMChat.
 from dataclasses import dataclass, field
 from typing import Literal
 
-from tai.core.chats import ModelRole
-from tai.core.primitives.messages import Message
+from core.chats import ModelRole
+from core.primitives.messages import Message
 
 from .status import Evaluation, UserStatus
 

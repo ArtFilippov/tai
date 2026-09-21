@@ -5,9 +5,9 @@ from collections.abc import Callable
 from pathlib import Path
 from types import FrameType
 
-from tai.attacks.fitd import FITDExperiment
-from tai.core.runs import UserState, UserStatus
-from tai.core.runs.storage import capture_run, save_run
+from attacks.fitd import FITDExperiment
+from core.runs import UserState, UserStatus
+from core.runs.storage import capture_run, save_run
 
 
 def _status(status: UserStatus) -> str:

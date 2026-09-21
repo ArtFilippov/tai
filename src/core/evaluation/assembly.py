@@ -11,7 +11,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
-from tai.core.chats import LLMChat
+from core.chats import LLMChat
 
 from .evaluator import EvaluationChat, Evaluator
 from .model_evaluator import (

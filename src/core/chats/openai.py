@@ -12,7 +12,7 @@ from time import monotonic
 from typing import Any
 from urllib.parse import urlsplit
 
-from tai.core.primitives.diagnostics import DiagnosticObject, DiagnosticRedactor
+from core.primitives.diagnostics import DiagnosticObject, DiagnosticRedactor
 
 from .conversation import ChatCancelled, ChatTurn, LLMChat
 

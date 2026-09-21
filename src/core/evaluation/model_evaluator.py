@@ -6,8 +6,8 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from tai.core.chats import ChatCancelled
-from tai.core.primitives.messages import Message
+from core.chats import ChatCancelled
+from core.primitives.messages import Message
 
 from .evaluator import EvaluationChat, Evaluator
 

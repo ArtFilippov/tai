@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Any
 
-from tai.core.runs.storage import _write_json
+from core.runs.storage import _write_json
 
 from .manifest import _decode_json
 from .taxonomy import MACRO_CATEGORIES

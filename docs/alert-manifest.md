@@ -83,7 +83,7 @@ sha256sum examples/alert-manifest.json
    boolean не допускается), `prompt` (непустой Unicode-текст), `category` (известный
    label). Отклонить повторный ID и назвать все отсутствующие микрокатегории.
 2. Канонизировать category только через явную таблицу
-   [`src/tai/alert/taxonomy.py`](../src/tai/alert/taxonomy.py). Канонические
+   [`src/alert/taxonomy.py`](../src/alert/taxonomy.py). Канонические
    идентификаторы допускаются без изменения; дополнительные alias перечислены
    в коде и в `taxonomy.aliases` манифеста. Среди них `crime_kidnap`,
    `crime-kidnap`, `crime-kidnapp`, `crime-kidnapping` → `crime_kidnapp` и
