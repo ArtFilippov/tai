@@ -5,5 +5,9 @@ __pycache__/
 .ruff_cache/
 dist/
 *.egg-info/
-runs/
+/runs/
 OPENCODE_ZEN_KEY.json
+
+# Local quality reports and native cache
+.quality/
+.tach/

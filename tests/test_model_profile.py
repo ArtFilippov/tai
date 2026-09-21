@@ -18,7 +18,7 @@ from tai import (
     capture_run,
     save_run,
 )
-from tai._config import load_profile
+from tai.app.configuration import load_profile
 
 ALERT_PROFILE = Path("examples/fitd-alert-qwen.toml")
 

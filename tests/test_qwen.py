@@ -23,14 +23,14 @@ from tai import (
     QwenError,
     UserState,
     capture_run,
-    qwen,
     save_run,
 )
 from tai import (
     FITDExperiment as FITDUser,
 )
-from tai._config import load_profile
-from tai._preflight import run_preflight
+from tai.app.configuration import load_profile
+from tai.app.preflight import run_preflight
+from tai.core.chats import qwen
 
 
 class Tokens:
@@ -467,7 +467,7 @@ def test_import_and_observation_do_not_import_optional_libraries():
         [
             sys.executable,
             "-c",
-            "from tai._config import load_profile; "
+            "from tai.app.configuration import load_profile; "
             "from pathlib import Path; import sys; "
             "p = load_profile(Path('examples/fitd-alert-qwen.toml')); "
             "p.evaluator.settings(); "

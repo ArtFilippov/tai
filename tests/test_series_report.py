@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from tai.alert import load_alert_manifest
-from tai.series_report import (
+from tai.alert.report import (
     build_series_report,
     classify_outcome,
     reconstruct_report,

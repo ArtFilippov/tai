@@ -83,7 +83,7 @@ sha256sum examples/alert-manifest.json
    boolean не допускается), `prompt` (непустой Unicode-текст), `category` (известный
    label). Отклонить повторный ID и назвать все отсутствующие микрокатегории.
 2. Канонизировать category только через явную таблицу
-   [`src/tai/_alert_taxonomy.py`](../src/tai/_alert_taxonomy.py). Канонические
+   [`src/tai/alert/taxonomy.py`](../src/tai/alert/taxonomy.py). Канонические
    идентификаторы допускаются без изменения; дополнительные alias перечислены
    в коде и в `taxonomy.aliases` манифеста. Среди них `crime_kidnap`,
    `crime-kidnap`, `crime-kidnapp`, `crime-kidnapping` → `crime_kidnapp` и
@@ -182,9 +182,7 @@ for record in manifest.records:
 ```bash
 uv run --locked --offline pytest tests/test_alert.py
 uv run --locked --offline pytest
-uv run --locked --offline ruff check .
-uv run --locked --offline ruff format --check .
-uv run --locked --offline mypy
+uv run --locked --offline --group dev python quality/check.py
 ```
 
 Тесты используют общий запрет внешней сети. Управляемый набор проверяет golden

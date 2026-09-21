@@ -1,0 +1,434 @@
+source_roots = ["src"]
+exact = true
+ignore_type_checking_imports = false
+root_module = "forbid"
+forbid_circular_dependencies = true
+layers_explicit_depends_on = true
+respect_gitignore = false
+# Packages group cohesive components; file boundaries retain their layer checks.
+# Contract package exports stay independent of concrete adapters and assembly.
+layers = ["Bootstrap", "Interface", "Infrastructure", "UseCase", "Domain"]
+exclude = [".git/**", "**/.git/**", ".venv/**", "**/.venv/**", "venv/**", "**/venv/**", "__pycache__/**", "**/__pycache__/**", ".mypy_cache/**", "**/.mypy_cache/**", ".pytest_cache/**", "**/.pytest_cache/**", ".ruff_cache/**", "**/.ruff_cache/**", ".tox/**", "**/.tox/**", ".nox/**", "**/.nox/**", ".quality/**", "**/.quality/**", "node_modules/**", "**/node_modules/**", "build/**", "**/build/**", "dist/**", "**/dist/**", "vendor/**", "**/vendor/**", "vendored/**", "**/vendored/**", "_vendor/**", "**/_vendor/**", "generated/**", "**/generated/**", "_generated/**", "**/_generated/**", "migrations/**", "**/migrations/**", "tests/**", "**/tests/**", "**/test/**"]
+
+[[modules]]
+path = "tai"
+layer = "Bootstrap"
+depends_on = [
+    "tai.alert",
+    "tai.attacks.fitd",
+    "tai.core.chats",
+    "tai.core.chats.openai",
+    "tai.core.chats.qwen",
+    "tai.core.evaluation",
+    "tai.core.evaluation.assembly",
+    "tai.core.evaluation.model_evaluator",
+    "tai.core.evaluation.text_evaluator",
+    "tai.core.primitives.messages",
+    "tai.core.runs",
+    "tai.core.runs.journal",
+    "tai.core.runs.storage",
+]
+
+[[modules]]
+path = "tai.alert"
+layer = "Domain"
+depends_on = ["tai.alert.manifest"]
+
+[[modules]]
+path = "tai.alert.manifest"
+layer = "Domain"
+depends_on = ["tai.alert.taxonomy"]
+
+[[modules]]
+path = "tai.alert.preparation"
+layer = "Infrastructure"
+cannot_depend_on = ["tai.alert.report", "tai.app.preflight", "tai.app.series", "tai.attacks.fitd.user"]
+depends_on = ["tai.alert.manifest"]
+
+[[modules]]
+path = "tai.alert.report"
+layer = "UseCase"
+depends_on = ["tai.alert.manifest", "tai.alert.taxonomy", "tai.core.runs.storage"]
+
+[[modules]]
+path = "tai.alert.taxonomy"
+layer = "Domain"
+depends_on = []
+
+[[modules]]
+path = "tai.app"
+layer = "Bootstrap"
+depends_on = []
+
+[[modules]]
+path = "tai.app.cli"
+layer = "Bootstrap"
+depends_on = [
+    "tai.alert.manifest",
+    "tai.alert.preparation",
+    "tai.alert.report",
+    "tai.app.configuration",
+    "tai.app.preflight",
+    "tai.app.series",
+    "tai.app.terminal",
+    "tai.core.primitives.messages",
+]
+
+[[modules]]
+path = "tai.app.configuration"
+layer = "Bootstrap"
+depends_on = [
+    "tai.attacks.fitd",
+    "tai.core.chats",
+    "tai.core.chats.openai",
+    "tai.core.chats.qwen",
+    "tai.core.evaluation.assembly",
+    "tai.core.evaluation.model_evaluator",
+    "tai.core.primitives.diagnostics",
+    "tai.core.primitives.messages",
+]
+
+[[modules]]
+path = "tai.app.preflight"
+layer = "UseCase"
+depends_on = [
+    "tai.app.configuration",
+    "tai.core.chats",
+    "tai.core.chats.conversation",
+    "tai.core.evaluation",
+    "tai.core.evaluation.observation",
+    "tai.core.primitives.messages",
+    "tai.core.runs",
+    "tai.core.runs.journal",
+    "tai.core.runs.operations",
+]
+
+[[modules]]
+path = "tai.app.series"
+layer = "UseCase"
+depends_on = [
+    "tai.alert",
+    "tai.alert.report",
+    "tai.app.configuration",
+    "tai.attacks.fitd",
+    "tai.attacks.fitd.garak_adapter",
+    "tai.attacks.fitd.profile",
+    "tai.core.primitives.diagnostics",
+    "tai.core.primitives.messages",
+    "tai.core.runs",
+    "tai.core.runs.storage",
+]
+
+[[modules]]
+path = "tai.app.terminal"
+layer = "Interface"
+cannot_depend_on = [
+    "tai.alert.preparation",
+    "tai.attacks.fitd.garak_adapter",
+    "tai.core.chats.http_worker",
+    "tai.core.chats.openai",
+    "tai.core.chats.qwen",
+    "tai.core.evaluation.observation",
+    "tai.core.runs.journal",
+    "tai.core.runs.storage",
+]
+depends_on = ["tai.attacks.fitd", "tai.core.runs", "tai.core.runs.storage"]
+
+[[modules]]
+path = "tai.attacks"
+layer = "Bootstrap"
+depends_on = []
+
+[[modules]]
+path = "tai.attacks.fitd"
+layer = "Bootstrap"
+depends_on = ["tai.attacks.fitd.experiment", "tai.attacks.fitd.user"]
+
+[[modules]]
+path = "tai.attacks.fitd.experiment"
+layer = "Bootstrap"
+depends_on = [
+    "tai.attacks.fitd.garak_adapter",
+    "tai.attacks.fitd.user",
+    "tai.core.chats",
+    "tai.core.evaluation",
+    "tai.core.evaluation.assembly",
+    "tai.core.evaluation.observation",
+    "tai.core.primitives.diagnostics",
+    "tai.core.primitives.messages",
+    "tai.core.runs.journal",
+    "tai.core.runs.operations",
+]
+
+[[modules]]
+path = "tai.attacks.fitd.garak_adapter"
+layer = "Infrastructure"
+cannot_depend_on = ["tai.alert.report", "tai.app.preflight", "tai.app.series", "tai.attacks.fitd.user"]
+depends_on = [
+    "tai.attacks.fitd.profile",
+    "tai.core.chats",
+    "tai.core.primitives.messages",
+    "tai.core.runs.operations",
+]
+
+[[modules]]
+path = "tai.attacks.fitd.profile"
+layer = "Domain"
+depends_on = []
+
+[[modules]]
+path = "tai.attacks.fitd.user"
+layer = "UseCase"
+depends_on = [
+    "tai.attacks.fitd.garak_adapter",
+    "tai.attacks.fitd.profile",
+    "tai.core.chats",
+    "tai.core.chats.conversation",
+    "tai.core.evaluation",
+    "tai.core.evaluation.assembly",
+    "tai.core.primitives.messages",
+    "tai.core.runs",
+    "tai.core.runs.operations",
+]
+
+[[modules]]
+path = "tai.core"
+layer = "Domain"
+depends_on = []
+
+[[modules]]
+path = "tai.core.chats"
+layer = "Domain"
+depends_on = ["tai.core.chats.conversation"]
+
+[[modules]]
+path = "tai.core.chats.conversation"
+layer = "Domain"
+depends_on = ["tai.core.primitives.diagnostics", "tai.core.primitives.messages"]
+
+# OpenAI launches the adjacent http_worker.py by filename, not by Python import.
+[[modules]]
+path = "tai.core.chats.http_worker"
+layer = "Infrastructure"
+cannot_depend_on = ["tai.alert.report", "tai.app.preflight", "tai.app.series", "tai.attacks.fitd.user"]
+depends_on = []
+
+[[modules]]
+path = "tai.core.chats.openai"
+layer = "Infrastructure"
+cannot_depend_on = ["tai.alert.report", "tai.app.preflight", "tai.app.series", "tai.attacks.fitd.user"]
+depends_on = ["tai.core.chats.conversation", "tai.core.primitives.diagnostics"]
+
+[[modules]]
+path = "tai.core.chats.qwen"
+layer = "Infrastructure"
+cannot_depend_on = ["tai.alert.report", "tai.app.preflight", "tai.app.series", "tai.attacks.fitd.user"]
+depends_on = ["tai.core.chats.conversation", "tai.core.primitives.diagnostics"]
+
+[[modules]]
+path = "tai.core.evaluation"
+layer = "Domain"
+depends_on = ["tai.core.evaluation.evaluator"]
+
+[[modules]]
+path = "tai.core.evaluation.assembly"
+layer = "Bootstrap"
+depends_on = [
+    "tai.core.chats",
+    "tai.core.evaluation.evaluator",
+    "tai.core.evaluation.model_evaluator",
+    "tai.core.evaluation.observation",
+    "tai.core.evaluation.text_evaluator",
+]
+
+[[modules]]
+path = "tai.core.evaluation.evaluator"
+layer = "Domain"
+depends_on = ["tai.core.primitives.messages"]
+
+[[modules]]
+path = "tai.core.evaluation.model_evaluator"
+layer = "Domain"
+depends_on = ["tai.core.chats", "tai.core.evaluation.evaluator", "tai.core.primitives.messages"]
+
+[[modules]]
+path = "tai.core.evaluation.observation"
+layer = "Infrastructure"
+cannot_depend_on = ["tai.alert.report", "tai.app.preflight", "tai.app.series", "tai.attacks.fitd.user"]
+depends_on = [
+    "tai.core.chats",
+    "tai.core.evaluation.evaluator",
+    "tai.core.primitives.messages",
+    "tai.core.runs.journal",
+    "tai.core.runs.operations",
+]
+
+[[modules]]
+path = "tai.core.evaluation.text_evaluator"
+layer = "Domain"
+depends_on = ["tai.core.evaluation.evaluator", "tai.core.primitives.messages"]
+
+[[modules]]
+path = "tai.core.primitives"
+layer = "Domain"
+depends_on = []
+
+[[modules]]
+path = "tai.core.primitives.diagnostics"
+layer = "Domain"
+depends_on = ["tai.core.primitives.diagnostics.redaction"]
+
+[[modules]]
+path = "tai.core.primitives.diagnostics.redaction"
+layer = "Domain"
+depends_on = []
+
+[[modules]]
+path = "tai.core.primitives.messages"
+layer = "Domain"
+depends_on = ["tai.core.primitives.messages.message"]
+
+[[modules]]
+path = "tai.core.primitives.messages.message"
+layer = "Domain"
+depends_on = []
+
+[[modules]]
+path = "tai.core.runs"
+layer = "Domain"
+depends_on = ["tai.core.runs.status", "tai.core.runs.user"]
+
+[[modules]]
+path = "tai.core.runs.journal"
+layer = "Infrastructure"
+cannot_depend_on = ["tai.alert.report", "tai.app.preflight", "tai.app.series", "tai.attacks.fitd.user"]
+depends_on = [
+    "tai.core.chats",
+    "tai.core.primitives.diagnostics",
+    "tai.core.primitives.messages",
+    "tai.core.runs.operations",
+    "tai.core.runs.status",
+]
+
+[[modules]]
+path = "tai.core.runs.operations"
+layer = "Domain"
+depends_on = ["tai.core.chats", "tai.core.primitives.messages", "tai.core.runs.status"]
+
+[[modules]]
+path = "tai.core.runs.status"
+layer = "Domain"
+depends_on = ["tai.core.primitives.messages"]
+
+[[modules]]
+path = "tai.core.runs.storage"
+layer = "Infrastructure"
+cannot_depend_on = ["tai.alert.report", "tai.app.preflight", "tai.app.series", "tai.attacks.fitd.user"]
+depends_on = [
+    "tai.core.primitives.diagnostics",
+    "tai.core.runs.journal",
+    "tai.core.runs.status",
+    "tai.core.runs.user",
+]
+
+[[modules]]
+path = "tai.core.runs.user"
+layer = "Domain"
+depends_on = ["tai.core.primitives.messages", "tai.core.runs.status"]
+
+# The root facade exposes exactly the documented src/tai/__init__.py API.
+[[interfaces]]
+from = ['^tai$']
+expose = [
+    '^AlertManifest$',
+    '^AlertRecord$',
+    '^ChatCancelled$',
+    '^ChatTurn$',
+    '^ContainsTextEvaluator$',
+    '^Evaluation$',
+    '^Evaluator$',
+    '^EvaluatorSetup$',
+    '^FITDUser$',
+    '^FITDExperiment$',
+    '^LLMChat$',
+    '^Message$',
+    '^ModelEvaluationError$',
+    '^ModelEvaluator$',
+    '^ModelRole$',
+    '^ModelVerdictError$',
+    '^OpenAIAuthenticationError$',
+    '^OpenAIChat$',
+    '^OpenAIContentError$',
+    '^OpenAIError$',
+    '^OpenAIHTTPError$',
+    '^OpenAIJSONError$',
+    '^OpenAIRateLimitError$',
+    '^OpenAIResponseError$',
+    '^OpenAITimeoutError$',
+    '^OpenAITransportError$',
+    '^Progress$',
+    '^QwenChat$',
+    '^QwenContextError$',
+    '^QwenError$',
+    '^RunEvent$',
+    '^RunJournal$',
+    '^RunRecord$',
+    '^RunSnapshot$',
+    '^User$',
+    '^UserState$',
+    '^UserStatus$',
+    '^capture_run$',
+    '^load_alert_manifest$',
+    '^save_run$',
+    '^select_alert_records$',
+]
+
+# Each component's package interface matches its explicit __all__.
+[[interfaces]]
+from = ['^tai\.alert$']
+expose = ['^AlertManifest$', '^AlertRecord$', '^load_alert_manifest$', '^select_alert_records$']
+
+[[interfaces]]
+from = ['^tai\.attacks\.fitd$']
+expose = ['^FITDExperiment$', '^FITDUser$']
+
+[[interfaces]]
+from = ['^tai\.core\.chats$']
+expose = ['^ChatCancelled$', '^ChatTurn$', '^LLMChat$', '^ModelRole$']
+
+[[interfaces]]
+from = ['^tai\.core\.evaluation$']
+expose = ['^EvaluationChat$', '^Evaluator$', '^evaluate$']
+
+[[interfaces]]
+from = ['^tai\.core\.runs$']
+expose = ['^Evaluation$', '^Progress$', '^RunSnapshot$', '^User$', '^UserState$', '^UserStatus$']
+
+[[interfaces]]
+from = ['^tai\.core\.primitives\.messages$']
+expose = ['^Message$']
+
+[[interfaces]]
+from = ['^tai\.core\.primitives\.diagnostics$']
+expose = ['^DiagnosticObject$', '^DiagnosticRedactor$']
+
+# Namespace containers have no symbol facade of their own.
+[[interfaces]]
+from = ['^tai\.app$', '^tai\.attacks$', '^tai\.core$', '^tai\.core\.primitives$']
+expose = []
+
+# Descriptive leaf modules retain the public-symbol rule at every used depth.
+[[interfaces]]
+from = [
+    '^tai\.app\.[^.]+$',
+    '^tai\.alert\.[^.]+$',
+    '^tai\.attacks\.fitd\.[^.]+$',
+    '^tai\.core\.(chats|evaluation|runs)\.[^.]+$',
+    '^tai\.core\.primitives\.(messages|diagnostics)\.[^.]+$',
+]
+expose = ['^[A-Za-z][A-Za-z0-9_]*$']
+
+[rules]
+unused_ignore_directives = "error"
+require_ignore_directive_reasons = "error"
+unused_external_dependencies = "error"

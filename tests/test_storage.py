@@ -19,7 +19,7 @@ from tai import (
     capture_run,
     save_run,
 )
-from tai.terminal import run_foreground
+from tai.app.terminal import run_foreground
 
 
 def puzzle(user_type=FITDExperiment, **kwargs):
@@ -67,7 +67,7 @@ def test_wait_without_storage_configuration_never_saves_results(
 def test_terminal_status_cannot_be_captured_until_participants_are_released(
     tmp_path, monkeypatch
 ):
-    import tai.fitd as implementation
+    import tai.attacks.fitd.user as implementation
 
     entered, release = Event(), Event()
     release_chats = implementation._release_chats

@@ -90,11 +90,9 @@ Target и Attacker владеют своими разговорами через
 `.python-version`; системный Python менять не требуется.
 
 ```bash
-uv sync --locked
-uv run --locked pytest
-uv run --locked ruff check .
-uv run --locked ruff format --check .
-uv run --locked mypy
+uv sync --locked --group dev
+uv run --locked --group dev python quality/check.py
+uv run --locked --group dev pytest
 uv run --locked python examples/offline_fitd.py
 ```
 
@@ -103,6 +101,129 @@ uv run --locked python examples/offline_fitd.py
 к управляемому локальному HTTP endpoint; запрет внешней сети распространяется
 и на HTTP-подпроцессы. Программируются ответы моделей, а построение лестницы,
 переходы FITD и решение о продолжении выполняет настоящая библиотека.
+
+### Статические проверки Python Quality
+
+**Python Quality Bundle 1.0.0** — единственный набор статических проверок проекта.
+На свежем клоне достаточно
+`uv sync --locked --group dev`: инструменты закреплены в `pyproject.toml` и `uv.lock`,
+runner и профили находятся в [`quality/`](quality/README.md). Архитектура уже
+инициализирована; её состояние хранится в `quality/architecture.ready.json`.
+
+Единая команда проверяет `src/` и `tests/`:
+
+```bash
+uv run --locked --group dev python quality/check.py
+# Полный машиночитаемый вывод:
+uv run --locked --group dev python quality/check.py --json
+```
+
+| Инструмент | Проверки |
+| --- | --- |
+| Pylint 4.0.8 + clean-architecture-linter-plugin 1.2.2 | Ошибки, читаемость, сложность, дубли и архитектурные эвристики; отдельные профили production/tests. |
+| Pyright 1.1.414 | Строгая проверка типов. |
+| Tach 0.35.1 | Границы модулей, публичные импорты, слои, циклы и внешние зависимости (`check` и `check-external`). |
+| pydoclint 0.9.1 | Соответствие существующих Google docstrings сигнатуре и телу; наличие docstrings необязательно. |
+
+Все анализаторы выполняются до конца, даже если один нашёл нарушения. Код выхода:
+**0** — все проверки пройдены, **1** — найдены нарушения, **2** — ошибка конфигурации
+или исполнения инструмента. Успешная установка и принятие архитектурной конфигурации
+сами по себе не означают, что код прошёл строгий профиль.
+
+Полный отчёт всегда сохраняется в `.quality/reports/latest.json`, история — в
+`.quality/reports/<run-id>/report.json`, сырые логи — в соседнем `raw/`.
+Для короткого вывода можно добавить `--max-diagnostics 20`; JSON остаётся полным.
+Каталог `.quality/` исключён из Git. Проверки не создают baseline и не исправляют код.
+
+Настройки читаемости меняются в [`quality/readability.toml`](quality/readability.toml),
+общая область исключений — в [`quality/scope.toml`](quality/scope.toml). После изменения:
+
+```bash
+uv run --locked --group dev python quality/apply.py --json
+```
+
+Настройки типов находятся в `pyrightconfig.json`, архитектуры — в `tach.toml`.
+Runtime-тесты pytest и офлайн-пример запускаются отдельными командами выше.
+Локальные исправления runner проверяются отдельно:
+
+```bash
+uv run --locked --group dev python -m unittest discover -s quality/tests
+```
+
+При работе с окружением Qwen добавляйте `--extra qwen` к командам uv.
+Подробности профиля и ограничения: [`quality/README.md`](quality/README.md);
+инструкции для агентов: [`AGENTS.md`](AGENTS.md) и [`quality/AGENTS.md`](quality/AGENTS.md).
+Локальные исправления поставки: [`quality/LOCAL-CHANGES.md`](quality/LOCAL-CHANGES.md).
+
+### Архитектурные настройки Python Quality (Tach)
+
+[Tach](https://docs.gauge.sh/) входит в Python Quality и устанавливается
+вместе с dev-зависимостями.
+
+Пакеты группируют связанные обязанности; общие механизмы располагаются глубже
+прикладных сценариев, а базовые компоненты — в `core/primitives/`:
+
+```text
+src/tai/
+  __init__.py                 # пользовательский API
+  app/                        # CLI, конфигурация, preflight, одиночный запуск и серия
+  attacks/fitd/                # FITD User, garak-адаптер, профиль и сборка эксперимента
+  alert/                      # манифест, таксономия, подготовка и отчёт ALERT
+  core/
+    chats/                    # разговор и адаптеры OpenAI/Qwen
+    evaluation/               # контракт, оценщики, сборка и наблюдение
+    runs/                     # User, состояние, операции, журнал и сохранение
+    primitives/
+      messages/               # неизменяемый Message
+      diagnostics/            # диагностические снимки и редактирование секретов
+```
+
+Имена файлов описывают содержимое: `conversation.py`, `garak_adapter.py`,
+`model_evaluator.py`, `observation.py`, `message.py`, `redaction.py`.
+`__init__.py` с явным `__all__` задаёт интерфейс компонента. Например:
+
+```python
+from tai.attacks.fitd import FITDExperiment, FITDUser
+from tai.core.chats import LLMChat
+from tai.core.chats.openai import OpenAIChat
+from tai.core.primitives.messages import Message
+```
+
+Контрактные интерфейсы `chats`, `evaluation` и `runs` экспортируют общие типы
+и операции; конкретные адаптеры, сборка и хранение импортируются из именованных
+модулей. Корневой API `from tai import ...` сохраняется. Старые пути плоских
+модулей заменены новыми; entry point команды `tai` — `tai.app.cli:main`.
+HTTP-worker находится рядом с `openai.py` и запускается по имени файла
+`http_worker.py`; эта связь исполнения дополняет граф Python-импортов.
+
+[`tach.toml`](tach.toml) фиксирует файловые границы, включая `__init__.py`, и
+зависимости внутри и между компонентами. Публичные экспорты пакетов соответствуют
+их `__all__`; интерфейсы остальных модулей открывают символы без начального
+подчёркивания. Проверка учитывает импорты под `TYPE_CHECKING`;
+`exact = true` выявляет как неразрешённые зависимости, так и неиспользуемые разрешения.
+Проверки циклов и явных межслойных зависимостей включены.
+
+Слои назначены отдельным модулям внутри пакетов: контракты и предметные значения —
+Domain; выполнение запусков, preflight и отчёты серий — UseCase; адаптеры garak/HTTP/Qwen,
+наблюдение оценивания, журнал и хранение — Infrastructure; терминал — Interface;
+сборка зависимостей, CLI и фасад FITD/корневой API — Bootstrap.
+Дополнительные `cannot_depend_on` запрещают связи
+Interface → Infrastructure и Infrastructure → UseCase, которые разрешил бы один
+лишь линейный порядок слоёв. Текущие импорты остаются видимыми для диагностики:
+принятие конфигурации не подавляет нарушения границ или слоёв.
+
+Проверки модульных и внешних зависимостей выполняются через `quality/check.py`.
+
+При добавлении модуля задайте в `tach.toml` его слой, зависимости и публичный интерфейс.
+После намеренного изменения зависимостей можно выполнить
+`uv run --locked --group dev tach sync`, затем обязательно просмотреть diff:
+sync записывает фактические импорты, в том числе нежелательные. Для обычной проверки
+sync не нужен. После изменения слоёв синхронизируйте clean-architecture-плагин:
+
+```bash
+uv run --locked --group dev python quality/init_architecture.py --accept --json
+uv run --locked --group dev python quality/check.py
+```
 
 ### Закрепление garak
 
@@ -543,7 +664,7 @@ CLI обрабатывает Ctrl+C: обработчик только выст�
 
 Повтор команды создаёт новый UUID и каталог, сохраняя прежние файлы. Журнал пишет
 независимый `RunJournal`, подключённый обёртками в `FITDExperiment`. Итоговые
-метаданные и полный результат сохраняет `tai.storage` после ожидания User.
+метаданные и полный результат сохраняет `tai.core.runs.storage` после ожидания User.
 Терминал читает этот же журнал. В диагностике
 сохраняются режим авторизации и редактированные снимки настроек и сообщений
 (правила — в разделе «Авторизация в диагностических снимках» ниже).

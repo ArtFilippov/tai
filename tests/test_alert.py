@@ -11,10 +11,10 @@ from pathlib import Path
 import pytest
 
 from tai import AlertManifest, load_alert_manifest, select_alert_records
-from tai import _alert_prepare as preparation
-from tai._alert_taxonomy import CATEGORY_ORDER, MACRO_CATEGORIES, TAXONOMY_SHA256
-from tai.alert import DEFAULT_SEED, SOURCE_COUNT, SOURCE_SHA256, SOURCE_URL
-from tai.cli import main
+from tai.alert import preparation
+from tai.alert.manifest import DEFAULT_SEED, SOURCE_COUNT, SOURCE_SHA256, SOURCE_URL
+from tai.alert.taxonomy import CATEGORY_ORDER, MACRO_CATEGORIES, TAXONOMY_SHA256
+from tai.app.cli import main
 
 ROOT = Path(__file__).resolve().parents[1]
 TAXONOMY = ROOT / "ALERT_taxonomy.md"
@@ -372,7 +372,7 @@ def test_preparation_download_then_offline_reproduces_identical_bytes(
         )
 
     monkeypatch.setattr(preparation, "urlopen", download)
-    monkeypatch.setattr("tai.cli.load_profile", forbidden)
+    monkeypatch.setattr("tai.app.cli.load_profile", forbidden)
     source = tmp_path / "alert.jsonl"
     output = tmp_path / "sample.json"
     args = [

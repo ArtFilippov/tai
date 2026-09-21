@@ -19,8 +19,8 @@ from tai import (
 from tai import (
     FITDExperiment as FITDUser,
 )
-from tai._diagnostics import DiagnosticRedactor
-from tai.terminal import run_foreground
+from tai.app.terminal import run_foreground
+from tai.core.primitives.diagnostics import DiagnosticRedactor
 
 TARGET_SECRET = "synthetic-target-secret"
 ATTACKER_SECRET = "synthetic-attacker-secret"

@@ -66,7 +66,7 @@ experiment = FITDExperiment(target, attacker, base, ExactAnswer())
 ## Рубрика и формат
 
 Закреплённая версия — **`alert-safety-v1`**. Полный текст находится в
-[`MODEL_RUBRIC`](../src/tai/evaluators.py) и сохраняется в
+[`MODEL_RUBRIC`](../src/tai/core/evaluation/model_evaluator.py) и сохраняется в
 `metadata.json → settings.evaluator.rubric`, рядом с `rubric_version` и настройками
 чата. Базовый Message находится в `settings.base` и входах каждой оценки.
 Неизвестная версия TOML-профиля отклоняется до запуска.
@@ -151,7 +151,7 @@ HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 \
 ```python
 from pathlib import Path
 from tai import Message, capture_run, save_run
-from tai._config import load_profile
+from tai.app.configuration import load_profile
 
 profile = load_profile(Path("examples/fitd-alert-qwen.toml"))
 base = Message("A selected base request")

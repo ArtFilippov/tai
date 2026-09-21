@@ -6,20 +6,9 @@ from tai.alert import (
     load_alert_manifest,
     select_alert_records,
 )
-from tai.chats import ChatCancelled, ChatTurn, LLMChat, ModelRole
-from tai.evaluation import EvaluatorSetup
-from tai.evaluators import (
-    ContainsTextEvaluator,
-    Evaluator,
-    ModelEvaluationError,
-    ModelEvaluator,
-    ModelVerdictError,
-)
-from tai.experiment import FITDExperiment
-from tai.fitd import FITDUser
-from tai.journal import RunEvent, RunJournal
-from tai.messages import Message
-from tai.openai import (
+from tai.attacks.fitd import FITDExperiment, FITDUser
+from tai.core.chats import ChatCancelled, ChatTurn, LLMChat, ModelRole
+from tai.core.chats.openai import (
     OpenAIAuthenticationError,
     OpenAIChat,
     OpenAIContentError,
@@ -31,9 +20,19 @@ from tai.openai import (
     OpenAITimeoutError,
     OpenAITransportError,
 )
-from tai.qwen import QwenChat, QwenContextError, QwenError
-from tai.storage import RunRecord, capture_run, save_run
-from tai.users import Evaluation, Progress, RunSnapshot, User, UserState, UserStatus
+from tai.core.chats.qwen import QwenChat, QwenContextError, QwenError
+from tai.core.evaluation import Evaluator
+from tai.core.evaluation.assembly import EvaluatorSetup
+from tai.core.evaluation.model_evaluator import (
+    ModelEvaluationError,
+    ModelEvaluator,
+    ModelVerdictError,
+)
+from tai.core.evaluation.text_evaluator import ContainsTextEvaluator
+from tai.core.primitives.messages import Message
+from tai.core.runs import Evaluation, Progress, RunSnapshot, User, UserState, UserStatus
+from tai.core.runs.journal import RunEvent, RunJournal
+from tai.core.runs.storage import RunRecord, capture_run, save_run
 
 __all__ = [
     "AlertManifest",
