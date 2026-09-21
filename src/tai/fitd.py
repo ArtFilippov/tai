@@ -11,6 +11,18 @@ from typing import Any, TextIO
 from uuid import uuid4
 
 from tai._diagnostics import DiagnosticRedactor
+from tai._operations import (
+    Cause,
+    Checkpoint,
+    Context,
+    ConversationChange,
+    EvaluationResult,
+    Exchange,
+    ResourcesReleased,
+    ResultChange,
+    RunStarted,
+    WorkerOutcome,
+)
 from tai._profile import FITD_PROFILE
 from tai.chats import ChatCancelled, LLMChat, ModelRole, _acquire_chats, _release_chats
 from tai.evaluators import Evaluator, ModelEvaluator
@@ -141,20 +153,22 @@ class _Execution:
         self._run_dir: Path | None = None
         self._closed = False
 
-    def start(self) -> None:
+    def start(self) -> RunStarted:
         with self._lock:
             _acquire_chats(self._chats, self)
             try:
+                run_id = str(uuid4())
                 self._status = replace(
-                    self._status, state=UserState.RUNNING, run_id=str(uuid4())
+                    self._status, state=UserState.RUNNING, run_id=run_id
                 )
                 self._worker = Thread(
-                    target=self._run, name=f"fitd-{self._status.run_id}"
+                    target=self._run, args=(run_id,), name=f"fitd-{run_id}"
                 )
                 self._worker.start()
             except Exception:
                 _release_chats(self._chats, self)
                 raise
+            return RunStarted(run_id)
 
     def is_active(self) -> bool:
         with self._lock:
@@ -225,9 +239,15 @@ class _Execution:
         self._events.append(event)
 
     def _send(
-        self, role: ModelRole, message: Message, *, result_id: str | None = None
-    ) -> Message:
+        self,
+        role: ModelRole,
+        message: Message,
+        cause: Cause,
+        *,
+        result_id: str | None = None,
+    ) -> Exchange:
         chat, counter = self._participants[role]
+        context = self._context(role, cause)
         call_id = str(uuid4())
         link = {"result_id": result_id} if result_id is not None else {}
         with self._lock:
@@ -284,59 +304,107 @@ class _Execution:
                 self._status,
                 progress=replace(progress, **{counter: getattr(progress, counter) + 1}),
             )
-        return response
+        return Exchange(context, call_id, message, response)
 
-    def _checkpoint(self, role: ModelRole) -> object:
-        self._check_running()
-        return self._participants[role][0].checkpoint()
+    def _context(self, role: ModelRole, cause: Cause) -> Context:
+        run_id = self._status.run_id
+        assert run_id is not None
+        return Context(run_id, role, self._conversation_id(role), cause)
 
-    def _restore(self, role: ModelRole, checkpoint: object) -> None:
+    def _checkpoint(self, role: ModelRole, cause: Cause) -> Checkpoint:
         self._check_running()
-        self._participants[role][0].restore(checkpoint)
+        token = self._participants[role][0].checkpoint()
+        return Checkpoint(self._context(role, cause), str(uuid4()), token)
 
-    def _reset(self, role: ModelRole) -> None:
+    def _restore(
+        self, role: ModelRole, checkpoint: Checkpoint, cause: Cause
+    ) -> ConversationChange:
         self._check_running()
+        self._participants[role][0].restore(checkpoint.token)
+        context = self._context(role, cause)
+        return ConversationChange(
+            "restored", context, context.conversation_id, checkpoint
+        )
+
+    def _reset(self, role: ModelRole, cause: Cause) -> ConversationChange:
+        self._check_running()
+        previous = self._conversation_id(role)
         self._participants[role][0].reset()
+        return ConversationChange("reset", self._context(role, cause), previous)
 
     def _conversation_id(self, role: ModelRole) -> str:
         return self._participants[role][0].conversation_id
 
-    def _publish(self, result: Message | None) -> None:
+    def _publish(
+        self, result: Message | None, context: Context, checkpoint_id: str
+    ) -> ResultChange:
         with self._lock:
+            previous, evaluation = self._result, self._status.evaluation
             if self._closed or self._result is result:
-                return
+                return ResultChange(
+                    "unchanged",
+                    context,
+                    checkpoint_id,
+                    previous,
+                    previous,
+                    evaluation,
+                    evaluation,
+                )
             self._result = result
             self._status = replace(
                 self._status,
                 result_id=result.id if result is not None else None,
                 evaluation=None,
             )
+            change = ResultChange(
+                "withdrawn"
+                if result is None
+                else ("accepted" if previous is None else "replaced"),
+                context,
+                checkpoint_id,
+                previous,
+                result,
+                evaluation,
+                None,
+            )
         assert self._run_dir is not None
         if result is None:
             self._emit("result_withdrawn")
             (self._run_dir / "result.txt").unlink(missing_ok=True)
-            return
+            return change
         self._emit("result_published", result=json.loads(result.dump()))
         (self._run_dir / "result.txt").write_text(result.to_string(), encoding="utf-8")
+        return change
 
     def _check_running(self) -> None:
         if self._closed or self._stop_requested.is_set():
             raise ChatCancelled()
 
-    def _evaluate(self) -> bool:
+    def _evaluate(
+        self, result: Message, context: Context, checkpoint_id: str
+    ) -> EvaluationResult:
         with self._lock:
             self._check_running()
-            result = self._result
-            if result is None:
-                raise RuntimeError("FITD requested evaluation without a result")
+            if self._result is not result:
+                raise RuntimeError(
+                    "FITD requested evaluation of an unpresented Message"
+                )
             self._status = replace(self._status, evaluation=None)
             self._record_event("evaluation_started", result_id=result.id)
         self._flush_events()
         evaluator = self._evaluator
         if isinstance(evaluator, ModelEvaluator):
+
+            def reset_evaluator() -> None:
+                self._reset("Evaluator", context.cause)
+
             evaluator = evaluator._with_io(
-                lambda message: self._send("Evaluator", message, result_id=result.id),
-                lambda: self._reset("Evaluator"),
+                lambda message: (
+                    self._send(
+                        "Evaluator", message, context.cause, result_id=result.id
+                    ).response
+                ),
+                reset_evaluator,
             )
         try:
             success = evaluator.is_success(result)
@@ -352,26 +420,34 @@ class _Execution:
                 error=f"{type(exc).__name__}: {exc}",
             )
             raise
-        evaluation = Evaluation(result.id, success)
-        self._emit("evaluation_completed", **asdict(evaluation))
-        with self._lock:
-            self._status = replace(self._status, evaluation=evaluation)
-        return success
+        return self._record_evaluation(result, success, context, checkpoint_id)
 
-    def _run(self) -> None:
-        run_id = self.status().run_id
-        assert run_id is not None
+    def _record_evaluation(
+        self, result: Message, success: bool, context: Context, checkpoint_id: str
+    ) -> EvaluationResult:
+        """Commit the verdict only to the exact, still presented Message."""
+        evaluation = Evaluation(result.id, success)
+        with self._lock:
+            if self._closed or self._result is not result:
+                raise RuntimeError("Cannot record evaluation of an unpresented Message")
+            self._status = replace(self._status, evaluation=evaluation)
+        self._emit("evaluation_completed", **asdict(evaluation))
+        return EvaluationResult(context, checkpoint_id, result, evaluation)
+
+    def _run(self, run_id: str) -> WorkerOutcome:
         run_dir = self._artifacts_dir / run_id
         state, reason = UserState.COMPLETED, "round_limit"
         settings: dict[str, Any] | None = None
+        error: Exception | None = None
+        released: ResourcesReleased | None = None
         try:
             run_dir.mkdir(parents=True, exist_ok=False)
             self._run_dir = run_dir
             with (run_dir / "events.jsonl").open("w", encoding="utf-8") as journal:
                 self._journal = journal
                 try:
-                    for chat, _ in self._participants.values():
-                        chat.reset()
+                    for role in self._participants:
+                        self._reset(role, Cause("run_started"))
                     from tai._fitd import GARAK_REVISION, run_fitd
 
                     settings = {
@@ -400,6 +476,7 @@ class _Execution:
                         profile=self._profile,
                     )
                 except Exception as exc:
+                    error = exc
                     if isinstance(exc, ChatCancelled) and self._stop_requested.is_set():
                         state, reason = UserState.STOPPED, "user_stop"
                     else:
@@ -408,6 +485,7 @@ class _Execution:
             self._journal = None
             self._finalize(run_dir, state, reason, settings)
         except Exception as exc:
+            error = exc
             with self._lock:
                 self._status = replace(
                     self._status,
@@ -418,7 +496,22 @@ class _Execution:
             self._journal = None
             with self._lock:
                 self._closed = True
-            _release_chats(self._chats, self)
+            try:
+                released = self._release_resources(run_id)
+            except Exception as exc:
+                with self._lock:
+                    if self._status.state is not UserState.FAILED or error is None:
+                        error = exc
+                    self._status = replace(
+                        self._status,
+                        state=UserState.FAILED,
+                        reason=f"{type(error).__name__}: {error}",
+                    )
+        return WorkerOutcome(self.status(), self.result(), error, released)
+
+    def _release_resources(self, run_id: str) -> ResourcesReleased:
+        _release_chats(self._chats, self)
+        return ResourcesReleased(run_id, tuple(self._participants))
 
     def _finalize(
         self,
