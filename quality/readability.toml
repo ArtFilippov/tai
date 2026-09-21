@@ -1,12 +1,12 @@
 # Edit these limits, then run: uv run --locked python quality/apply.py
 # Length means Pylint's own metrics, NOT an AST-independent line count.
 [production]
-max_line_length = 100
-max_module_lines = 400
-max_statements = 30
-max_complexity = 8
-max_branches = 8
-max_nested_blocks = 4
+max_line_length = 160
+max_module_lines = 300
+max_statements = 20
+max_complexity = 6
+max_branches = 4
+max_nested_blocks = 3
 max_locals = 10
 max_returns = 4
 max_bool_expr = 4
@@ -21,9 +21,9 @@ max_try_statements = 1
 
 # Test-only overrides. Missing keys inherit production values.
 [tests]
-max_module_lines = 800
-max_statements = 60
-max_complexity = 10
+max_module_lines = 500
+max_statements = 30
+max_complexity = 6
 max_branches = 10
 max_nested_blocks = 4
 max_locals = 20

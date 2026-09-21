@@ -23,8 +23,8 @@ indent-string = "    "
 indent-after-paren = 4
 single-line-if-stmt = false
 single-line-class-stmt = false
-max-line-length = 100
-max-module-lines = 800
+max-line-length = 160
+max-module-lines = 500
 
 [tool.pylint.similarities]
 ignore-comments = true
@@ -34,8 +34,8 @@ ignore-signatures = true
 min-similarity-lines = 4
 
 [tool.pylint.design]
-max-statements = 60
-max-complexity = 10
+max-statements = 30
+max-complexity = 6
 max-branches = 10
 max-locals = 20
 max-returns = 6
