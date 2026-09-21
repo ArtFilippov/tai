@@ -12,7 +12,7 @@ def test_terminal_does_not_reevaluate_or_attribute_old_score_to_new_result(
         def __init__(self):
             self.results = []
 
-        def is_success(self, result):
+        def evaluate(self, base, result):
             self.results.append(result)
             if len(self.results) == 2:
                 raise RuntimeError("Required evaluation unavailable")

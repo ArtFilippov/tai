@@ -7,16 +7,15 @@ from pathlib import Path
 from typing import Any
 
 from tai import (
-    ContainsTextEvaluator,
-    Evaluator,
+    EvaluatorSetup,
     FITDExperiment,
     LLMChat,
     Message,
-    ModelEvaluator,
     OpenAIChat,
     QwenChat,
 )
 from tai._diagnostics import DiagnosticRedactor
+from tai.chats import ModelRole
 from tai.evaluators import MODEL_RUBRIC_VERSION
 
 
@@ -127,32 +126,40 @@ def _openai_chat(value: Any, role: str) -> OpenAIChat:
 
 
 @dataclass(frozen=True)
-class ModelEvaluatorProfile:
-    """Unbound classifier configuration; each base gets its own Evaluator."""
-
-    chat: LLMChat
-    rubric_version: str
-
-
-@dataclass(frozen=True)
 class RoleProfile:
     target: LLMChat
     attacker: LLMChat
-    evaluator: ContainsTextEvaluator | ModelEvaluatorProfile
+    evaluator: EvaluatorSetup
     max_calls_per_conv: int
 
-    def redactor(self) -> DiagnosticRedactor:
-        chats = [self.target, self.attacker]
-        if isinstance(self.evaluator, ModelEvaluatorProfile):
-            chats.append(self.evaluator.chat)
-        return DiagnosticRedactor.combine(*(chat._redactor for chat in chats))
+    def __post_init__(self) -> None:
+        chats = tuple(self.chats().values())
+        if len({id(chat) for chat in chats}) != len(chats):
+            raise ValueError("Participants must use independent LLMChat instances")
 
-    def create_evaluator(self, base: Message) -> Evaluator:
-        if isinstance(self.evaluator, ModelEvaluatorProfile):
-            return ModelEvaluator(
-                self.evaluator.chat, base, self.evaluator.rubric_version
-            )
-        return self.evaluator
+    def chats(self) -> dict[ModelRole, LLMChat]:
+        chats: dict[ModelRole, LLMChat] = {
+            "Target": self.target,
+            "Attacker": self.attacker,
+        }
+        if self.evaluator.chat is not None:
+            chats["Evaluator"] = self.evaluator.chat
+        return chats
+
+    def redactor(self) -> DiagnosticRedactor:
+        return DiagnosticRedactor.combine(
+            *(chat._redactor for chat in self.chats().values())
+        )
+
+    def settings(self) -> dict[str, Any]:
+        redactor = self.redactor()
+        return {
+            "evaluator": redactor.snapshot(self.evaluator.settings()),
+            **{
+                role: chat._diagnostic_settings(redactor)
+                for role, chat in self.chats().items()
+            },
+        }
 
     def create_experiment(
         self, base: Message, journal_dir: Path | None = None
@@ -161,13 +168,13 @@ class RoleProfile:
             self.target,
             self.attacker,
             base,
-            self.create_evaluator(base),
+            self.evaluator,
             journal_dir=journal_dir,
             max_calls_per_conv=self.max_calls_per_conv,
         )
 
 
-def load_profile(config: Path) -> RoleProfile:
+def load_profile(config: Path, *, alert_series: bool = False) -> RoleProfile:
     """One validated profile shared by readiness and terminal experiments."""
     with config.open("rb") as source:
         try:
@@ -183,10 +190,12 @@ def load_profile(config: Path) -> RoleProfile:
     evaluation = data.get("evaluator")
     if not isinstance(evaluation, dict):
         raise ValueError("evaluator: требуется TOML-таблица")
-    evaluator: ContainsTextEvaluator | ModelEvaluatorProfile
+    if alert_series and evaluation.get("type") != "model":
+        raise ValueError("ALERT series requires evaluator.type=model")
+    evaluator: EvaluatorSetup
     if evaluation.get("type") == "contains_text":
         evaluation = _table(evaluation, "evaluator", {"type", "criterion"})
-        evaluator = ContainsTextEvaluator(
+        evaluator = EvaluatorSetup.contains_text(
             _string(evaluation.get("criterion"), "evaluator.criterion")
         )
     elif evaluation.get("type") == "model":
@@ -198,7 +207,7 @@ def load_profile(config: Path) -> RoleProfile:
             raise ValueError(
                 f"evaluator.rubric_version: требуется {MODEL_RUBRIC_VERSION}"
             )
-        evaluator = ModelEvaluatorProfile(
+        evaluator = EvaluatorSetup.model(
             _chat(evaluation.get("chat"), "evaluator.chat"), rubric_version
         )
     else:
@@ -210,4 +219,6 @@ def load_profile(config: Path) -> RoleProfile:
     max_calls = run.get("max_calls_per_conv", 10)
     if type(max_calls) is not int or max_calls <= 0:
         raise ValueError("run.max_calls_per_conv: требуется положительное целое")
+    if alert_series and max_calls != 20:
+        raise ValueError("ALERT series requires run.max_calls_per_conv=20")
     return RoleProfile(target, attacker, evaluator, max_calls)

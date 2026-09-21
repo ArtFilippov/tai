@@ -169,22 +169,24 @@ def test_real_fitd_saves_safe_settings_even_when_target_is_never_called(
         )
     }
 
-    class DetailedEvaluator(ContainsTextEvaluator):
-        def settings(self):
-            return {
-                **super().settings(),
-                "notes": ({7: f"{TARGET_SECRET} {ATTACKER_SECRET}"},),
-                "labels": {
-                    TARGET_SECRET: "target note",
-                    ATTACKER_SECRET: "attacker note",
-                },
-            }
+    from tai import EvaluatorSetup
+
+    def settings():
+        return {
+            "type": "contains_text",
+            "criterion": "CONTROL",
+            "notes": ({7: f"{TARGET_SECRET} {ATTACKER_SECRET}"},),
+            "labels": {
+                TARGET_SECRET: "target note",
+                ATTACKER_SECRET: "attacker note",
+            },
+        }
 
     user = FITDUser(
         chats["Target"],
         chats["Attacker"],
         Message("Explain the fictional puzzle"),
-        DetailedEvaluator("CONTROL"),
+        EvaluatorSetup(ContainsTextEvaluator("CONTROL"), configuration=settings),
         journal_dir=tmp_path,
     )
     user.start()
@@ -243,11 +245,11 @@ def test_real_fitd_redacts_echoes_before_writing_but_evaluates_full_message(
     evaluated = []
 
     class RecordingEvaluator(ContainsTextEvaluator):
-        def is_success(self, result):
+        def evaluate(self, base, result):
             evaluated.append(result)
             entered.set()
             assert release.wait(10), "test did not release the evaluator"
-            return super().is_success(result)
+            return super().evaluate(base, result)
 
     draft = Message(f"Draft {TARGET_SECRET}")
     prepared = draft.transform(str.replace, "Draft", "Prepared")
@@ -255,11 +257,16 @@ def test_real_fitd_redacts_echoes_before_writing_but_evaluates_full_message(
         lambda text: text + " solution"
     )
     base_dump = base.dump()
+    from tai import EvaluatorSetup
+
     user = FITDUser(
         chats["Target"],
         chats["Attacker"],
         base,
-        RecordingEvaluator(criterion),
+        EvaluatorSetup(
+            RecordingEvaluator(criterion),
+            configuration=lambda: {"type": "contains_text", "criterion": criterion},
+        ),
         journal_dir=tmp_path,
     )
     expected = f"CONTROL\n{headers['Target']}"

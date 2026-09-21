@@ -33,9 +33,9 @@ class RecordingEvaluator(Evaluator):
     def __init__(self):
         self.results = []
 
-    def is_success(self, result):
+    def evaluate(self, base, result):
         self.results.append(result)
-        return ContainsTextEvaluator("CONTROL").is_success(result)
+        return ContainsTextEvaluator("CONTROL").evaluate(base, result)
 
 
 def run_puzzle(tmp_path, target_responses, attacker_responses):
@@ -143,7 +143,7 @@ def test_refusal_is_rephrased_and_restored_before_continuing_the_real_ladder(tmp
 
 def assert_rejected_control_is_diagnostic(user, evaluator, events):
     assert "CONTROL" not in user.result().to_string()
-    assert ContainsTextEvaluator("CONTROL").is_success(user.result()) is False
+    assert ContainsTextEvaluator("CONTROL").evaluate(user._base, user.result()) is False
     assert all("CONTROL" not in result.to_string() for result in evaluator.results)
     assert not any(
         e["kind"] == "evaluation_completed" and e["data"]["success"] for e in events

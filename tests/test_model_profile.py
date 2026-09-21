@@ -18,20 +18,20 @@ from tai import (
     capture_run,
     save_run,
 )
-from tai._config import ModelEvaluatorProfile, load_profile
+from tai._config import load_profile
 
 ALERT_PROFILE = Path("examples/fitd-alert-qwen.toml")
 
 
-def test_alert_profile_pins_three_independent_roles_and_base_specific_factory():
+def test_alert_profile_pins_three_independent_roles_and_reusable_evaluator():
     profile = load_profile(ALERT_PROFILE)
-    assert isinstance(profile.evaluator, ModelEvaluatorProfile)
-    first = profile.create_evaluator(Message("First base"))
-    second = profile.create_evaluator(Message("Second base"))
-    assert isinstance(first, ModelEvaluator) and isinstance(second, ModelEvaluator)
-    assert first is not second and first.base.id != second.base.id
-    assert first.settings()["base"]["text"] == "First base"
-    assert second.settings()["base"]["text"] == "Second base"
+    assert isinstance(profile.evaluator.evaluator, ModelEvaluator)
+    first = profile.create_experiment(Message("First base"))
+    second = profile.create_experiment(Message("Second base"))
+    assert first._evaluator is second._evaluator is profile.evaluator.evaluator
+    assert first._base.to_string() == "First base"
+    assert second._base.to_string() == "Second base"
+    assert "base" not in profile.evaluator.settings()
     chats = (profile.target, profile.attacker, profile.evaluator.chat)
     assert len({id(chat) for chat in chats}) == 3
     assert len({chat.conversation_id for chat in chats}) == 3
@@ -47,9 +47,8 @@ def test_alert_profile_pins_three_independent_roles_and_base_specific_factory():
         assert len(settings["initial_history"]) == 1
         assert "puzzle" not in json.dumps(settings)
         assert "SILVER-KEY" not in json.dumps(settings)
-    # Legacy profiles keep the original evaluator contract.
-    legacy = load_profile(Path("examples/fitd-qwen.toml"))
-    assert isinstance(legacy.create_evaluator(Message("base")), ContainsTextEvaluator)
+    text_profile = load_profile(Path("examples/fitd-qwen.toml"))
+    assert isinstance(text_profile.evaluator.evaluator, ContainsTextEvaluator)
 
 
 @pytest.mark.parametrize(
@@ -119,8 +118,8 @@ def test_preflight_exercises_neutral_pair_and_requires_structured_verdict(
     assert [r["role"] for r in data["roles"]] == ["Target", "Attacker", "Evaluator"]
     judge = data["roles"][2]
     assert judge["ok"] is valid and judge["response"] == response
-    assert judge["settings"]["chat"]["conversation_id"] == judge["conversation_id"]
-    assert len(judge["settings"]["chat"]["initial_history"]) == 1
+    assert judge["exchange_settings"]["conversation_id"] == judge["conversation_id"]
+    assert len(judge["exchange_settings"]["initial_history"]) == 1
     assert judge["result_id"] == judge["result"]["id"]
     if valid:
         assert judge["success"] is json.loads(response)["success"]
@@ -277,7 +276,7 @@ def test_evaluator_json_credentials_are_redacted_before_journaling_and_in_proven
     assert events == [json.loads(e.dump()) for e in user.journal.events()]
     assert_safe_tree(events)
     assert_safe_tree(metadata)
-    assert metadata["settings"]["evaluator"]["base"]["text"] == expected["base_request"]
+    assert metadata["settings"]["base"]["text"] == expected["base_request"]
     completed = [
         e["data"]
         for e in events

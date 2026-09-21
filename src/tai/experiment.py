@@ -13,7 +13,8 @@ from pathlib import Path
 from tai._diagnostics import DiagnosticRedactor
 from tai._operations import WorkerOutcome
 from tai.chats import LLMChat
-from tai.evaluators import Evaluator, ModelEvaluator
+from tai.evaluation import EvaluatorSetup, observe_evaluation
+from tai.evaluators import Evaluator
 from tai.fitd import FITDUser, _Execution
 from tai.journal import RunJournal
 from tai.messages import Message
@@ -65,26 +66,31 @@ def _execution_type(journal: RunJournal, directory: Path | None) -> type[_Execut
                 journal.enqueue("stop_requested")
             return stopped
 
-        def _exchange(self, context, call_id, message, result_id):
+        def _exchange(self, context, call_id, message):
             operation = super()._exchange
             return journal.call(
                 "exchange",
-                lambda: operation(context, call_id, message, result_id),
+                lambda: operation(context, call_id, message),
                 context=context,
                 call_id=call_id,
                 message=message,
-                result_id=result_id,
             )
 
         def _assess(self, result, context, checkpoint_id):
             operation = super()._assess
-            return journal.call(
-                "assessment",
-                lambda: operation(result, context, checkpoint_id),
-                context=context,
-                result_id=result.id,
-                checkpoint_id=checkpoint_id,
-            )
+            with observe_evaluation(
+                journal, context, self._base, result
+            ) as evaluation_id:
+                return journal.call(
+                    "assessment",
+                    lambda: operation(result, context, checkpoint_id),
+                    context=context,
+                    base=self._base,
+                    result=result,
+                    evaluation_id=evaluation_id,
+                    result_id=result.id,
+                    checkpoint_id=checkpoint_id,
+                )
 
         def _run_strategy(self, **kwargs):
             from tai._fitd import _FITD, _Target
@@ -132,7 +138,7 @@ class FITDExperiment(FITDUser):
         target: LLMChat,
         attacker: LLMChat,
         base: Message,
-        evaluator: Evaluator,
+        evaluator: Evaluator | EvaluatorSetup,
         *,
         journal_dir: str | Path | None = None,
         max_calls_per_conv: int = 10,
@@ -166,9 +172,7 @@ class FITDExperiment(FITDUser):
     def _new_execution(
         self, execution_type: type[_Execution] | None = None
     ) -> _Execution:
-        chats = {"Target": self._target, "Attacker": self._attacker}
-        if isinstance(self._evaluator, ModelEvaluator):
-            chats["Evaluator"] = self._evaluator.chat
+        chats = self._source_chats
         redactor = DiagnosticRedactor.combine(
             *(chat._redactor for chat in chats.values())
         )
@@ -185,7 +189,7 @@ class FITDExperiment(FITDUser):
             return {
                 "garak_revision": GARAK_REVISION,
                 **asdict(self._profile),
-                "evaluator": self._evaluator.settings(),
+                "evaluator": self._evaluation_setup.settings(),
                 "base": self._base,
                 **participants(),
             }

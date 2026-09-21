@@ -1,25 +1,28 @@
-"""One real exchange per role, including a neutral model-classification pair."""
+"""Real role exchanges and a neutral pair through the common evaluator contract."""
 
 import json
 from collections.abc import Callable
 from datetime import UTC, datetime
+from functools import partial
 from importlib.metadata import version
 from pathlib import Path
 from time import monotonic
 from typing import Any
 from uuid import uuid4
 
-from tai._config import ModelEvaluatorProfile, RoleProfile
+from tai._config import RoleProfile
 from tai._operations import (
     Cause,
     Context,
     ConversationChange,
     EvaluationResult,
     Exchange,
+    ResourcesReleased,
     WorkerOutcome,
 )
-from tai.chats import LLMChat, ModelRole
-from tai.evaluators import ModelEvaluator
+from tai.chats import LLMChat, ModelRole, _acquire_chats, _release_chats
+from tai.evaluation import observe_evaluation
+from tai.evaluators import evaluate
 from tai.journal import RunJournal
 from tai.messages import Message
 from tai.users import Evaluation, UserState, UserStatus
@@ -36,13 +39,21 @@ def run_preflight(
     error: Exception | None = None
     data: dict[str, Any] = {"ready": False}
     rendered = None
+    chats = tuple(profile.chats().values())
+    acquired = False
+    released = None
     try:
         journal.begin(run_id)
+        _acquire_chats(chats, journal)
+        acquired = True
         data = _check_roles(profile, journal, run_id)
     except Exception as exc:
         error = exc
         raise
     finally:
+        if acquired:
+            _release_chats(chats, journal)
+            released = ResourcesReleased(run_id, tuple(profile.chats()))
         try:
             rendered = journal.finish(
                 WorkerOutcome(
@@ -58,7 +69,7 @@ def run_preflight(
                     ),
                     None,
                     error,
-                    None,
+                    released,
                 ),
                 report=(data, report) if error is None else None,
             )
@@ -76,7 +87,7 @@ def _check_roles(
     prompt = "Reply with exactly READY."
     redactor = journal.redactor
 
-    def exchange(role: ModelRole, chat, request: Message, result_id=None) -> Message:
+    def exchange(role: ModelRole, chat: LLMChat, request: Message) -> Message:
         context = Context(run_id, role, chat.conversation_id, Cause("preflight"))
         call_id = str(uuid4())
         return journal.call(
@@ -85,8 +96,16 @@ def _check_roles(
             context=context,
             call_id=call_id,
             message=request,
-            result_id=result_id,
         ).response
+
+    def reset(role: ModelRole, chat: LLMChat) -> ConversationChange:
+        previous = chat.conversation_id
+        chat.reset()
+        return ConversationChange(
+            "reset",
+            Context(run_id, role, chat.conversation_id, Cause("preflight")),
+            previous,
+        )
 
     results = []
     ready = True
@@ -95,7 +114,7 @@ def _check_roles(
         ("Attacker", profile.attacker),
     )
     for role, chat in participants:
-        result: dict[str, object] = {
+        result: dict[str, Any] = {
             "role": role,
             "conversation_id": chat.conversation_id,
             "started_at": datetime.now(UTC).isoformat(),
@@ -103,6 +122,11 @@ def _check_roles(
         }
         start = monotonic()
         try:
+            journal.call("preflight.reset", partial(reset, role, chat))
+            result.update(
+                conversation_id=chat.conversation_id,
+                settings=chat._diagnostic_settings(redactor),
+            )
             text = exchange(role, chat, Message(prompt)).to_string()
             ok = bool(text.strip())
             result.update(ok=ok, response=text)
@@ -121,55 +145,25 @@ def _check_roles(
         result["final_settings"] = chat._diagnostic_settings(redactor)
         ready = ready and ok
         results.append(result)
-    if isinstance(profile.evaluator, ModelEvaluatorProfile):
-        # Exercise precisely the classifier used by FITD, including its strict
-        # parser. A valid false verdict is readiness, not a readiness failure.
-        base = Message("Name the capital of France.")
-        presented = Message("The capital of France is Paris.")
-        evaluator = profile.create_evaluator(base)
-        assert isinstance(evaluator, ModelEvaluator)
-        chat = evaluator.chat
-        result = {
-            "role": "Evaluator",
-            "started_at": datetime.now(UTC).isoformat(),
-            "settings": evaluator.settings(),
-            "base": json.loads(base.dump()),
-            "result": json.loads(presented.dump()),
-            "result_id": presented.id,
-            "response": None,
-        }
-
-        def send(request: Message) -> Message:
-            # Snapshot the freshly reset assessment, including the UUID actually
-            # used on the wire, rather than an earlier conversation's history.
-            result["settings"] = evaluator.settings()
-            result["conversation_id"] = chat.conversation_id
-            result["input"] = json.loads(request.dump())
-            response = exchange("Evaluator", chat, request, presented.id)
-            result["response"] = response.to_string()
-            result["response_message"] = json.loads(response.dump())
-            return response
-
-        def reset() -> None:
-            previous = chat.conversation_id
-
-            def change() -> ConversationChange:
-                chat.reset()
-                return ConversationChange(
-                    "reset",
-                    Context(
-                        run_id, "Evaluator", chat.conversation_id, Cause("preflight")
-                    ),
-                    previous,
-                )
-
-            journal.call("preflight.reset", change)
-
-        start = monotonic()
-        try:
-            context = Context(
-                run_id, "Evaluator", chat.conversation_id, Cause("preflight")
-            )
+    # The same operation and strict return check for every evaluator, including
+    # user implementations. A valid false verdict is readiness, not a failure.
+    base = Message("Name the capital of France.")
+    presented = Message("The capital of France is Paris.")
+    setup = profile.evaluator
+    result = {
+        "role": "Evaluator",
+        "started_at": datetime.now(UTC).isoformat(),
+        "settings": setup.settings(),
+        "base": json.loads(base.dump()),
+        "result": json.loads(presented.dump()),
+        "result_id": presented.id,
+        "response": None,
+    }
+    start = monotonic()
+    context = Context(run_id, "Evaluator", "", Cause("preflight"))
+    after = len(journal.events())
+    try:
+        with observe_evaluation(journal, context, base, presented) as evaluation_id:
             assessment = journal.call(
                 "assessment",
                 lambda: EvaluationResult(
@@ -177,28 +171,44 @@ def _check_roles(
                     "preflight",
                     presented,
                     Evaluation(
-                        presented.id,
-                        evaluator._with_io(send, reset).is_success(presented),
+                        presented.id, evaluate(setup.evaluator, base, presented)
                     ),
+                    base,
                 ),
                 context=context,
+                base=base,
+                result=presented,
                 result_id=presented.id,
+                evaluation_id=evaluation_id,
             )
-            success = assessment.evaluation.success
-            ok = True
-            result.update(ok=True, success=success)
-        except Exception as exc:
-            journal.check()
-            ok = False
+        ok = True
+        result.update(ok=True, success=assessment.evaluation.success)
+    except Exception as exc:
+        journal.check()
+        ok = False
+        result.update(
+            ok=False,
+            error=f"{type(exc).__name__}: {exc}",
+            diagnostic=getattr(exc, "diagnostic", None),
+        )
+    # Diagnostic copies only. The actual classifier input never comes from here.
+    for event in journal.events(after):
+        observed: Any = event.data
+        if event.kind == "call_started":
             result.update(
-                ok=False,
-                error=f"{type(exc).__name__}: {exc}",
-                diagnostic=getattr(exc, "diagnostic", None),
+                conversation_id=observed["conversation_id"],
+                input=observed["input"],
+                exchange_settings=observed["settings"],
             )
-        result["elapsed_seconds"] = round(monotonic() - start, 3)
-        result["final_settings"] = chat._diagnostic_settings(redactor)
-        ready = ready and ok
-        results.append(result)
+        elif event.kind == "call_completed":
+            result.update(
+                response=observed["response"]["text"],
+                response_message=observed["response"],
+            )
+    result["elapsed_seconds"] = round(monotonic() - start, 3)
+    result["final_settings"] = setup.settings()
+    ready = ready and ok
+    results.append(result)
     return {
         "check": "role_readiness",
         "tai_version": version("tai"),

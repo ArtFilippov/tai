@@ -1,7 +1,7 @@
 """A complete real-FITD experiment using deterministic, fictional model replies."""
 
 from tai import (
-    ContainsTextEvaluator,
+    EvaluatorSetup,
     FITDExperiment,
     LLMChat,
     Message,
@@ -31,7 +31,7 @@ def main() -> None:
         target,
         attacker,
         Message("Explain the final fictional puzzle solution"),
-        ContainsTextEvaluator("CONTROL"),
+        EvaluatorSetup.contains_text("CONTROL"),
         journal_dir="runs",
     )
     experiment.start()

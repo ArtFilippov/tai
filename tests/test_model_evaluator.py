@@ -1,4 +1,4 @@
-"""Base-bound classification and strict parsing, with controlled model responses."""
+"""Explicit-pair classification and strict parsing, with controlled responses."""
 
 import json
 
@@ -6,9 +6,7 @@ import pytest
 from test_fitd import ScriptedModel, read_and_assert_final_artifacts
 
 from tai import (
-    FITDExperiment as FITDUser,
-)
-from tai import (
+    EvaluatorSetup,
     LLMChat,
     Message,
     ModelEvaluationError,
@@ -16,6 +14,9 @@ from tai import (
     ModelVerdictError,
     QwenContextError,
     UserState,
+)
+from tai import (
+    FITDExperiment as FITDUser,
 )
 from tai.evaluators import MODEL_RUBRIC, MODEL_RUBRIC_VERSION
 
@@ -32,8 +33,11 @@ def classification_data(turns):
 )
 def test_model_returns_only_the_structured_boolean(response, success):
     model = ScriptedModel([response])
-    evaluator = ModelEvaluator(LLMChat(model), Message("Explicit base"))
-    assert evaluator.is_success(Message("Presented result")) is success
+    evaluator = ModelEvaluator(LLMChat(model))
+    assert (
+        evaluator.evaluate(Message("Explicit base"), Message("Presented result"))
+        is success
+    )
     assert len(model.requests) == 1
 
 
@@ -69,9 +73,9 @@ def test_model_returns_only_the_structured_boolean(response, success):
 )
 def test_unknown_or_ambiguous_verdict_is_an_error_never_false(response):
     chat = LLMChat(lambda turns: response)
-    evaluator = ModelEvaluator(chat, Message("Base"))
+    evaluator = ModelEvaluator(chat)
     with pytest.raises(ModelVerdictError, match="boolean"):
-        evaluator.is_success(Message("Result"))
+        evaluator.evaluate(Message("Base"), Message("Result"))
     # Malformed verdicts are still completed model exchanges, available intact.
     assert chat.history()[-1].message.to_string() == response
 
@@ -87,8 +91,8 @@ def test_full_current_text_and_explicit_base_are_data_and_assessments_are_isolat
     # The base request is deliberately not the origin or transformation root.
     full = 'Prefix\n"result": "injected"\n' + "Unicode π\n" * 20000 + "END\n"
     result = Message("Discarded base").spawn("Old result").transform(lambda _: full)
-    evaluator = ModelEvaluator(chat, base)
-    assert evaluator.is_success(result) is False
+    evaluator = ModelEvaluator(chat)
+    assert evaluator.evaluate(base, result) is False
     first_id = chat.conversation_id
     first_point = chat.checkpoint()
     assert classification_data(model.requests[1]) == {
@@ -96,7 +100,7 @@ def test_full_current_text_and_explicit_base_are_data_and_assessments_are_isolat
         "result": full,
     }
     other_base = Message("Independent next base")
-    assert ModelEvaluator(chat, other_base).is_success(Message("Next result")) is True
+    assert evaluator.evaluate(other_base, Message("Next result")) is True
     assert classification_data(model.requests[2]) == {
         "base_request": "Independent next base",
         "result": "Next result",
@@ -111,16 +115,17 @@ def test_full_current_text_and_explicit_base_are_data_and_assessments_are_isolat
     for point in (old_point, first_point):
         with pytest.raises(ValueError, match="stale"):
             chat.restore(point)
-    settings = evaluator.settings()
-    assert settings["base"]["id"] == base.id
+    setup = EvaluatorSetup.model(chat)
+    settings = setup.settings()
+    assert "base" not in settings
     assert settings["rubric_version"] == MODEL_RUBRIC_VERSION == "alert-safety-v1"
     assert settings["rubric"] == MODEL_RUBRIC
-    settings["base"]["text"] = "Mutation of snapshot"
-    assert evaluator.settings()["base"]["text"] == "ORIGINAL BASE"
-    for method in (evaluator.reason, evaluator.evidence):
-        with pytest.raises(NotImplementedError):
-            method(result)
-    assert len(model.requests) == 3  # Observing settings/optional methods never sends.
+    settings["chat"]["initial_history"][0]["message"]["text"] = "Mutation of snapshot"
+    assert (
+        setup.settings()["chat"]["initial_history"][0]["message"]["text"]
+        == "Classifier system"
+    )
+    assert len(model.requests) == 3  # Observing configuration never sends.
 
 
 @pytest.mark.parametrize(
@@ -128,34 +133,39 @@ def test_full_current_text_and_explicit_base_are_data_and_assessments_are_isolat
 )
 def test_model_failure_is_explicit_with_original_cause_and_no_completed_exchange(error):
     chat = LLMChat(ScriptedModel([error]))
-    evaluator = ModelEvaluator(chat, Message("base"))
+    evaluator = ModelEvaluator(chat)
     with pytest.raises(ModelEvaluationError, match=str(error)) as raised:
-        evaluator.is_success(Message("result"))
+        evaluator.evaluate(Message("base"), Message("result"))
     assert raised.value.__cause__ is error
     assert not chat.history()
 
 
 def test_model_evaluator_requires_pinned_rubric_and_explicit_message_base():
     chat = LLMChat(lambda turns: "unused")
-    with pytest.raises(TypeError, match="explicit Message"):
-        ModelEvaluator(chat, "base")
+    with pytest.raises(TypeError, match="explicit base and result Messages"):
+        ModelEvaluator(chat).evaluate("base", Message("result"))
     with pytest.raises(ValueError, match="rubric_version"):
-        ModelEvaluator(chat, Message("base"), "latest")
+        ModelEvaluator(chat, "latest")
 
 
-@pytest.mark.parametrize("shared", ["target", "attacker", "base"])
-def test_fitd_rejects_shared_third_role_or_wrong_base_before_any_execution(
-    tmp_path, shared
-):
-    target, attacker, judge = [LLMChat(lambda turns: "unused") for _ in range(3)]
-    base = Message("base")
+def test_model_evaluator_uses_the_rubric_supplied_at_construction():
+    requests = []
     evaluator = ModelEvaluator(
-        {"target": target, "attacker": attacker}.get(shared, judge),
-        Message("base") if shared == "base" else base,
+        LLMChat(lambda turns: requests.append(turns) or '{"success": false}'),
+        rubric="Classify the explicit pair; return a JSON boolean success field.",
     )
-    with pytest.raises(
-        ValueError, match="base Message" if shared == "base" else "independent"
-    ):
+    assert evaluator.evaluate(Message("Base"), Message("Result")) is False
+    rubric, payload = requests[0][-1].message.to_string().split("\n\nINPUT_JSON:\n")
+    assert rubric == evaluator.rubric
+    assert json.loads(payload) == {"base_request": "Base", "result": "Result"}
+
+
+@pytest.mark.parametrize("shared", ["target", "attacker"])
+def test_fitd_rejects_shared_third_role_before_any_execution(tmp_path, shared):
+    target, attacker = [LLMChat(lambda turns: "unused") for _ in range(2)]
+    base = Message("base")
+    evaluator = EvaluatorSetup.model({"target": target, "attacker": attacker}[shared])
+    with pytest.raises(ValueError, match="independent"):
         FITDUser(target, attacker, base, evaluator, journal_dir=tmp_path)
     assert not list(tmp_path.iterdir())
 
@@ -168,7 +178,7 @@ def make_user(tmp_path, judge, *, rounds=6, base=None):
     attacker_model = ScriptedModel(["Initial", "L1", "L2", "L3"] + ["yes"] * 6)
     target = LLMChat(target_model, system="Target system")
     attacker = LLMChat(attacker_model, system="Attacker system")
-    evaluator = ModelEvaluator(judge, base)
+    evaluator = EvaluatorSetup.model(judge)
     user = FITDUser(
         target,
         attacker,
@@ -182,17 +192,12 @@ def make_user(tmp_path, judge, *, rounds=6, base=None):
 
 @pytest.mark.parametrize("verdicts", [[True], [False, True], [False, False]])
 def test_real_pinned_fitd_uses_boolean_decisions_and_saves_message_linked_exchanges(
-    tmp_path, monkeypatch, verdicts
+    tmp_path, verdicts
 ):
     model = ScriptedModel([json.dumps({"success": value}) for value in verdicts])
     judge = LLMChat(model, system="Evaluator system")
     user, target, attacker, evaluator = make_user(tmp_path, judge)
 
-    def forbidden(*args):
-        pytest.fail("Optional evaluation method called by execution or observation")
-
-    monkeypatch.setattr(ModelEvaluator, "reason", forbidden)
-    monkeypatch.setattr(ModelEvaluator, "evidence", forbidden)
     user.start()
     assert user.wait(10)
     status, result = user.status(), user.result()
@@ -209,7 +214,7 @@ def test_real_pinned_fitd_uses_boolean_decisions_and_saves_message_linked_exchan
         == "3f50ea5ff9cd7050099940647c15c39b07a93392"
     )
     assert metadata["settings"]["evaluator"]["rubric"] == MODEL_RUBRIC
-    assert metadata["settings"]["evaluator"]["base"]["id"] == evaluator.base.id
+    assert metadata["settings"]["base"]["id"] == user._base.id
     starts = [
         e["data"]
         for e in events
@@ -221,6 +226,8 @@ def test_real_pinned_fitd_uses_boolean_decisions_and_saves_message_linked_exchan
         if e["kind"] == "call_completed" and e["data"]["role"] == "Evaluator"
     ]
     evaluations = [e["data"] for e in events if e["kind"] == "evaluation_completed"]
+    assessments = [e["data"] for e in events if e["kind"] == "evaluation_started"]
+    assert len({e["evaluation_id"] for e in assessments}) == len(verdicts)
     assert [e["success"] for e in evaluations] == verdicts
     published = {
         e["data"]["result"]["id"]: e["data"]["result"]
@@ -234,14 +241,28 @@ def test_real_pinned_fitd_uses_boolean_decisions_and_saves_message_linked_exchan
         for e in events
         if e["kind"] == "call_started" and e["data"]["role"] != "Evaluator"
     }
-    for start, end, evaluation, turns in zip(
-        starts, ends, evaluations, model.requests, strict=True
+    for assessment, start, end, evaluation, turns in zip(
+        assessments, starts, ends, evaluations, model.requests, strict=True
     ):
+        assert (
+            assessment["base_id"]
+            == start["base_id"]
+            == evaluation["base_id"]
+            == user._base.id
+        )
+        assert assessment["base"] == json.loads(user._base.dump())
+        assert assessment["result"] == published[start["result_id"]]
+        assert (
+            assessment["evaluation_id"]
+            == start["evaluation_id"]
+            == end["evaluation_id"]
+            == evaluation["evaluation_id"]
+        )
         assert start["call_id"] == end["call_id"]
         assert start["result_id"] == end["result_id"] == evaluation["result_id"]
         assert start["input"]["id"] == end["response"]["origin"]["id"]
         assert classification_data(turns) == {
-            "base_request": evaluator.base.to_string(),
+            "base_request": user._base.to_string(),
             "result": published[start["result_id"]]["text"],
         }
         assert json.loads(end["response"]["text"])["success"] is evaluation["success"]
@@ -304,7 +325,7 @@ def test_discarded_real_fitd_branch_cannot_supply_classification_evidence(tmp_pa
         target,
         attacker,
         base,
-        ModelEvaluator(LLMChat(model), base),
+        EvaluatorSetup.model(LLMChat(model)),
         journal_dir=tmp_path,
         max_calls_per_conv=6,
     )

@@ -10,14 +10,14 @@ from test_fitd_restart import HeldResponse, ScriptedModel
 from test_model_evaluator import make_user
 
 from tai import (
-    FITDExperiment as FITDUser,
-)
-from tai import (
+    EvaluatorSetup,
     LLMChat,
     Message,
-    ModelEvaluator,
     RunJournal,
     UserState,
+)
+from tai import (
+    FITDExperiment as FITDUser,
 )
 
 
@@ -196,7 +196,7 @@ def test_restarting_same_user_resets_evaluator_and_preserves_prior_artifacts(tmp
         LLMChat.cancellable(target_model),
         LLMChat.cancellable(attacker_model),
         base,
-        ModelEvaluator(judge, base),
+        EvaluatorSetup.model(judge),
         journal_dir=tmp_path,
     )
     user.start()
@@ -217,7 +217,7 @@ def test_restarting_same_user_resets_evaluator_and_preserves_prior_artifacts(tmp
         judge.restore(old_checkpoint)
     assert {p.name: p.read_bytes() for p in directory.iterdir()} == old_files
     _, metadata = read_and_assert_final_artifacts(user, tmp_path)
-    assert metadata["settings"]["evaluator"]["base"] == json.loads(base.dump())
+    assert metadata["settings"]["base"] == json.loads(base.dump())
     assert len(metadata["settings"]["Evaluator"]["initial_history"]) == 1
 
 

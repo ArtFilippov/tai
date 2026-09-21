@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
-from dataclasses import dataclass, field, replace
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Protocol
 
-from tai.chats import ChatCancelled, LLMChat
+from tai.chats import ChatCancelled
 from tai.messages import Message
 
 MODEL_RUBRIC_VERSION = "alert-safety-v1"
@@ -81,70 +80,58 @@ def _verdict(text: str) -> bool:
     return value["success"]
 
 
-class Evaluator:
-    def settings(self) -> dict[str, Any]:
-        """Configuration snapshot only; never evaluate a result here."""
-        return {"type": f"{type(self).__module__}.{type(self).__qualname__}"}
+class Evaluator(Protocol):
+    """The entire working contract; inheritance is optional."""
 
-    def is_success(self, result: Message) -> bool:
-        raise NotImplementedError
+    def evaluate(self, base: Message, result: Message) -> bool:
+        """Judge the full presented text against this explicit base request."""
+        ...
 
-    def reason(self, result: Message) -> str:
-        raise NotImplementedError
 
-    def evidence(self, result: Message) -> list[str]:
-        raise NotImplementedError
+class EvaluationChat(Protocol):
+    """Only the chat operations needed by a model classifier."""
+
+    def reset(self) -> None: ...
+
+    def send(self, message: Message) -> Message: ...
+
+
+def evaluate(evaluator: Evaluator, base: Message, result: Message) -> bool:
+    """Enforce the contract at every execution/readiness boundary."""
+    success = evaluator.evaluate(base, result)
+    if type(success) is not bool:
+        raise TypeError("Evaluator.evaluate must return bool")
+    return success
 
 
 @dataclass(frozen=True, slots=True)
 class ModelEvaluator(Evaluator):
-    """A base-bound classifier with a fresh chat conversation per assessment.
+    """A fresh conversation per explicit pair, preserving system and model weights."""
 
-    ``is_success`` performs exactly one exchange and returns a strict bool or
-    raises ModelEvaluationError (ChatCancelled on cancellation). No history or
-    provenance is sent as classification data. FITD admits the entire assessment
-    and journals its exchanges through the private, execution-local I/O binding.
-    User.stop() lets the admitted assessment finish and retain its verdict.
-    """
-
-    chat: LLMChat
-    base: Message
+    chat: EvaluationChat
     rubric_version: str = MODEL_RUBRIC_VERSION
-    _send: Callable[[Message], Message] = field(init=False, repr=False, compare=False)
-    _reset: Callable[[], None] = field(init=False, repr=False, compare=False)
+    rubric: str = MODEL_RUBRIC
 
     def __post_init__(self) -> None:
-        if not isinstance(self.base, Message):
-            raise TypeError("ModelEvaluator base must be an explicit Message")
-        if not isinstance(self.chat, LLMChat):
-            raise TypeError("ModelEvaluator chat must be an independent LLMChat")
         if self.rubric_version != MODEL_RUBRIC_VERSION:
             raise ValueError(f"Unsupported rubric_version; use {MODEL_RUBRIC_VERSION}")
-        object.__setattr__(self, "_send", self.chat.send)
-        object.__setattr__(self, "_reset", self.chat.reset)
+        if not isinstance(self.rubric, str) or not self.rubric:
+            raise ValueError("rubric must be a nonempty string")
 
-    def _with_io(
-        self, send: Callable[[Message], Message], reset: Callable[[], None]
-    ) -> ModelEvaluator:
-        # Never retain another execution's signals or callbacks on the shared
-        # evaluator. The bound copy lives only for this assessment.
-        bound = replace(self)
-        object.__setattr__(bound, "_send", send)
-        object.__setattr__(bound, "_reset", reset)
-        return bound
-
-    def is_success(self, result: Message) -> bool:
+    def evaluate(self, base: Message, result: Message) -> bool:
+        if not isinstance(base, Message) or not isinstance(result, Message):
+            raise TypeError("Evaluation requires explicit base and result Messages")
         request = Message(
-            MODEL_RUBRIC
+            self.rubric
             + "\n\nINPUT_JSON:\n"
             + json.dumps(
-                {"base_request": self.base.to_string(), "result": result.to_string()},
+                {"base_request": base.to_string(), "result": result.to_string()},
                 ensure_ascii=False,
             )
         )
         try:
-            self._reset()
-            response = self._send(request)
+            self.chat.reset()
+            response = self.chat.send(request)
         except ChatCancelled:
             raise
         except Exception as exc:
@@ -153,15 +140,6 @@ class ModelEvaluator(Evaluator):
                 diagnostic=getattr(exc, "diagnostic", None),
             ) from exc
         return _verdict(response.to_string())
-
-    def settings(self) -> dict[str, Any]:
-        return {
-            "type": "model",
-            "base": json.loads(self.base.dump()),
-            "rubric_version": self.rubric_version,
-            "rubric": MODEL_RUBRIC,
-            "chat": self.chat.settings(),
-        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -172,15 +150,5 @@ class ContainsTextEvaluator(Evaluator):
         if not isinstance(self.criterion, str) or not self.criterion:
             raise ValueError("criterion must be a nonempty string")
 
-    def is_success(self, result: Message) -> bool:
+    def evaluate(self, base: Message, result: Message) -> bool:
         return self.criterion in result.to_string()
-
-    def settings(self) -> dict[str, Any]:
-        return {"type": "contains_text", "criterion": self.criterion}
-
-    def reason(self, result: Message) -> str:
-        outcome = "found" if self.is_success(result) else "not found"
-        return f"Exact case-sensitive criterion {self.criterion!r} {outcome}."
-
-    def evidence(self, result: Message) -> list[str]:
-        return [self.criterion] if self.is_success(result) else []

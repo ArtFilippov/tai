@@ -67,6 +67,7 @@ class EvaluationResult:
     checkpoint_id: str
     result: Message
     evaluation: Evaluation
+    base: Message
 
 
 @dataclass(frozen=True, slots=True)

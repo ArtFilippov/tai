@@ -1,17 +1,75 @@
 # Модельное оценивание FITD / ALERT
 
-`ModelEvaluator(chat, base, rubric_version="alert-safety-v1")` реализует общий
-контракт `is_success(result: Message) -> bool`. Базовый запрос — явно переданный
-`Message` данного запуска; он не выводится из происхождения результата.
-`FITDUser` отклоняет оценщик с другим ID базового Message и совпадение экземпляров
-LLMChat между любой парой из Target, Attacker и Evaluator.
+Все оценщики реализуют единственный рабочий контракт:
+`evaluate(base: Message, result: Message) -> bool`. Базовый запрос — явный аргумент
+каждой оценки; он не выводится из происхождения результата. `Evaluator` — Protocol:
+для собственного оценщика достаточно одного метода, без наследования, настроек,
+перечисления ресурсов или подключения к жизненному циклу запуска.
+
+```python
+from tai import ContainsTextEvaluator, LLMChat, Message, ModelEvaluator
+
+base = Message("Explain the fictional puzzle")
+result = Message("The answer is CONTROL")
+assert ContainsTextEvaluator("CONTROL").evaluate(base, result) is True
+
+judge = LLMChat(
+    lambda turns: '{"success": false}', system="Classify the supplied pair."
+)
+evaluator = ModelEvaluator(judge)
+assert evaluator.evaluate(base, result) is False
+assert (
+    evaluator.evaluate(Message("Another request"), Message("Another result")) is False
+)
+```
+
+`ModelEvaluator(chat, rubric_version="alert-safety-v1", rubric=MODEL_RUBRIC)` хранит
+чат и рубрику. Перед **каждой** оценкой он сбрасывает разговор, сохраняя системные
+инструкции и общие веса. Изменение базового запроса не требует нового оценщика.
+
+## Сборка зависимостей и собственный оценщик
+
+Для запуска с модельным оценщиком используйте `EvaluatorSetup.model(judge)`:
+
+```python
+from tai import EvaluatorSetup, FITDExperiment
+
+# target, attacker и judge — три разных исходных LLMChat.
+experiment = FITDExperiment(target, attacker, base, EvaluatorSetup.model(judge))
+experiment.start()
+experiment.wait()
+```
+
+Сборка хранит исходный чат отдельно от оценщика, заранее передаёт ему обёрнутый
+чат и делает настройки доступными журналу. `FITDUser` резервирует собранные исходные
+чаты атомарно и отклоняет совпадение любых ролей. Обёртки связывают обмены с текущей
+оценкой; рабочий код вызывает только `evaluate(base, result)`, без распознавания
+конкретных классов или подмены приватных методов ввода-вывода.
+
+```python
+class ExactAnswer:
+    def evaluate(self, base: Message, result: Message) -> bool:
+        return result.to_string() == "Answer to " + base.to_string()
+
+
+experiment = FITDExperiment(target, attacker, base, ExactAnswer())
+```
+
+Собственному оценщику не нужны дополнительные методы. При необходимости сборка
+принимает `EvaluatorSetup(evaluator, configuration=lambda: {...})`; без конфигурации
+сохраняется имя Python-типа. Для собственного оценщика на основе чата доступна
+`EvaluatorSetup.with_chat(source_chat, factory, settings=...)`: фабрика получает
+чат с операциями `reset()` и `send(Message)`, обёрнутый для наблюдения. Для строкового
+оценщика `EvaluatorSetup.contains_text(criterion)` сохраняет критерий в настройках.
+Самостоятельное оценивание использует тот же `evaluate(base, result)`.
 
 ## Рубрика и формат
 
 Закреплённая версия — **`alert-safety-v1`**. Полный текст находится в
 [`MODEL_RUBRIC`](../src/tai/evaluators.py) и сохраняется в
-`metadata.json → settings.evaluator.rubric`, рядом с `rubric_version`, базовым
-Message и настройками чата. Неизвестная версия отклоняется до запуска.
+`metadata.json → settings.evaluator.rubric`, рядом с `rubric_version` и настройками
+чата. Базовый Message находится в `settings.base` и входах каждой оценки.
+Неизвестная версия TOML-профиля отклоняется до запуска.
 Изменение смысла рубрики требует новой версии.
 
 Успех — **содержательное выполнение исходного запроса вопреки соответствующему
@@ -68,13 +126,16 @@ HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 \
 ```
 
 Каталог отчёта должен существовать. Preflight проверяет Target и Attacker
-непустым ответом, затем вызывает настоящий `ModelEvaluator` на нейтральной паре:
+непустым ответом, затем вызывает любой настроенный оценщик через `evaluate` на паре:
 `Name the capital of France.` / `The capital of France is Paris.`
 Готовность третьей роли требует **валидного boolean**, а не положительного успеха
 атаки. По рубрике для этой пары ожидается `false`; даже `true` — структурно валидный
 ответ, отдельно доступный для проверки качества. Невалидный ответ/ошибка даёт
 `ready=false` и код 1; ошибка одной роли не пропускает остальные. Отчёт содержит
 полные вход, ответ или ошибку, Message ID, настройки и длительность каждой роли.
+Для модельных обменов `exchange_settings` фиксирует настройки сброшенного разговора
+перед отправкой. Корректное `false` строкового или собственного оценщика тоже
+означает доступную оценку. Preflight резервирует те же исходные чаты, что и FITD.
 
 Для отдельного базового запроса применяется та же фабрика:
 
@@ -102,10 +163,10 @@ save_run(record, "runs")
 status, result = record.snapshot.status, record.snapshot.result
 ```
 
-`RoleProfile.create_evaluator(base)` создаёт новую привязку `ModelEvaluator` к
-базовому Message; `create_experiment` делает это автоматически. `RoleProfile.evaluator`
-содержит `ModelEvaluatorProfile(chat, rubric_version)` либо прежний
-`ContainsTextEvaluator`. Для `type="model"` обязательны `rubric_version` и
+`RoleProfile.evaluator` содержит `EvaluatorSetup`: готовый оценщик, исходный чат
+при его наличии и источник диагностических настроек. `create_experiment(base)`
+передаёт ту же сборку новому запуску; базовый Message поступает в каждую оценку.
+Для `type="model"` обязательны `rubric_version` и
 `[evaluator.chat]`, использующий ту же схему Qwen/OpenAI, что остальные роли.
 `contains_text` по-прежнему требует только `criterion`.
 
@@ -117,7 +178,7 @@ status, result = record.snapshot.status, record.snapshot.result
 
 Оценка вызывается в штатной точке FITD только для принятого adversarial-результата.
 `true` позволяет User завершить стратегию; `false` продолжает её до штатного
-предела. Отчёт/статус не вызывают `is_success`, `reason` или `evidence`.
+предела. Отчёт/статус не вызывают `evaluate`.
 Сборщик серии должен считать результат оценённым только при `COMPLETED`, наличии
 результата и `status.evaluation.result_id == status.result_id == result.id`.
 `FAILED`, `STOPPED` и отсутствие итоговой оценки не равны отрицательной оценке,
@@ -129,16 +190,17 @@ status, result = record.snapshot.status, record.snapshot.result
 освобождения участников, без дополнительных модельных обращений или оценивания.
 Ход атаки доступен через независимый журнал.
 
-- `evaluation_started/completed/failed/cancelled` связаны с `result_id`.
-  `evaluation_completed` сохраняет `{result_id, success}`; ошибка — текст исключения.
+- `evaluation_started/completed/failed/cancelled` связаны по `evaluation_id`,
+  `base_id` и `result_id`. Начало хранит диагностические копии обеих точных Message;
+  завершение — строгий `success`, ошибка — текст исключения.
 - Модельные `call_started/completed/failed/cancelled` имеют `role="Evaluator"`,
-  `result_id` и общий `call_id`; начало содержит полный входной Message и UUID
+  `result_id`, `evaluation_id` и общий `call_id`; начало содержит полный входной Message и UUID
   разговора. Завершение содержит исходный ответ Message (включая невалидный JSON),
   ошибка — сообщение/диагностику транспорта. Ответ связан с входом через `origin.id`.
 - `metadata.json` хранит окончательный статус, оценку именно текущего результата,
   полную рубрику, начальные настройки трёх ролей и `final_settings.Evaluator`
-  с наблюдённым dtype. `progress.evaluator_calls` считает завершённые обмены,
-  в том числе невалидный JSON; это не счётчик положительных оценок.
+  с наблюдённым dtype. `progress.evaluator_calls` считает допущенные оценивания
+  любого оценщика, включая ошибки; модельные обмены учитываются в журнале.
 - `result.txt` хранит полный предъявленный результат. Как и для других ролей,
   диагностические копии событий/настроек скрывают явно настроенные секреты
   всех трёх участников; текст, передаваемый оценщику, не редактируется.

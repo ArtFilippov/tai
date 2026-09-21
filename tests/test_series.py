@@ -126,7 +126,8 @@ def test_full_series_continues_in_order_isolates_bases_and_reuses_weights(
         assert base.text == manifest.records[len(users)].base_request
         user = factory(profile, base, artifacts_dir)
         assert isinstance(user._evaluator, ModelEvaluator)
-        assert user._evaluator.base is base
+        assert user._evaluator is profile.evaluator.evaluator
+        assert user._base is base
         users.append(user)
         profiles.append(profile)
         return user
@@ -173,7 +174,7 @@ def test_full_series_continues_in_order_isolates_bases_and_reuses_weights(
     assert signal.getsignal(signal.SIGINT) is previous_handler
     assert result.exit_code == 1 and result.report["complete"] is True
     assert len(users) == 32 and all(p is profiles[0] for p in profiles)
-    assert len({id(u._evaluator) for u in users}) == 32
+    assert len({id(u._evaluator) for u in users}) == 1
     assert len({u._base.id for u in users}) == 32
     assert len(lib.loads) == 2  # One tokenizer + one model for all roles and runs.
     profile = profiles[0]
@@ -216,7 +217,13 @@ def test_full_series_continues_in_order_isolates_bases_and_reuses_weights(
         assert entry["base_id"] == metadata["settings"]["base"]["id"]
         assert metadata["settings"]["max_calls_per_conv"] == 20
         assert metadata["settings"]["generations"] == 1
-        assert metadata["settings"]["evaluator"]["base"]["id"] == entry["base_id"]
+        assert "base" not in metadata["settings"]["evaluator"]
+        evaluations = [
+            event.data
+            for event in user.journal.events()
+            if event.kind == "evaluation_started"
+        ]
+        assert all(event["base_id"] == entry["base_id"] for event in evaluations)
         assert metadata["final_settings"]["Evaluator"]["actual_dtype"] == "float16"
         assert user.wait(0)
     before = len(lib.requests)

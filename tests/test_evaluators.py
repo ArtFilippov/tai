@@ -13,14 +13,13 @@ from tai import ContainsTextEvaluator, Evaluator, Message
         ("", False),
     ],
 )
-def test_contains_text_checks_current_text_exactly_and_explains_the_same_decision(
-    text, expected
-):
+def test_contains_text_checks_full_presented_text_exactly(text, expected):
     evaluator = ContainsTextEvaluator("CONTROL")
     result = Message(text)
-    assert evaluator.is_success(result) is expected
-    assert evaluator.evidence(result) == (["CONTROL"] if expected else [])
-    assert ("not found" in evaluator.reason(result)) is (not expected)
+    assert (
+        evaluator.evaluate(Message("CONTROL in base is not evidence"), result)
+        is expected
+    )
 
 
 def test_empty_criterion_is_invalid():
@@ -28,35 +27,14 @@ def test_empty_criterion_is_invalid():
         ContainsTextEvaluator("")
 
 
-@pytest.mark.parametrize("method", ["is_success", "reason", "evidence"])
-def test_unsupported_evaluator_methods_raise_explicitly(method):
-    with pytest.raises(NotImplementedError):
-        getattr(Evaluator(), method)(Message("result"))
+def test_one_operation_without_inheritance_is_the_entire_contract():
+    class EqualText:
+        def evaluate(self, base: Message, result: Message) -> bool:
+            return base.to_string() == result.to_string()
 
-
-def test_partial_evaluators_support_each_method_independently():
-    class SuccessOnly(Evaluator):
-        def is_success(self, result):
-            return result.to_string() == "result"
-
-    class ReasonOnly(Evaluator):
-        def reason(self, result):
-            return "Explanation of " + result.to_string()
-
-    class EvidenceOnly(Evaluator):
-        def evidence(self, result):
-            return [result.to_string()]
-
-    result = Message("result")
-    for evaluator, supported, expected in [
-        (SuccessOnly(), "is_success", True),
-        (ReasonOnly(), "reason", "Explanation of result"),
-        (EvidenceOnly(), "evidence", ["result"]),
-    ]:
-        assert getattr(evaluator, supported)(result) == expected
-        for method in {"is_success", "reason", "evidence"} - {supported}:
-            with pytest.raises(NotImplementedError):
-                getattr(evaluator, method)(result)
+    evaluator: Evaluator = EqualText()
+    assert evaluator.evaluate(Message("same"), Message("same")) is True
+    assert evaluator.evaluate(Message("other"), Message("same")) is False
 
 
 @pytest.mark.parametrize("location", ["base", "intermediate", "origin"])
@@ -74,12 +52,9 @@ def test_contains_text_ignores_control_string_outside_current_text(location):
         result = Message("CONTROL").spawn("ordinary")
     assert "CONTROL" in result.dump()
     assert result.to_string() == "ordinary"
-    assert evaluator.is_success(result) is False
-    assert "not found" in evaluator.reason(result)
-    assert evaluator.evidence(result) == []
+    base = Message("Explicit base")
+    assert evaluator.evaluate(base, result) is False
 
     selected = result.transform(str.replace, "ordinary", "CONTROL")
-    assert evaluator.is_success(selected) is True
-    assert "not found" not in evaluator.reason(selected)
-    assert evaluator.evidence(selected) == ["CONTROL"]
-    assert evaluator.is_success(result) is False
+    assert evaluator.evaluate(base, selected) is True
+    assert evaluator.evaluate(base, result) is False

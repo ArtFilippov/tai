@@ -54,12 +54,14 @@ def test_preflight_checks_both_configured_roles_and_saves_safe_report(
     data = json.loads(completed.stdout)
     assert json.loads(report.read_text()) == data
     assert data["ready"] is True
-    assert [r["role"] for r in data["roles"]] == ["Target", "Attacker"]
-    assert [r["response"] for r in data["roles"]] == ["READY", "READY"]
+    assert [r["role"] for r in data["roles"]] == ["Target", "Attacker", "Evaluator"]
+    assert [r["response"] for r in data["roles"]] == ["READY", "READY", None]
+    assert data["roles"][2]["ok"] is True
+    assert data["roles"][2]["success"] is False
     assert len(endpoint.requests) == 2
     assert len({session(r) for r in endpoint.requests}) == 2
     for result, request, temperature, auth in zip(
-        data["roles"],
+        data["roles"][:2],
         endpoint.requests,
         [0.25, 0.75],
         ["Bearer synthetic-target-secret", "Custom synthetic-attacker-secret"],
@@ -110,7 +112,7 @@ def test_preflight_reports_each_role_even_when_one_cannot_generate(
     data = json.loads(completed.stdout)
     assert data["ready"] is False
     assert len(endpoint.requests) == 2
-    for result in data["roles"]:
+    for result in data["roles"][:2]:
         if result["role"].lower() == failing_role:
             assert result["ok"] is False and result["error"]
         else:

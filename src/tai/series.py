@@ -13,11 +13,10 @@ from typing import Any
 from uuid import uuid4
 
 from tai import FITDExperiment, Message
-from tai._config import ModelEvaluatorProfile, RoleProfile, load_profile
+from tai._config import RoleProfile, load_profile
 from tai._diagnostics import DiagnosticRedactor
 from tai._profile import FITD_PROFILE
 from tai.alert import load_alert_manifest
-from tai.evaluators import MODEL_RUBRIC
 from tai.series_report import _write_json, build_series_report, classify_outcome
 from tai.storage import capture_run, save_run
 from tai.users import RunSnapshot
@@ -37,8 +36,6 @@ def _now() -> str:
 def _settings(profile: RoleProfile) -> dict[str, Any]:
     from tai._fitd import GARAK_REVISION
 
-    assert isinstance(profile.evaluator, ModelEvaluatorProfile)
-    redactor = profile.redactor()
     return {
         "tai_version": version("tai"),
         "python": platform.python_version(),
@@ -47,14 +44,7 @@ def _settings(profile: RoleProfile) -> dict[str, Any]:
         "fitd": asdict(
             replace(FITD_PROFILE, max_calls_per_conv=profile.max_calls_per_conv)
         ),
-        "Target": profile.target._diagnostic_settings(redactor),
-        "Attacker": profile.attacker._diagnostic_settings(redactor),
-        "Evaluator": profile.evaluator.chat._diagnostic_settings(redactor),
-        "evaluator": {
-            "type": "model",
-            "rubric_version": profile.evaluator.rubric_version,
-            "rubric": redactor.text(MODEL_RUBRIC),
-        },
+        **profile.settings(),
     }
 
 
@@ -107,7 +97,7 @@ def run_alert_series(
     """Validate all inputs, then run one FITD per saved record in order.
 
     Main thread only (owns SIGINT temporarily). A single loaded RoleProfile holds
-    shared Qwen weights. Each User binds a new base/evaluator; FITD resets chats.
+    shared Qwen weights. Each User supplies its base to the same evaluator contract.
     Configuration/series I/O errors raise; run-local errors are saved and continued.
     """
     paths = {
@@ -117,13 +107,9 @@ def run_alert_series(
     }
     inputs = {name: path.read_bytes() for name, path in paths.items()}
     manifest = load_alert_manifest(manifest_path, taxonomy_path=taxonomy_path)
-    profile = load_profile(profile_path)
+    profile = load_profile(profile_path, alert_series=True)
     if any(path.read_bytes() != inputs[name] for name, path in paths.items()):
         raise ValueError("Series input files changed during validation")
-    if not isinstance(profile.evaluator, ModelEvaluatorProfile):
-        raise ValueError("ALERT series requires evaluator.type=model")
-    if profile.max_calls_per_conv != 20:
-        raise ValueError("ALERT series requires run.max_calls_per_conv=20")
     settings = _settings(profile)  # Settings only: no readiness/model calls.
     redactor = profile.redactor()
     sources = {

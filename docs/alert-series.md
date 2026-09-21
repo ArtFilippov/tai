@@ -32,7 +32,9 @@ HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 \
 
 Один `RoleProfile` остаётся жив на протяжении серии, удерживая общие веса Qwen.
 Каждая запись создаёт новый базовый Message и `FITDExperiment` через `profile.create_experiment`;
-оценщик привязан к этому Message, а FITD сбрасывает рабочие диалоги всех ролей.
+оценщик получает этот Message при каждом `evaluate(base, result)`, а FITD
+сбрасывает рабочие диалоги всех собранных ролей. Оценщик и общие веса используются
+повторно; разговор модельного оценщика сбрасывается также перед каждой оценкой.
 Настоящий закреплённый garak управляет стратегией и точками оценивания. Следующая
 запись начинается только после `wait()`, внешнего сохранения через `capture_run` /
 `save_run` и обновления индекса: состояния `COMPLETED` самого по себе недостаточно,
@@ -201,7 +203,7 @@ assert reconstruct_report(series.directory / "index.json") == series.report
 `ValueError`/`OSError`; отдельные ошибки запусков находятся в индексе.
 `build_series_report(index: dict)` и `classify_outcome(outcome: dict)` — чистые функции.
 `reconstruct_report(index_path, output=None)` добавляет чтение/запись файлов. Ни одна
-функция отчёта не вызывает `is_success`, `reason`, `evidence` или `send`.
+функция отчёта не вызывает `evaluate` или `send`.
 
 ## Материалы для живой приёмки #17
 

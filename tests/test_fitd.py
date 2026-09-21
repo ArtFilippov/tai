@@ -40,9 +40,9 @@ class RecordingEvaluator(Evaluator):
         self.evaluator = ContainsTextEvaluator(criterion)
         self.results = []
 
-    def is_success(self, result):
+    def evaluate(self, base, result):
         self.results.append(result)
-        return self.evaluator.is_success(result)
+        return self.evaluator.evaluate(base, result)
 
 
 def read_and_assert_final_artifacts(user, root):
@@ -376,11 +376,11 @@ def test_negative_evaluation_continues_and_is_not_attributed_to_new_result(tmp_p
     entered, release = Event(), Event()
 
     class HoldingEvaluator(RecordingEvaluator):
-        def is_success(self, result):
+        def evaluate(self, base, result):
             if self.results:
                 entered.set()
                 assert release.wait(10)
-            return super().is_success(result)
+            return super().evaluate(base, result)
 
     evaluator = HoldingEvaluator("CONTROL")
     attacker = LLMChat(ScriptedModel(["Initial", "L1", "L2", "L3"] + ["yes"] * 6))
@@ -511,14 +511,14 @@ def test_required_evaluation_failure_preserves_new_result_without_an_old_score(
     tmp_path, error_type
 ):
     class FailingEvaluator(RecordingEvaluator):
-        def is_success(self, result):
+        def evaluate(self, base, result):
             if self.results:
                 # Observation is durable; the presented result is not yet saved.
                 run_dir = tmp_path / user.status().run_id
                 assert not (run_dir / "result.txt").exists()
                 assert user.result() is result
                 raise error_type("required evaluation unavailable")
-            return super().is_success(result)
+            return super().evaluate(base, result)
 
     evaluator = FailingEvaluator("CONTROL")
     target_model = ScriptedModel(
@@ -677,7 +677,7 @@ def test_stop_during_evaluation_waits_for_execution_and_retains_its_outcome(
     entered, release = Event(), Event()
 
     class HoldingEvaluator(Evaluator):
-        def is_success(self, result):
+        def evaluate(self, base, result):
             entered.set()
             assert release.wait(5)
             if isinstance(outcome, Exception):

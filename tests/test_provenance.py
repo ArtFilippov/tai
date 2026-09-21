@@ -29,9 +29,9 @@ class SuccessOnlyEvaluator(Evaluator):
     def __init__(self):
         self.results = []
 
-    def is_success(self, result):
+    def evaluate(self, base, result):
         self.results.append(result)
-        return ContainsTextEvaluator("CONTROL").is_success(result)
+        return ContainsTextEvaluator("CONTROL").evaluate(base, result)
 
 
 def test_real_fitd_publishes_full_evaluated_text_and_saves_message_provenance(tmp_path):
@@ -103,10 +103,8 @@ def test_real_fitd_publishes_full_evaluated_text_and_saves_message_provenance(tm
     # Neither observations nor this external evaluation belong to the run.
     filtered = result.transform(str.replace, "CONTROL", "redacted")
     external = ContainsTextEvaluator("CONTROL")
-    assert external.is_success(result) is True
-    assert external.is_success(filtered) is False
-    assert external.evidence(filtered) == []
-    assert "not found" in external.reason(filtered)
+    assert external.evaluate(user._base, result) is True
+    assert external.evaluate(user._base, filtered) is False
     assert filtered.revert(1) is result
     for _ in range(3):
         assert user.result() is result
@@ -129,12 +127,12 @@ def test_new_publication_keeps_old_results_immutable_and_has_no_unearned_evaluat
         def __init__(self):
             self.results = []
 
-        def is_success(self, result):
+        def evaluate(self, base, result):
             self.results.append(result)
             if len(self.results) == 1:
                 first_entered.set()
                 assert first_release.wait(5), "first evaluation was not released"
-                return ContainsTextEvaluator("CONTROL").is_success(result)
+                return ContainsTextEvaluator("CONTROL").evaluate(base, result)
             second_entered.set()
             assert second_release.wait(5), "second evaluation was not released"
             raise failure_type("required evaluation unavailable")
@@ -178,9 +176,9 @@ def test_new_publication_keeps_old_results_immutable_and_has_no_unearned_evaluat
         publication_snapshot = publication.dump()
         assert publication.data["result"]["text"] == old.to_string()
         assert "CONTROL" in "\n".join(event.dump() for event in events_before)
-        assert ContainsTextEvaluator("CONTROL").is_success(old) is False
+        assert ContainsTextEvaluator("CONTROL").evaluate(user._base, old) is False
         branch = old.transform(lambda text: text + "\nCONTROL externally appended")
-        assert ContainsTextEvaluator("CONTROL").is_success(branch) is True
+        assert ContainsTextEvaluator("CONTROL").evaluate(user._base, branch) is True
         assert user.status() == old_status
         assert user.result() is old
         assert user.journal.events() == events_before

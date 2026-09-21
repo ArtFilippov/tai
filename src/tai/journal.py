@@ -272,6 +272,10 @@ class RunJournal:
         message: Message | None = None,
         result_id: str | None = None,
         checkpoint_id: str | None = None,
+        base: Message | None = None,
+        result: Message | None = None,
+        evaluation_id: str | None = None,
+        settings: DiagnosticObject | None = None,
         project: Callable[[Any], Any] = lambda value: value,
     ) -> Any:
         """Wrap an admitted operation using only explicit inputs and its return."""
@@ -280,10 +284,26 @@ class RunJournal:
             data["result_id"] = result_id
         if checkpoint_id is not None:
             data["checkpoint_id"] = checkpoint_id
+        if base is not None:
+            data.update(base_id=base.id, base=_value(base))
+        if result is not None:
+            data["result"] = _value(result)
+        if evaluation_id is not None:
+            data["evaluation_id"] = evaluation_id
+        if settings is not None:
+            data["settings"] = settings
         if operation == "exchange":
             data.update(call_id=call_id, input=_value(message))
             self.record("call_started", **data)
         elif operation == "assessment":
+            with self._lock:
+                self._status = replace(
+                    self._status,
+                    progress=replace(
+                        self._status.progress,
+                        evaluator_calls=self._status.progress.evaluator_calls + 1,
+                    ),
+                )
             self.record("evaluation_started", **data)
         else:
             self.record("operation_started", operation=operation, **data)
@@ -308,10 +328,16 @@ class RunJournal:
                 )
             raise
         self.check()
-        self.observe(project(outcome), result_id=result_id)
+        self.observe(project(outcome), result_id=result_id, evaluation_id=evaluation_id)
         return outcome
 
-    def observe(self, outcome: Any, *, result_id: str | None = None) -> None:
+    def observe(
+        self,
+        outcome: Any,
+        *,
+        result_id: str | None = None,
+        evaluation_id: str | None = None,
+    ) -> None:
         """Format domain outcomes. No decisions or native checks are repeated."""
         if isinstance(outcome, Exchange):
             data = dict(
@@ -322,19 +348,22 @@ class RunJournal:
             )
             if result_id is not None:
                 data["result_id"] = result_id
+            if evaluation_id is not None:
+                data["evaluation_id"] = evaluation_id
             counter = {
                 "Target": "target_calls",
                 "Attacker": "attacker_calls",
                 "Evaluator": "evaluator_calls",
             }[outcome.context.role]
-            with self._lock:
-                progress = self._status.progress
-                self._status = replace(
-                    self._status,
-                    progress=replace(
-                        progress, **{counter: getattr(progress, counter) + 1}
-                    ),
-                )
+            if outcome.context.role != "Evaluator":
+                with self._lock:
+                    progress = self._status.progress
+                    self._status = replace(
+                        self._status,
+                        progress=replace(
+                            progress, **{counter: getattr(progress, counter) + 1}
+                        ),
+                    )
             self.record("call_completed", **data)
         elif isinstance(outcome, Checkpoint):
             self.record(
@@ -437,6 +466,8 @@ class RunJournal:
                 "evaluation_completed",
                 **_context(outcome.context),
                 checkpoint_id=outcome.checkpoint_id,
+                base_id=outcome.base.id,
+                evaluation_id=evaluation_id,
                 **asdict(outcome.evaluation),
             )
 

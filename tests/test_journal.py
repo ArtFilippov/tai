@@ -10,17 +10,17 @@ from garak.exception import GarakException
 from garak.probes.fitd import FITD
 
 from tai import (
+    EvaluatorSetup,
     FITDExperiment,
     FITDUser,
     LLMChat,
     Message,
-    ModelEvaluator,
     RunJournal,
     UserState,
     capture_run,
     save_run,
 )
-from tai._config import ModelEvaluatorProfile, RoleProfile
+from tai._config import RoleProfile
 from tai._preflight import run_preflight
 from tai.evaluators import MODEL_RUBRIC_VERSION
 from tai.terminal import run_foreground
@@ -42,7 +42,7 @@ def participants(targets, continuations, verdicts=(' {"success": true}',)):
     attacker = chat("Attacker", ["Initial", "L1", "L2", "L3", *continuations])
     judge = chat("Evaluator", verdicts)
     base = Message("Solve the fictional puzzle")
-    return target, attacker, base, ModelEvaluator(judge, base), trace
+    return target, attacker, base, EvaluatorSetup.model(judge), trace
 
 
 @pytest.mark.parametrize(
@@ -390,9 +390,7 @@ def test_cli_and_preflight_fail_on_journal_errors_without_extra_calls(tmp_path, 
         journals.append(journal)
         return journal
 
-    profile = RoleProfile(
-        target, attacker, ModelEvaluatorProfile(evaluator.chat, MODEL_RUBRIC_VERSION), 1
-    )
+    profile = RoleProfile(target, attacker, evaluator, 1)
     with pytest.raises(OSError, match="cannot write journal"):
         run_preflight(profile, journal_factory=factory)
     assert trace == []
@@ -435,7 +433,7 @@ def test_preflight_reports_real_exchange_and_verdict_events(tmp_path, capsys):
     attacker = LLMChat(lambda turns: "READY")
     judge = LLMChat(lambda turns: '{"success": false}')
     profile = RoleProfile(
-        target, attacker, ModelEvaluatorProfile(judge, MODEL_RUBRIC_VERSION), 1
+        target, attacker, EvaluatorSetup.model(judge, MODEL_RUBRIC_VERSION), 1
     )
     assert run_preflight(profile, tmp_path / "report.json") == 0
     data = json.loads(capsys.readouterr().out)

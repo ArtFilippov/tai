@@ -7,6 +7,7 @@ from tai.alert import (
     select_alert_records,
 )
 from tai.chats import ChatCancelled, ChatTurn, LLMChat, ModelRole
+from tai.evaluation import EvaluatorSetup
 from tai.evaluators import (
     ContainsTextEvaluator,
     Evaluator,
@@ -42,6 +43,7 @@ __all__ = [
     "ContainsTextEvaluator",
     "Evaluation",
     "Evaluator",
+    "EvaluatorSetup",
     "FITDUser",
     "FITDExperiment",
     "LLMChat",

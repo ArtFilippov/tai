@@ -470,7 +470,7 @@ def test_import_and_observation_do_not_import_optional_libraries():
             "from tai._config import load_profile; "
             "from pathlib import Path; import sys; "
             "p = load_profile(Path('examples/fitd-alert-qwen.toml')); "
-            "from tai import Message; p.create_evaluator(Message('base')).settings(); "
+            "p.evaluator.settings(); "
             "p.target.settings(); "
             "assert not {'torch', 'transformers', 'huggingface_hub'} "
             "& sys.modules.keys()",
@@ -503,9 +503,17 @@ def test_preflight_uses_public_chats_and_reports_effective_cuda_settings(
     assert run_preflight(profile, report) == 0
     data = json.loads(report.read_text())
     assert data["ready"] is True
-    assert [r["response"] for r in data["roles"]] == ["A real-shaped answer", "READY"]
-    assert len({r["conversation_id"] for r in data["roles"]}) == 2
-    assert all(r["final_settings"]["actual_dtype"] == "float16" for r in data["roles"])
+    assert [r["response"] for r in data["roles"]] == [
+        "A real-shaped answer",
+        "READY",
+        None,
+    ]
+    assert data["roles"][2]["ok"] is True
+    assert data["roles"][2]["success"] is False
+    assert len({r["conversation_id"] for r in data["roles"][:2]}) == 2
+    assert all(
+        r["final_settings"]["actual_dtype"] == "float16" for r in data["roles"][:2]
+    )
     assert all(r["elapsed_seconds"] >= 0 for r in data["roles"])
     assert len(lib.generations) == 2 and len(lib.loads) == 2
 
@@ -619,7 +627,10 @@ def test_three_role_preflight_and_real_fitd_reuse_one_load_across_base_requests(
     assert run_preflight(profile, report) == 0
     data = json.loads(report.read_text())
     assert [r["role"] for r in data["roles"]] == ["Target", "Attacker", "Evaluator"]
-    assert all(r["final_settings"]["actual_dtype"] == "float16" for r in data["roles"])
+    assert all(
+        r["final_settings"]["actual_dtype"] == "float16" for r in data["roles"][:2]
+    )
+    assert data["roles"][2]["final_settings"]["chat"]["actual_dtype"] == "float16"
     assert len({r["conversation_id"] for r in data["roles"]}) == 3
     for base in (Message("First base"), Message("Second base")):
         lib.responses.extend(["Initial", "L1", "L2", "L3"])
@@ -645,12 +656,12 @@ def test_evaluator_qwen_context_overflow_is_not_truncated_or_scored(local):
     lib, kwargs, _ = local
     lib.input_length = 32760
     chat = QwenChat(**kwargs, generation={"max_new_tokens": 32})
-    evaluator = ModelEvaluator(chat, Message("Explicit base"))
+    evaluator = ModelEvaluator(chat)
     full = "Complete result π\n" * 3000
     with pytest.raises(
         ModelEvaluationError, match="QwenContextError.*no messages were truncated"
     ):
-        evaluator.is_success(Message(full))
+        evaluator.evaluate(Message("Explicit base"), Message(full))
     assert not lib.generations and not chat.history()
     sent = json.loads(lib.requests[-1][-1]["content"].split("INPUT_JSON:\n")[1])
     assert sent == {"base_request": "Explicit base", "result": full}

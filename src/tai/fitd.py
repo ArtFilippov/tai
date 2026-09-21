@@ -21,7 +21,8 @@ from tai._operations import (
 )
 from tai._profile import FITD_PROFILE
 from tai.chats import LLMChat, ModelRole, _acquire_chats, _release_chats
-from tai.evaluators import Evaluator, ModelEvaluator
+from tai.evaluation import EvaluatorSetup, evaluator_setup
+from tai.evaluators import Evaluator, evaluate
 from tai.messages import Message
 from tai.users import Evaluation, Progress, RunSnapshot, User, UserState, UserStatus
 
@@ -46,23 +47,21 @@ class FITDUser(User):
         target: LLMChat,
         attacker: LLMChat,
         base: Message,
-        evaluator: Evaluator,
+        evaluator: Evaluator | EvaluatorSetup,
         *,
         max_calls_per_conv: int = 10,
     ) -> None:
-        if target is attacker:
-            raise ValueError(
-                "Target and Attacker must be independent LLMChat instances"
-            )
-        if isinstance(evaluator, ModelEvaluator):
-            if evaluator.chat is target or evaluator.chat is attacker:
-                raise ValueError("Evaluator must use an independent LLMChat instance")
-            if evaluator.base.id != base.id:
-                raise ValueError("Evaluator must be bound to this run's base Message")
+        self._evaluation_setup = evaluator_setup(evaluator)
+        chats: dict[ModelRole, LLMChat] = {"Target": target, "Attacker": attacker}
+        if self._evaluation_setup.chat is not None:
+            chats["Evaluator"] = self._evaluation_setup.chat
+        if len({id(chat) for chat in chats.values()}) != len(chats):
+            raise ValueError("Participants must use independent LLMChat instances")
+        self._source_chats = chats
         self._target = target
         self._attacker = attacker
         self._base = base
-        self._evaluator = evaluator
+        self._evaluator = self._evaluation_setup.evaluator
         if type(max_calls_per_conv) is not int or max_calls_per_conv <= 0:
             raise ValueError("max_calls_per_conv must be a positive integer")
         self._profile = replace(FITD_PROFILE, max_calls_per_conv=max_calls_per_conv)
@@ -73,8 +72,7 @@ class FITDUser(User):
         self, execution_type: type[_Execution] | None = None
     ) -> _Execution:
         return (execution_type or _Execution)(
-            self._target,
-            self._attacker,
+            self._source_chats,
             self._base,
             self._evaluator,
             max_calls_per_conv=self._profile.max_calls_per_conv,
@@ -115,19 +113,15 @@ class _Execution:
 
     def __init__(
         self,
-        target: LLMChat,
-        attacker: LLMChat,
+        chats: dict[ModelRole, LLMChat],
         base: Message,
         evaluator: Evaluator,
         *,
         max_calls_per_conv: int,
     ) -> None:
-        self._participants: dict[ModelRole, tuple[LLMChat, str]] = {
-            "Target": (target, "target_calls"),
-            "Attacker": (attacker, "attacker_calls"),
+        self._participants = {
+            role: (chat, role.lower() + "_calls") for role, chat in chats.items()
         }
-        if isinstance(evaluator, ModelEvaluator):
-            self._participants["Evaluator"] = (evaluator.chat, "evaluator_calls")
         self._chats = tuple(chat for chat, _ in self._participants.values())
         self._base = base
         self._evaluator = evaluator
@@ -207,25 +201,16 @@ class _Execution:
         role: ModelRole,
         message: Message,
         cause: Cause,
-        *,
-        result_id: str | None = None,
-        within_evaluation: bool = False,
     ) -> Exchange:
         with self._lock:
-            if within_evaluation:
-                self._ensure_open()
-            else:
-                self._ensure_running()
-        return self._exchange(
-            self._context(role, cause), str(uuid4()), message, result_id
-        )
+            self._ensure_running()
+        return self._exchange(self._context(role, cause), str(uuid4()), message)
 
     def _exchange(
         self,
         context: Context,
         call_id: str,
         message: Message,
-        result_id: str | None,
     ) -> Exchange:
         """An admitted call completes even if stop is requested before model I/O."""
         chat, counter = self._participants[context.role]
@@ -263,14 +248,9 @@ class _Execution:
         self,
         role: ModelRole,
         cause: Cause,
-        *,
-        within_evaluation: bool = False,
     ) -> ConversationChange:
         with self._lock:
-            if within_evaluation:
-                self._ensure_open()
-            else:
-                self._ensure_running()
+            self._ensure_running()
         previous = self._conversation_id(role)
         self._participants[role][0].reset()
         return ConversationChange("reset", self._context(role, cause), previous)
@@ -335,33 +315,20 @@ class _Execution:
                 raise RuntimeError(
                     "FITD requested evaluation of an unpresented Message"
                 )
-            self._status = replace(self._status, evaluation=None)
+            self._status = replace(
+                self._status,
+                evaluation=None,
+                progress=replace(
+                    self._status.progress,
+                    evaluator_calls=self._status.progress.evaluator_calls + 1,
+                ),
+            )
         return self._assess(result, context, checkpoint_id)
 
     def _assess(
         self, result: Message, context: Context, checkpoint_id: str
     ) -> EvaluationResult:
-        evaluator = self._evaluator
-        if isinstance(evaluator, ModelEvaluator):
-
-            def reset_evaluator() -> None:
-                self._reset("Evaluator", context.cause, within_evaluation=True)
-
-            evaluator = evaluator._with_io(
-                lambda message: (
-                    self._send(
-                        "Evaluator",
-                        message,
-                        context.cause,
-                        result_id=result.id,
-                        within_evaluation=True,
-                    ).response
-                ),
-                reset_evaluator,
-            )
-        success = evaluator.is_success(result)
-        if not isinstance(success, bool):
-            raise TypeError("Evaluator.is_success must return bool")
+        success = evaluate(self._evaluator, self._base, result)
         return self._record_evaluation(result, success, context, checkpoint_id)
 
     def _record_evaluation(
@@ -372,7 +339,7 @@ class _Execution:
             if self._closed or self._result is not result:
                 raise RuntimeError("Cannot record evaluation of an unpresented Message")
             self._status = replace(self._status, evaluation=evaluation)
-        return EvaluationResult(context, checkpoint_id, result, evaluation)
+        return EvaluationResult(context, checkpoint_id, result, evaluation, self._base)
 
     def _initialize(self, run_id: str) -> None:
         for role in self._participants:
