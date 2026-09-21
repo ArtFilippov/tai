@@ -7,12 +7,12 @@ from collections import deque
 from pathlib import Path
 
 import pytest
+from app_test_support import HttpPeer, session
 from http_peer import Reply
 from test_cli import configure, read_artifacts
-from test_zen_sessions import session
 
 
-def profile(endpoint, tmp_path, monkeypatch):
+def profile(endpoint: HttpPeer, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("TAI_TEST_TARGET_KEY", "synthetic-target-secret")
     monkeypatch.setenv("TAI_TEST_ATTACKER_AUTH", "Custom synthetic-attacker-secret")
     config = configure(endpoint, tmp_path)
@@ -25,7 +25,7 @@ def profile(endpoint, tmp_path, monkeypatch):
     return config
 
 
-def preflight(config, *extra):
+def preflight(config: Path, *extra: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [
             str(Path(sys.executable).with_name("tai")),
@@ -37,12 +37,13 @@ def preflight(config, *extra):
         capture_output=True,
         text=True,
         timeout=15,
+        check=False,
     )
 
 
 def test_preflight_checks_both_configured_roles_and_saves_safe_report(
-    endpoint, tmp_path, monkeypatch
-):
+    endpoint: HttpPeer, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
     config = profile(endpoint, tmp_path, monkeypatch)
     endpoint.scripts = {
         "/v1/target/chat/completions": deque([Reply("READY")]),
@@ -50,7 +51,7 @@ def test_preflight_checks_both_configured_roles_and_saves_safe_report(
     }
     report = tmp_path / "readiness.json"
     completed = preflight(config, "--report", str(report))
-    assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert not completed.returncode, completed.stdout + completed.stderr
     data = json.loads(completed.stdout)
     assert json.loads(report.read_text()) == data
     assert data["ready"] is True
@@ -85,8 +86,8 @@ def test_preflight_checks_both_configured_roles_and_saves_safe_report(
     "failure", ["http", "empty", "whitespace", "models", "truncated"]
 )
 def test_preflight_reports_each_role_even_when_one_cannot_generate(
-    endpoint, tmp_path, monkeypatch, failing_role, failure
-):
+    endpoint: HttpPeer, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failing_role: str, failure: str,
+) -> None:
     config = profile(endpoint, tmp_path, monkeypatch)
     endpoint.scripts = {
         f"/v1/{role}/chat/completions": deque(
@@ -121,7 +122,7 @@ def test_preflight_reports_each_role_even_when_one_cannot_generate(
     assert "synthetic-" not in completed.stdout + completed.stderr
 
 
-def with_key(key_file, *args):
+def with_key(key_file: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [
             sys.executable,
@@ -133,12 +134,13 @@ def with_key(key_file, *args):
         capture_output=True,
         text=True,
         timeout=15,
+        check=False,
     )
 
 
 def test_explicit_json_key_reaches_both_preflight_and_fitd_without_disclosure(
-    endpoint, tmp_path, monkeypatch
-):
+    endpoint: HttpPeer, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
     key_file = tmp_path / "user key.json"
     key_file.write_text(
         json.dumps({"opencode": {"type": "api", "key": "synthetic-json-secret"}})
@@ -174,7 +176,7 @@ def test_explicit_json_key_reaches_both_preflight_and_fitd_without_disclosure(
             ]
         )
         completed = with_key(key_file, command, "--config", str(config), *extra)
-        assert completed.returncode == 0, completed.stdout + completed.stderr
+        assert not completed.returncode, completed.stdout + completed.stderr
         assert endpoint.requests
         assert all(
             r[1]["Authorization"] == "Bearer synthetic-json-secret"
@@ -203,8 +205,8 @@ def test_explicit_json_key_reaches_both_preflight_and_fitd_without_disclosure(
     ],
 )
 def test_explicit_key_file_errors_are_safe_and_do_not_send(
-    endpoint, tmp_path, document
-):
+    endpoint: HttpPeer, tmp_path: Path, document: bytes | None,
+) -> None:
     key_file = tmp_path / "key.json"
     if document is not None:
         key_file.write_bytes(document)

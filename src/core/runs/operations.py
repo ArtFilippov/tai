@@ -106,11 +106,15 @@ class LocalDecision:
 
 
 @dataclass(frozen=True, slots=True)
-class BranchDecision:
+class BranchSelection:
     id: str
     context: Context
     branch: Literal["exhausted", "continue", "realign", "restart", "rephrase"]
     point: ConversationPoint
+
+
+@dataclass(frozen=True, slots=True)
+class BranchDecision(BranchSelection):
     next_attempt_id: str | None
     next_request: Message | None
     levels_completed: int
@@ -120,7 +124,11 @@ class BranchDecision:
 
 @dataclass(frozen=True, slots=True)
 class RunStarted:
-    """Admission only; the worker may still be executing when this is returned."""
+    """Admission only; the worker may still be executing when this is returned.
+
+    Attributes:
+        run_id (str): Identity of the admitted execution.
+    """
 
     run_id: str
 
@@ -133,7 +141,14 @@ class ResourcesReleased:
 
 @dataclass(frozen=True, slots=True)
 class WorkerOutcome:
-    """Returned by worker execution, including finalization and resource release."""
+    """Returned by worker execution, including finalization and resource release.
+
+    Attributes:
+        status (UserStatus): Terminal worker status.
+        result (Message | None): Original presented result, if available.
+        error (Exception | None): Original execution or cleanup failure.
+        released (ResourcesReleased | None): Completed resource-release evidence.
+    """
 
     status: UserStatus
     result: Message | None

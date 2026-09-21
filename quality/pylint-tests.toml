@@ -34,6 +34,7 @@ ignore-signatures = true
 min-similarity-lines = 4
 
 [tool.pylint.design]
+ignored-parents = ["builtins.BaseException", "builtins.Exception", "builtins.RuntimeError", "builtins.OSError", "builtins.TimeoutError", "typing.Protocol", "typing_extensions.Protocol", "enum.Enum", "enum.StrEnum"]
 max-statements = 30
 max-complexity = 6
 max-branches = 10

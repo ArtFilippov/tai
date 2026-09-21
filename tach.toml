@@ -7,6 +7,8 @@ layers_explicit_depends_on = true
 respect_gitignore = false
 # Packages group cohesive components; file boundaries retain their layer checks.
 # Contract package exports stay independent of concrete adapters and assembly.
+# The linear order is supplemented below: Interface cannot import Infrastructure,
+# and Infrastructure cannot import UseCase, even with an explicit dependency.
 layers = ["Bootstrap", "Interface", "Infrastructure", "UseCase", "Domain"]
 exclude = [".git/**", "**/.git/**", ".venv/**", "**/.venv/**", "venv/**", "**/venv/**", "__pycache__/**", "**/__pycache__/**", ".mypy_cache/**", "**/.mypy_cache/**", ".pytest_cache/**", "**/.pytest_cache/**", ".ruff_cache/**", "**/.ruff_cache/**", ".tox/**", "**/.tox/**", ".nox/**", "**/.nox/**", ".quality/**", "**/.quality/**", "node_modules/**", "**/node_modules/**", "build/**", "**/build/**", "dist/**", "**/dist/**", "vendor/**", "**/vendor/**", "vendored/**", "**/vendored/**", "_vendor/**", "**/_vendor/**", "generated/**", "**/generated/**", "_generated/**", "**/_generated/**", "migrations/**", "**/migrations/**", "tests/**", "**/tests/**", "**/test/**"]
 
@@ -31,24 +33,27 @@ depends_on = [
 
 [[modules]]
 path = "alert"
-layer = "Domain"
+layer = "Infrastructure"
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
 depends_on = ["alert.manifest"]
 
 [[modules]]
 path = "alert.manifest"
-layer = "Domain"
-depends_on = ["alert.taxonomy"]
+layer = "Infrastructure"
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+depends_on = ["alert.records", "alert.taxonomy", "alert.validation", "alert.values"]
 
 [[modules]]
 path = "alert.preparation"
 layer = "Infrastructure"
-cannot_depend_on = ["alert.report", "app.preflight", "app.series", "attacks.fitd.user"]
-depends_on = ["alert.manifest"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+depends_on = ["alert.manifest", "alert.records", "alert.values"]
 
 [[modules]]
 path = "alert.report"
-layer = "UseCase"
-depends_on = ["alert.manifest", "alert.taxonomy", "core.runs.storage"]
+layer = "Infrastructure"
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+depends_on = ["alert.accounting", "alert.values", "core.runs.storage"]
 
 [[modules]]
 path = "alert.taxonomy"
@@ -64,9 +69,9 @@ depends_on = []
 path = "app.cli"
 layer = "Bootstrap"
 depends_on = [
-    "alert.manifest",
     "alert.preparation",
     "alert.report",
+    "app.arguments",
     "app.configuration",
     "app.preflight",
     "app.series",
@@ -78,61 +83,49 @@ depends_on = [
 path = "app.configuration"
 layer = "Bootstrap"
 depends_on = [
+    "app.chat_factory",
+    "app.configuration_values",
+    "app.profiles",
     "attacks.fitd",
-    "core.chats",
-    "core.chats.openai",
-    "core.chats.qwen",
     "core.evaluation.assembly",
     "core.evaluation.model_evaluator",
-    "core.primitives.diagnostics",
     "core.primitives.messages",
 ]
 
 [[modules]]
 path = "app.preflight"
-layer = "UseCase"
+layer = "Bootstrap"
 depends_on = [
-    "app.configuration",
-    "core.chats",
-    "core.chats.conversation",
-    "core.evaluation",
+    "app.contracts",
+    "app.profiles",
+    "app.readiness_session",
+    "app.runtime",
     "core.evaluation.observation",
-    "core.primitives.messages",
-    "core.runs",
     "core.runs.journal",
-    "core.runs.operations",
 ]
 
 [[modules]]
 path = "app.series"
-layer = "UseCase"
+layer = "Bootstrap"
 depends_on = [
-    "alert",
-    "alert.report",
+    "alert.manifest",
+    "alert.records",
     "app.configuration",
-    "attacks.fitd",
+    "app.contracts",
+    "app.experiments",
+    "app.runtime",
+    "app.series_contracts",
+    "app.series_execution",
+    "app.series_storage",
     "attacks.fitd.garak_adapter",
     "attacks.fitd.profile",
-    "core.primitives.diagnostics",
     "core.primitives.messages",
-    "core.runs",
-    "core.runs.storage",
 ]
 
 [[modules]]
 path = "app.terminal"
-layer = "Interface"
-cannot_depend_on = [
-    "alert.preparation",
-    "attacks.fitd.garak_adapter",
-    "core.chats.http_worker",
-    "core.chats.openai",
-    "core.chats.qwen",
-    "core.evaluation.observation",
-    "core.runs.journal",
-    "core.runs.storage",
-]
-depends_on = ["attacks.fitd", "core.runs", "core.runs.storage"]
+layer = "Bootstrap"
+depends_on = ["app.configuration", "app.experiments", "app.runtime", "app.terminal_control", "attacks.fitd", "core.primitives.messages"]
 
 [[modules]]
 path = "attacks"
@@ -142,33 +135,35 @@ depends_on = []
 [[modules]]
 path = "attacks.fitd"
 layer = "Bootstrap"
-depends_on = ["attacks.fitd.experiment", "attacks.fitd.user"]
+depends_on = ["attacks.fitd.bootstrap", "attacks.fitd.experiment"]
 
 [[modules]]
 path = "attacks.fitd.experiment"
 layer = "Bootstrap"
 depends_on = [
-    "attacks.fitd.garak_adapter",
+    "attacks.fitd.bootstrap",
+    "attacks.fitd.execution",
+    "attacks.fitd.execution_state",
+    "attacks.fitd.observation",
     "attacks.fitd.user",
     "core.chats",
     "core.evaluation",
-    "core.evaluation.assembly",
-    "core.evaluation.observation",
+    "core.evaluation.configuration",
     "core.primitives.diagnostics",
     "core.primitives.messages",
     "core.runs.journal",
-    "core.runs.operations",
 ]
 
 [[modules]]
 path = "attacks.fitd.garak_adapter"
 layer = "Infrastructure"
-cannot_depend_on = ["alert.report", "app.preflight", "app.series", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
 depends_on = [
+    "attacks.fitd.contracts",
+    "attacks.fitd.probe",
     "attacks.fitd.profile",
-    "core.chats",
+    "attacks.fitd.target",
     "core.primitives.messages",
-    "core.runs.operations",
 ]
 
 [[modules]]
@@ -180,15 +175,10 @@ depends_on = []
 path = "attacks.fitd.user"
 layer = "UseCase"
 depends_on = [
-    "attacks.fitd.garak_adapter",
-    "attacks.fitd.profile",
-    "core.chats",
-    "core.chats.conversation",
-    "core.evaluation",
-    "core.evaluation.assembly",
+    "attacks.fitd.execution",
+    "attacks.fitd.execution_state",
     "core.primitives.messages",
     "core.runs",
-    "core.runs.operations",
 ]
 
 [[modules]]
@@ -204,26 +194,26 @@ depends_on = ["core.chats.conversation"]
 [[modules]]
 path = "core.chats.conversation"
 layer = "Domain"
-depends_on = ["core.primitives.diagnostics", "core.primitives.messages"]
+depends_on = ["core.chats.chat_contract", "core.chats.chat_state", "core.primitives.diagnostics", "core.primitives.messages"]
 
-# OpenAI launches the adjacent http_worker.py by filename, not by Python import.
+# openai_transport launches the adjacent http_worker.py by filename, not by Python import.
 [[modules]]
 path = "core.chats.http_worker"
 layer = "Infrastructure"
-cannot_depend_on = ["alert.report", "app.preflight", "app.series", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
 depends_on = []
 
 [[modules]]
 path = "core.chats.openai"
 layer = "Infrastructure"
-cannot_depend_on = ["alert.report", "app.preflight", "app.series", "attacks.fitd.user"]
-depends_on = ["core.chats.conversation", "core.primitives.diagnostics"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+depends_on = ["core.chats.conversation", "core.chats.openai_config", "core.chats.openai_errors", "core.chats.openai_transport", "core.primitives.diagnostics"]
 
 [[modules]]
 path = "core.chats.qwen"
 layer = "Infrastructure"
-cannot_depend_on = ["alert.report", "app.preflight", "app.series", "attacks.fitd.user"]
-depends_on = ["core.chats.conversation", "core.primitives.diagnostics"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+depends_on = ["core.chats.conversation", "core.chats.qwen_config", "core.chats.qwen_executor", "core.primitives.diagnostics"]
 
 [[modules]]
 path = "core.evaluation"
@@ -235,6 +225,7 @@ path = "core.evaluation.assembly"
 layer = "Bootstrap"
 depends_on = [
     "core.chats",
+    "core.evaluation.configuration",
     "core.evaluation.evaluator",
     "core.evaluation.model_evaluator",
     "core.evaluation.observation",
@@ -249,24 +240,24 @@ depends_on = ["core.primitives.messages"]
 [[modules]]
 path = "core.evaluation.model_evaluator"
 layer = "Domain"
-depends_on = ["core.chats", "core.evaluation.evaluator", "core.primitives.messages"]
+depends_on = ["core.chats", "core.evaluation.evaluator", "core.evaluation.verdict", "core.primitives.messages", "core.primitives.messages.validation"]
 
 [[modules]]
 path = "core.evaluation.observation"
 layer = "Infrastructure"
-cannot_depend_on = ["alert.report", "app.preflight", "app.series", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
 depends_on = [
     "core.chats",
     "core.evaluation.evaluator",
     "core.primitives.messages",
-    "core.runs.journal",
+    "core.runs.journal_ports",
     "core.runs.operations",
 ]
 
 [[modules]]
 path = "core.evaluation.text_evaluator"
 layer = "Domain"
-depends_on = ["core.evaluation.evaluator", "core.primitives.messages"]
+depends_on = ["core.evaluation.evaluator", "core.primitives.messages", "core.primitives.messages.validation"]
 
 [[modules]]
 path = "core.primitives"
@@ -281,7 +272,7 @@ depends_on = ["core.primitives.diagnostics.redaction"]
 [[modules]]
 path = "core.primitives.diagnostics.redaction"
 layer = "Domain"
-depends_on = []
+depends_on = ["core.primitives.diagnostics.json_values"]
 
 [[modules]]
 path = "core.primitives.messages"
@@ -291,7 +282,7 @@ depends_on = ["core.primitives.messages.message"]
 [[modules]]
 path = "core.primitives.messages.message"
 layer = "Domain"
-depends_on = []
+depends_on = ["core.primitives.messages.validation"]
 
 [[modules]]
 path = "core.runs"
@@ -301,12 +292,16 @@ depends_on = ["core.runs.status", "core.runs.user"]
 [[modules]]
 path = "core.runs.journal"
 layer = "Infrastructure"
-cannot_depend_on = ["alert.report", "app.preflight", "app.series", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
 depends_on = [
-    "core.chats",
-    "core.primitives.diagnostics",
-    "core.primitives.messages",
+    "core.runs.journal_calls",
+    "core.runs.journal_formatting",
+    "core.runs.journal_lifecycle",
+    "core.runs.journal_output",
+    "core.runs.journal_ports",
+    "core.runs.journal_values",
     "core.runs.operations",
+    "core.runs.records",
     "core.runs.status",
 ]
 
@@ -323,10 +318,12 @@ depends_on = ["core.primitives.messages"]
 [[modules]]
 path = "core.runs.storage"
 layer = "Infrastructure"
-cannot_depend_on = ["alert.report", "app.preflight", "app.series", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
 depends_on = [
     "core.primitives.diagnostics",
-    "core.runs.journal",
+    "core.runs.artifact_io",
+    "core.runs.journal_ports",
+    "core.runs.records",
     "core.runs.status",
     "core.runs.user",
 ]
@@ -335,6 +332,335 @@ depends_on = [
 path = "core.runs.user"
 layer = "Domain"
 depends_on = ["core.primitives.messages", "core.runs.status"]
+
+[[modules]]
+path = "alert.accounting"
+layer = "Domain"
+depends_on = ["alert.taxonomy", "alert.values"]
+
+[[modules]]
+path = "alert.records"
+layer = "Domain"
+depends_on = ["alert.taxonomy", "alert.values"]
+
+[[modules]]
+path = "alert.validation"
+layer = "Domain"
+depends_on = ["alert.records", "alert.taxonomy", "alert.values"]
+
+[[modules]]
+path = "alert.values"
+layer = "Domain"
+depends_on = []
+
+[[modules]]
+path = "app.arguments"
+layer = "Interface"
+cannot_depend_on = ["alert", "alert.manifest", "alert.preparation", "alert.report", "app.runtime", "app.series_storage", "attacks.fitd.continuation", "attacks.fitd.garak_adapter", "attacks.fitd.native", "attacks.fitd.native_configuration", "attacks.fitd.probe", "attacks.fitd.target", "core.chats.http_worker", "core.chats.openai", "core.chats.openai_transport", "core.chats.qwen", "core.chats.qwen_executor", "core.chats.qwen_runtime", "core.evaluation.observation", "core.runs.artifact_io", "core.runs.journal", "core.runs.journal_lifecycle", "core.runs.journal_output", "core.runs.journal_state", "core.runs.storage"]
+depends_on = ["alert.records"]
+
+[[modules]]
+path = "app.chat_factory"
+layer = "Bootstrap"
+depends_on = ["app.configuration_values", "core.chats", "core.chats.openai", "core.chats.qwen"]
+
+[[modules]]
+path = "app.configuration_values"
+layer = "Domain"
+depends_on = []
+
+[[modules]]
+path = "app.contracts"
+layer = "Domain"
+depends_on = ["core.primitives.diagnostics", "core.primitives.messages", "core.runs", "core.runs.operations"]
+
+[[modules]]
+path = "app.experiments"
+layer = "Bootstrap"
+depends_on = ["app.contracts", "attacks.fitd", "core.runs.storage"]
+
+[[modules]]
+path = "app.failure_capture"
+layer = "UseCase"
+depends_on = []
+
+[[modules]]
+path = "app.failures"
+layer = "Domain"
+depends_on = []
+
+[[modules]]
+path = "app.lifecycle"
+layer = "UseCase"
+depends_on = ["app.contracts"]
+
+[[modules]]
+path = "app.profiles"
+layer = "Domain"
+depends_on = ["core.chats", "core.evaluation.configuration", "core.primitives.diagnostics"]
+
+[[modules]]
+path = "app.readiness"
+layer = "UseCase"
+depends_on = [
+    "alert.values",
+    "app.contracts",
+    "app.failure_capture",
+    "app.failures",
+    "app.profiles",
+    "core.chats",
+    "core.evaluation",
+    "core.evaluation.configuration",
+    "core.primitives.messages",
+    "core.runs",
+    "core.runs.operations",
+]
+
+[[modules]]
+path = "app.readiness_session"
+layer = "UseCase"
+depends_on = ["app.contracts", "app.failure_capture", "app.profiles", "app.readiness", "core.chats.conversation", "core.runs", "core.runs.operations"]
+
+[[modules]]
+path = "app.runtime"
+layer = "Infrastructure"
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+depends_on = ["app.contracts"]
+
+[[modules]]
+path = "app.series_contracts"
+layer = "Domain"
+depends_on = ["alert.accounting", "app.contracts", "core.primitives.messages", "core.runs"]
+
+[[modules]]
+path = "app.series_execution"
+layer = "UseCase"
+depends_on = ["alert.accounting", "alert.records", "app.contracts", "app.failure_capture", "app.lifecycle", "app.series_contracts", "core.primitives.messages", "core.runs"]
+
+[[modules]]
+path = "app.series_storage"
+layer = "Infrastructure"
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+depends_on = ["alert.accounting", "app.series_contracts", "core.runs", "core.runs.storage"]
+
+[[modules]]
+path = "app.terminal_control"
+layer = "Interface"
+cannot_depend_on = ["alert", "alert.manifest", "alert.preparation", "alert.report", "app.runtime", "app.series_storage", "attacks.fitd.continuation", "attacks.fitd.garak_adapter", "attacks.fitd.native", "attacks.fitd.native_configuration", "attacks.fitd.probe", "attacks.fitd.target", "core.chats.http_worker", "core.chats.openai", "core.chats.openai_transport", "core.chats.qwen", "core.chats.qwen_executor", "core.chats.qwen_runtime", "core.evaluation.observation", "core.runs.artifact_io", "core.runs.journal", "core.runs.journal_lifecycle", "core.runs.journal_output", "core.runs.journal_state", "core.runs.storage"]
+depends_on = ["app.contracts", "app.failure_capture", "app.lifecycle", "core.runs"]
+
+[[modules]]
+path = "attacks.fitd.bootstrap"
+layer = "Bootstrap"
+depends_on = [
+    "attacks.fitd.contracts",
+    "attacks.fitd.execution_state",
+    "attacks.fitd.garak_adapter",
+    "attacks.fitd.profile",
+    "attacks.fitd.user",
+    "core.chats",
+    "core.evaluation",
+    "core.evaluation.configuration",
+    "core.primitives.messages",
+]
+
+[[modules]]
+path = "attacks.fitd.continuation"
+layer = "Infrastructure"
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+depends_on = ["attacks.fitd.contracts", "attacks.fitd.native", "attacks.fitd.target", "core.primitives.messages", "core.runs.operations"]
+
+[[modules]]
+path = "attacks.fitd.contracts"
+layer = "Domain"
+depends_on = ["attacks.fitd.profile", "core.chats", "core.primitives.messages", "core.runs.operations"]
+
+[[modules]]
+path = "attacks.fitd.execution"
+layer = "UseCase"
+depends_on = ["attacks.fitd.contracts", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "core.chats.conversation", "core.primitives.messages", "core.runs", "core.runs.operations"]
+
+[[modules]]
+path = "attacks.fitd.execution_operations"
+layer = "UseCase"
+depends_on = ["attacks.fitd.execution_state", "core.chats", "core.evaluation", "core.primitives.messages", "core.runs", "core.runs.operations"]
+
+[[modules]]
+path = "attacks.fitd.execution_state"
+layer = "UseCase"
+depends_on = ["attacks.fitd.contracts", "attacks.fitd.profile", "core.chats", "core.evaluation", "core.primitives.messages", "core.runs"]
+
+[[modules]]
+path = "attacks.fitd.native"
+layer = "Infrastructure"
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+depends_on = []
+
+[[modules]]
+path = "attacks.fitd.native_configuration"
+layer = "Infrastructure"
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+depends_on = ["attacks.fitd.native", "attacks.fitd.profile"]
+
+[[modules]]
+path = "attacks.fitd.observation"
+layer = "Bootstrap"
+depends_on = [
+    "attacks.fitd.contracts",
+    "attacks.fitd.execution",
+    "attacks.fitd.execution_state",
+    "attacks.fitd.garak_adapter",
+    "attacks.fitd.target",
+    "core.evaluation.observation",
+    "core.primitives.messages",
+    "core.runs",
+    "core.runs.journal",
+    "core.runs.operations",
+]
+
+[[modules]]
+path = "attacks.fitd.probe"
+layer = "Infrastructure"
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+depends_on = ["attacks.fitd.continuation", "attacks.fitd.contracts", "attacks.fitd.native", "attacks.fitd.native_configuration", "attacks.fitd.profile", "attacks.fitd.target", "core.primitives.messages", "core.runs.operations"]
+
+[[modules]]
+path = "attacks.fitd.target"
+layer = "Infrastructure"
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+depends_on = ["attacks.fitd.contracts", "attacks.fitd.native", "core.primitives.messages", "core.runs.operations"]
+
+[[modules]]
+path = "core.chats.chat_contract"
+layer = "Domain"
+depends_on = ["core.chats.chat_state", "core.primitives.diagnostics", "core.primitives.messages"]
+
+[[modules]]
+path = "core.chats.chat_state"
+layer = "Domain"
+depends_on = ["core.primitives.messages"]
+
+[[modules]]
+path = "core.chats.http_contracts"
+layer = "Domain"
+depends_on = []
+
+[[modules]]
+path = "core.chats.openai_config"
+layer = "Domain"
+depends_on = ["core.primitives.diagnostics"]
+
+[[modules]]
+path = "core.chats.openai_errors"
+layer = "Domain"
+depends_on = []
+
+[[modules]]
+path = "core.chats.openai_transport"
+layer = "Infrastructure"
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+depends_on = ["core.chats.conversation", "core.chats.http_contracts", "core.chats.openai_errors", "core.primitives.diagnostics"]
+
+[[modules]]
+path = "core.chats.qwen_config"
+layer = "Domain"
+depends_on = []
+
+[[modules]]
+path = "core.chats.qwen_contracts"
+layer = "Domain"
+depends_on = ["core.chats.chat_state", "core.chats.qwen_config"]
+
+[[modules]]
+path = "core.chats.qwen_executor"
+layer = "Infrastructure"
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+depends_on = ["core.chats.conversation", "core.chats.qwen_config", "core.chats.qwen_contracts", "core.chats.qwen_runtime"]
+
+[[modules]]
+path = "core.chats.qwen_runtime"
+layer = "Infrastructure"
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+depends_on = ["core.chats.conversation", "core.chats.qwen_config", "core.chats.qwen_contracts"]
+
+[[modules]]
+path = "core.evaluation.configuration"
+layer = "Domain"
+depends_on = ["core.chats", "core.evaluation.evaluator"]
+
+[[modules]]
+path = "core.evaluation.verdict"
+layer = "Domain"
+depends_on = ["core.primitives.diagnostics.json_values"]
+
+[[modules]]
+path = "core.primitives.diagnostics.json_values"
+layer = "Domain"
+depends_on = []
+
+[[modules]]
+path = "core.primitives.messages.validation"
+layer = "Domain"
+depends_on = []
+
+[[modules]]
+path = "core.runs.artifact_io"
+layer = "Infrastructure"
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+depends_on = []
+
+[[modules]]
+path = "core.runs.journal_calls"
+layer = "Domain"
+depends_on = ["core.chats", "core.primitives.diagnostics", "core.primitives.messages", "core.runs.journal_values", "core.runs.operations"]
+
+[[modules]]
+path = "core.runs.journal_configuration"
+layer = "Domain"
+depends_on = ["core.primitives.diagnostics"]
+
+[[modules]]
+path = "core.runs.journal_formatting"
+layer = "Domain"
+depends_on = ["core.runs.journal_values", "core.runs.operations"]
+
+[[modules]]
+path = "core.runs.journal_lifecycle"
+layer = "Infrastructure"
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+depends_on = ["core.primitives.diagnostics", "core.primitives.diagnostics.json_values", "core.runs.journal_configuration", "core.runs.journal_output", "core.runs.journal_ports", "core.runs.journal_state", "core.runs.journal_support", "core.runs.journal_values", "core.runs.status"]
+
+[[modules]]
+path = "core.runs.journal_output"
+layer = "Infrastructure"
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+depends_on = ["core.primitives.diagnostics", "core.runs.journal_support", "core.runs.journal_values", "core.runs.records"]
+
+[[modules]]
+path = "core.runs.journal_ports"
+layer = "Domain"
+depends_on = ["core.primitives.diagnostics", "core.primitives.diagnostics.json_values", "core.runs.journal_calls", "core.runs.operations", "core.runs.records", "core.runs.status"]
+
+[[modules]]
+path = "core.runs.journal_state"
+layer = "Infrastructure"
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+depends_on = ["core.primitives.diagnostics", "core.runs.journal_support", "core.runs.operations", "core.runs.status"]
+
+[[modules]]
+path = "core.runs.journal_support"
+layer = "Domain"
+depends_on = ["core.primitives.diagnostics", "core.runs.operations", "core.runs.records", "core.runs.status"]
+
+[[modules]]
+path = "core.runs.journal_values"
+layer = "Domain"
+depends_on = ["core.primitives.messages", "core.runs.operations"]
+
+[[modules]]
+path = "core.runs.records"
+layer = "Domain"
+depends_on = ["core.primitives.diagnostics", "core.primitives.diagnostics.json_values", "core.runs.status"]
 
 # The facade exposes exactly the documented src/tai.py API.
 [[interfaces]]

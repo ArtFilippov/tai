@@ -95,6 +95,7 @@ ignore-signatures = true
 min-similarity-lines = 4
 
 [tool.pylint.design]
+ignored-parents = ["builtins.BaseException", "builtins.Exception", "builtins.RuntimeError", "builtins.OSError", "builtins.TimeoutError", "typing.Protocol", "typing_extensions.Protocol", "enum.Enum", "enum.StrEnum"]
 max-statements = 20
 max-complexity = 6
 max-branches = 4
@@ -115,6 +116,7 @@ max-nested-blocks = 3
 max-try-statements = 1
 
 [tool.pyright]
+stubPath = "src/attacks/fitd/stubs"
 include = ["src", "tests"]
 exclude = [".git/**", "**/.git/**", ".venv/**", "**/.venv/**", "venv/**", "**/venv/**", "__pycache__/**", "**/__pycache__/**", ".mypy_cache/**", "**/.mypy_cache/**", ".pytest_cache/**", "**/.pytest_cache/**", ".ruff_cache/**", "**/.ruff_cache/**", ".tox/**", "**/.tox/**", ".nox/**", "**/.nox/**", ".quality/**", "**/.quality/**", "node_modules/**", "**/node_modules/**", "build/**", "**/build/**", "dist/**", "**/dist/**", "vendor/**", "**/vendor/**", "vendored/**", "**/vendored/**", "_vendor/**", "**/_vendor/**", "generated/**", "**/generated/**", "_generated/**", "**/_generated/**", "migrations/**", "**/migrations/**"]
 ignore = [".git/**", "**/.git/**", ".venv/**", "**/.venv/**", "venv/**", "**/venv/**", "__pycache__/**", "**/__pycache__/**", ".mypy_cache/**", "**/.mypy_cache/**", ".pytest_cache/**", "**/.pytest_cache/**", ".ruff_cache/**", "**/.ruff_cache/**", ".tox/**", "**/.tox/**", ".nox/**", "**/.nox/**", ".quality/**", "**/.quality/**", "node_modules/**", "**/node_modules/**", "build/**", "**/build/**", "dist/**", "**/dist/**", "vendor/**", "**/vendor/**", "vendored/**", "**/vendored/**", "_vendor/**", "**/_vendor/**", "generated/**", "**/generated/**", "_generated/**", "**/_generated/**", "migrations/**", "**/migrations/**"]
@@ -183,17 +185,34 @@ auto-regenerate-baseline = false
 [tool.clean-arch]
 project_type = "generic"
 visibility_enforcement = true
-infrastructure_modules = ["alert.preparation", "attacks.fitd.garak_adapter", "core.chats.http_worker", "core.chats.openai", "core.chats.qwen", "core.evaluation.observation", "core.runs.journal", "core.runs.storage"]
+infrastructure_modules = ["alert", "alert.manifest", "alert.preparation", "alert.report", "app.runtime", "app.series_storage", "attacks.fitd.continuation", "attacks.fitd.garak_adapter", "attacks.fitd.native", "attacks.fitd.native_configuration", "attacks.fitd.target", "core.chats.http_worker", "core.chats.openai", "core.chats.openai_transport", "core.chats.qwen", "core.chats.qwen_executor", "core.chats.qwen_runtime", "core.evaluation.observation", "core.runs.artifact_io", "core.runs.journal", "core.runs.journal_lifecycle", "core.runs.journal_output", "core.runs.journal_state", "core.runs.storage"]
 
 [tool.clean-arch.layer_map]
 Domain = ["domain"]
 UseCase = ["application", "use_cases", "usecase", "usecases"]
 Infrastructure = ["infrastructure", "adapters"]
-Interface = ["interfaces", "interface", "bootstrap", "composition"]
+Interface = ["interfaces", "interface"]
+Bootstrap = ["bootstrap", "composition"]
+
+[[tool.clean-arch.layers]]
+module = "core.primitives.diagnostics.json_values"
+name = "Domain"
 
 [[tool.clean-arch.layers]]
 module = "core.primitives.diagnostics.redaction"
 name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "core.primitives.messages.validation"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "attacks.fitd.execution_operations"
+name = "UseCase"
+
+[[tool.clean-arch.layers]]
+module = "attacks.fitd.native_configuration"
+name = "Infrastructure"
 
 [[tool.clean-arch.layers]]
 module = "core.primitives.messages.message"
@@ -208,6 +227,22 @@ module = "core.evaluation.text_evaluator"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
+module = "core.evaluation.configuration"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "attacks.fitd.execution_state"
+name = "UseCase"
+
+[[tool.clean-arch.layers]]
+module = "core.runs.journal_formatting"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "core.chats.openai_transport"
+name = "Infrastructure"
+
+[[tool.clean-arch.layers]]
 module = "core.evaluation.observation"
 name = "Infrastructure"
 
@@ -216,32 +251,136 @@ module = "core.primitives.diagnostics"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
+module = "core.runs.journal_lifecycle"
+name = "Infrastructure"
+
+[[tool.clean-arch.layers]]
 module = "attacks.fitd.garak_adapter"
 name = "Infrastructure"
+
+[[tool.clean-arch.layers]]
+module = "attacks.fitd.continuation"
+name = "Infrastructure"
+
+[[tool.clean-arch.layers]]
+module = "core.chats.http_contracts"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "core.chats.qwen_contracts"
+name = "Domain"
 
 [[tool.clean-arch.layers]]
 module = "core.evaluation.evaluator"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
+module = "app.configuration_values"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "attacks.fitd.observation"
+name = "Bootstrap"
+
+[[tool.clean-arch.layers]]
+module = "core.chats.chat_contract"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "core.chats.openai_config"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "core.chats.openai_errors"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "core.chats.qwen_executor"
+name = "Infrastructure"
+
+[[tool.clean-arch.layers]]
 module = "core.evaluation.assembly"
-name = "Interface"
+name = "Bootstrap"
 
 [[tool.clean-arch.layers]]
 module = "core.primitives.messages"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
+module = "core.runs.journal_output"
+name = "Infrastructure"
+
+[[tool.clean-arch.layers]]
+module = "core.runs.journal_values"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
 module = "attacks.fitd.experiment"
-name = "Interface"
+name = "Bootstrap"
 
 [[tool.clean-arch.layers]]
 module = "core.chats.conversation"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
+module = "core.chats.qwen_runtime"
+name = "Infrastructure"
+
+[[tool.clean-arch.layers]]
+module = "core.evaluation.verdict"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "core.runs.journal_calls"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "core.runs.journal_state"
+name = "Infrastructure"
+
+[[tool.clean-arch.layers]]
+module = "attacks.fitd.bootstrap"
+name = "Bootstrap"
+
+[[tool.clean-arch.layers]]
+module = "attacks.fitd.contracts"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "attacks.fitd.execution"
+name = "UseCase"
+
+[[tool.clean-arch.layers]]
 module = "core.chats.http_worker"
 name = "Infrastructure"
+
+[[tool.clean-arch.layers]]
+module = "core.chats.qwen_config"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "app.readiness_session"
+name = "UseCase"
+
+[[tool.clean-arch.layers]]
+module = "core.chats.chat_state"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "core.runs.artifact_io"
+name = "Infrastructure"
+
+[[tool.clean-arch.layers]]
+module = "app.series_contracts"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "app.series_execution"
+name = "UseCase"
+
+[[tool.clean-arch.layers]]
+module = "app.terminal_control"
+name = "Interface"
 
 [[tool.clean-arch.layers]]
 module = "attacks.fitd.profile"
@@ -252,12 +391,24 @@ module = "core.runs.operations"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
+module = "attacks.fitd.native"
+name = "Infrastructure"
+
+[[tool.clean-arch.layers]]
+module = "attacks.fitd.target"
+name = "Infrastructure"
+
+[[tool.clean-arch.layers]]
+module = "app.series_storage"
+name = "Infrastructure"
+
+[[tool.clean-arch.layers]]
 module = "alert.preparation"
 name = "Infrastructure"
 
 [[tool.clean-arch.layers]]
 module = "app.configuration"
-name = "Interface"
+name = "Bootstrap"
 
 [[tool.clean-arch.layers]]
 module = "attacks.fitd.user"
@@ -272,12 +423,32 @@ module = "core.runs.journal"
 name = "Infrastructure"
 
 [[tool.clean-arch.layers]]
+module = "core.runs.records"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
 module = "core.runs.storage"
 name = "Infrastructure"
 
 [[tool.clean-arch.layers]]
+module = "alert.accounting"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "alert.validation"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "app.chat_factory"
+name = "Bootstrap"
+
+[[tool.clean-arch.layers]]
 module = "core.runs.status"
 name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "app.experiments"
+name = "Bootstrap"
 
 [[tool.clean-arch.layers]]
 module = "core.chats.qwen"
@@ -293,7 +464,7 @@ name = "Domain"
 
 [[tool.clean-arch.layers]]
 module = "alert.manifest"
-name = "Domain"
+name = "Infrastructure"
 
 [[tool.clean-arch.layers]]
 module = "alert.taxonomy"
@@ -304,24 +475,60 @@ module = "core.runs.user"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
+module = "alert.records"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "app.arguments"
+name = "Interface"
+
+[[tool.clean-arch.layers]]
+module = "app.contracts"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "app.lifecycle"
+name = "UseCase"
+
+[[tool.clean-arch.layers]]
 module = "app.preflight"
+name = "Bootstrap"
+
+[[tool.clean-arch.layers]]
+module = "app.readiness"
 name = "UseCase"
 
 [[tool.clean-arch.layers]]
 module = "alert.report"
-name = "UseCase"
+name = "Infrastructure"
+
+[[tool.clean-arch.layers]]
+module = "alert.values"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "app.failures"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "app.profiles"
+name = "Domain"
 
 [[tool.clean-arch.layers]]
 module = "app.terminal"
-name = "Interface"
+name = "Bootstrap"
 
 [[tool.clean-arch.layers]]
 module = "attacks.fitd"
-name = "Interface"
+name = "Bootstrap"
+
+[[tool.clean-arch.layers]]
+module = "app.runtime"
+name = "Infrastructure"
 
 [[tool.clean-arch.layers]]
 module = "app.series"
-name = "UseCase"
+name = "Bootstrap"
 
 [[tool.clean-arch.layers]]
 module = "core.chats"
@@ -333,15 +540,15 @@ name = "Domain"
 
 [[tool.clean-arch.layers]]
 module = "app.cli"
-name = "Interface"
+name = "Bootstrap"
 
 [[tool.clean-arch.layers]]
 module = "attacks"
-name = "Interface"
+name = "Bootstrap"
 
 [[tool.clean-arch.layers]]
 module = "alert"
-name = "Domain"
+name = "Infrastructure"
 
 [[tool.clean-arch.layers]]
 module = "core"
@@ -349,8 +556,8 @@ name = "Domain"
 
 [[tool.clean-arch.layers]]
 module = "app"
-name = "Interface"
+name = "Bootstrap"
 
 [[tool.clean-arch.layers]]
 module = "tai"
-name = "Interface"
+name = "Bootstrap"

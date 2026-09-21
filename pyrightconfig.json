@@ -126,5 +126,6 @@
   "strictDictionaryInference": true,
   "strictListInference": true,
   "strictSetInference": true,
+  "stubPath": "src/attacks/fitd/stubs",
   "typeCheckingMode": "strict"
 }

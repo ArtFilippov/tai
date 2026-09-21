@@ -42,7 +42,12 @@ class UserStatus:
 
 @dataclass(frozen=True, slots=True)
 class RunSnapshot:
-    """One finished execution's actual state and original, immutable Message."""
+    """One finished execution's actual state and original, immutable Message.
+
+    Attributes:
+        status (UserStatus): The actual completed worker status.
+        result (Message | None): Original presented result, if one exists.
+    """
 
     status: UserStatus
     result: Message | None

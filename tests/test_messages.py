@@ -1,5 +1,8 @@
 import json
+from collections.abc import Iterator
 from dataclasses import FrozenInstanceError
+from pathlib import Path
+from typing import Never, cast
 
 import pytest
 
@@ -20,15 +23,15 @@ def test_message_is_an_immutable_serializable_text_with_its_own_identity():
     }
     assert Message("A supplied base request").id != message.id
     with pytest.raises(FrozenInstanceError):
-        message.text = "changed"
+        setattr(message, "text", "changed")
     with pytest.raises(FrozenInstanceError):
-        message.id = "changed"
+        setattr(message, "id", "changed")
 
 
 def test_transformations_branch_from_current_text_without_changing_earlier_versions():
     root = Message("Puzzle")
 
-    def surround(text, prefix, *, suffix):
+    def surround(text: str, prefix: str, *, suffix: str) -> str:
         return prefix + text + suffix
 
     first = root.transform(surround, "[", suffix="]")
@@ -44,13 +47,13 @@ def test_transformations_branch_from_current_text_without_changing_earlier_versi
     assert all(m.base() == "Puzzle" for m in (root, first, left, right))
     assert len({m.id for m in (root, first, left, right)}) == 4
     with pytest.raises(FrozenInstanceError):
-        left.text = "changed"
+        setattr(left, "text", "changed")
 
 
 def test_revert_selects_computed_versions_and_can_start_a_new_branch():
-    calls = []
+    calls: list[str] = []
 
-    def append_step(text, step):
+    def append_step(text: str, step: str) -> str:
         calls.append(step)
         return text + step
 
@@ -65,7 +68,7 @@ def test_revert_selects_computed_versions_and_can_start_a_new_branch():
     assert branch.to_string() == "start one other"
     assert second.to_string() == "start one two"
     assert branch.revert(1) is first
-    for message, distance in [(root, 1), (second, -1), (second, 3)]:
+    for message, distance in ((root, 1), (second, -1), (second, 3)):
         with pytest.raises(ValueError):
             message.revert(distance)
     assert calls == [" one", " two", " other"]
@@ -109,15 +112,15 @@ def test_spawn_starts_a_new_chain_with_a_snapshot_of_its_origin():
 
 
 @pytest.mark.parametrize("invalid", [None, 42, b"bytes", ["text"]])
-def test_non_text_values_are_rejected_without_changing_existing_history(invalid):
+def test_non_text_values_are_rejected_without_changing_existing_history(invalid: object):
     source = Message("original").transform(str.upper)
     snapshot = source.dump()
     with pytest.raises(TypeError):
-        Message(invalid)
+        Message(cast(str, invalid))
     with pytest.raises(TypeError):
-        source.transform(lambda text: invalid)
+        source.transform(lambda text: cast(str, invalid))
     with pytest.raises(TypeError):
-        source.spawn(invalid)
+        source.spawn(cast(str, invalid))
     assert source.dump() == snapshot
     assert source.revert(1).to_string() == "original"
 
@@ -127,7 +130,7 @@ def test_failed_transformation_propagates_its_error_and_leaves_source_usable():
     snapshot = source.dump()
     failure = RuntimeError("transformation failed")
 
-    def fail(text):
+    def fail(_text: str) -> Never:
         raise failure
 
     with pytest.raises(RuntimeError) as raised:
@@ -137,10 +140,10 @@ def test_failed_transformation_propagates_its_error_and_leaves_source_usable():
     assert source.transform(str.lower).to_string() == "original"
 
 
-def test_snapshots_preserve_computed_branches_without_reexecuting_functions(tmp_path):
+def test_snapshots_preserve_computed_branches_without_reexecuting_functions(tmp_path: Path):
     values = iter([" первая", " вторая"])
 
-    def consume(text, values):
+    def consume(text: str, values: Iterator[str]) -> str:
         return text + next(values)
 
     root = Message("Версия")
@@ -163,7 +166,7 @@ def test_snapshots_preserve_computed_branches_without_reexecuting_functions(tmp_
     saved = json.loads(path.read_text(encoding="utf-8"))
     assert saved["base"] == saved["text"] == ""
     assert saved["origin"] == json.loads(snapshot)
-    assert saved["transformations"][0]["text"] == ""
+    assert not saved["transformations"][0]["text"]
     saved["origin"]["transformations"][0]["text"] = "changed detached snapshot"
     assert second.dump() == snapshot
     assert first.to_string() == "Версия первая"

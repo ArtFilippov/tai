@@ -6,6 +6,8 @@ import json
 import sys
 from pathlib import Path
 
+from _architecture_compat import install_architecture_compat
+
 
 def patch_pathlib_alias_check() -> None:
     """Keep Pylint 4.0.8's file checks working for aliased pathlib methods.
@@ -44,6 +46,7 @@ def main() -> int:
         raise ValueError("No files for Pylint")
     from pylint.lint import Run
     patch_pathlib_alias_check()
+    install_architecture_compat()
     result = Run(["--rcfile=" + args.config, "--output-format=json2", "--output=" + args.output,
                   "--jobs=1", *files], exit=False)
     return result.linter.msg_status

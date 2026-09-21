@@ -1,18 +1,25 @@
 """Terminal observation uses the public User and never supplies an evaluation."""
 
+from pathlib import Path
+from typing import override
+
+import pytest
+
 from tai import Evaluator, LLMChat, Message
 from tai import FITDExperiment as FITDUser
 from app.terminal import run_foreground
 
 
 def test_terminal_does_not_reevaluate_or_attribute_old_score_to_new_result(
-    tmp_path, capsys
-):
+    tmp_path: Path, capsys: pytest.CaptureFixture[str],
+) -> None:
     class PartialEvaluator(Evaluator):
-        def __init__(self):
-            self.results = []
+        def __init__(self) -> None:
+            super().__init__()
+            self.results: list[Message] = []
 
-        def evaluate(self, base, result):
+        @override
+        def evaluate(self, base: Message, result: Message) -> bool:
             self.results.append(result)
             if len(self.results) == 2:
                 raise RuntimeError("Required evaluation unavailable")

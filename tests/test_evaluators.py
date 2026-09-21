@@ -13,7 +13,7 @@ from tai import ContainsTextEvaluator, Evaluator, Message
         ("", False),
     ],
 )
-def test_contains_text_checks_full_presented_text_exactly(text, expected):
+def test_contains_text_checks_full_presented_text_exactly(text: str, expected: bool):
     evaluator = ContainsTextEvaluator("CONTROL")
     result = Message(text)
     assert (
@@ -38,7 +38,7 @@ def test_one_operation_without_inheritance_is_the_entire_contract():
 
 
 @pytest.mark.parametrize("location", ["base", "intermediate", "origin"])
-def test_contains_text_ignores_control_string_outside_current_text(location):
+def test_contains_text_ignores_control_string_outside_current_text(location: str):
     evaluator = ContainsTextEvaluator("CONTROL")
     if location == "base":
         result = Message("CONTROL").transform(str.replace, "CONTROL", "ordinary")

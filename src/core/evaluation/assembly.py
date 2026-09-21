@@ -6,13 +6,13 @@ never by inspecting or changing an evaluator during a run.
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from copy import deepcopy
-from dataclasses import dataclass
-from typing import Any
+from collections.abc import Callable, Mapping
+from typing import Self
 
 from core.chats import LLMChat
 
+from .configuration import EvaluatorSetup as SetupContract
+from .configuration import evaluator_setup
 from .evaluator import EvaluationChat, Evaluator
 from .model_evaluator import (
     MODEL_RUBRIC,
@@ -22,9 +22,10 @@ from .model_evaluator import (
 from .observation import ObservedChat
 from .text_evaluator import ContainsTextEvaluator
 
+__all__ = ["EvaluatorSetup", "evaluator_setup"]
 
-@dataclass(frozen=True)
-class EvaluatorSetup:
+
+class EvaluatorSetup(SetupContract):
     """Assembly metadata, never an additional interface required of evaluators.
 
     Plain evaluators need only ``evaluate``. For chat-based evaluators use
@@ -32,25 +33,14 @@ class EvaluatorSetup:
     The model/contains_text constructors assemble the standard implementations.
     """
 
-    evaluator: Evaluator
-    chat: LLMChat | None = None
-    configuration: Callable[[], dict[str, Any]] | None = None
-
-    def settings(self) -> dict[str, Any]:
-        """Detached configuration only; observation never invokes the evaluator."""
-        if self.configuration is not None:
-            return deepcopy(self.configuration())
-        cls = type(self.evaluator)
-        return {"type": f"{cls.__module__}.{cls.__qualname__}"}
-
     @classmethod
     def with_chat(
         cls,
         chat: LLMChat,
         factory: Callable[[EvaluationChat], Evaluator],
         *,
-        settings: Callable[[], dict[str, Any]] | None = None,
-    ) -> EvaluatorSetup:
+        settings: Callable[[], Mapping[str, object]] | None = None,
+    ) -> Self:
         return cls(factory(ObservedChat(chat)), chat, settings)
 
     @classmethod
@@ -60,7 +50,7 @@ class EvaluatorSetup:
         rubric_version: str = MODEL_RUBRIC_VERSION,
         *,
         rubric: str = MODEL_RUBRIC,
-    ) -> EvaluatorSetup:
+    ) -> Self:
         return cls.with_chat(
             chat,
             lambda wrapped: ModelEvaluator(wrapped, rubric_version, rubric),
@@ -73,16 +63,8 @@ class EvaluatorSetup:
         )
 
     @classmethod
-    def contains_text(cls, criterion: str) -> EvaluatorSetup:
+    def contains_text(cls, criterion: str) -> Self:
         return cls(
             ContainsTextEvaluator(criterion),
             configuration=lambda: {"type": "contains_text", "criterion": criterion},
         )
-
-
-def evaluator_setup(evaluator: Evaluator | EvaluatorSetup) -> EvaluatorSetup:
-    return (
-        evaluator
-        if isinstance(evaluator, EvaluatorSetup)
-        else EvaluatorSetup(evaluator)
-    )

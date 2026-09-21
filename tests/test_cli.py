@@ -1,28 +1,28 @@
 """The installed command runs real FITD against a loopback Chat Completions API."""
 
 import json
-import os
-import signal
 import subprocess
 import sys
 from collections import deque
 from pathlib import Path
 
 import pytest
+from app_test_support import HttpPeer, cleanup_process
+from app_cli_checks import assert_roles, assert_stopped_cli, interrupt_cli, read_artifacts
 from http_peer import Reply
 
 
 @pytest.fixture(autouse=True)
-def credentials(monkeypatch):
+def credentials(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TAI_TEST_TARGET_KEY", "synthetic-target-secret")
     monkeypatch.setenv("TAI_TEST_ATTACKER_AUTH", "Custom synthetic-attacker-secret")
 
 
-def configure(endpoint, tmp_path, *, run="", criterion="KEY-FOUND"):
+def configure(endpoint: HttpPeer, tmp_path: Path, *, run: str = "", criterion: str = "KEY-FOUND") -> Path:
     endpoint.scripts = {
         "/v1/target/chat/completions": deque(
             Reply(text)
-            for text in ["One", "Two", "Three", "Four", "KEY-FOUND\nFull answer π\n"]
+            for text in ("One", "Two", "Three", "Four", "KEY-FOUND\nFull answer π\n")
         ),
         "/v1/attacker/chat/completions": deque(
             Reply(text) for text in ["Initial", "L1", "L2", "L3"] + ["yes"] * 10
@@ -57,7 +57,7 @@ criterion = {json.dumps(criterion)}
     return config
 
 
-def command(config, root, *source):
+def command(config: Path, root: Path, *source: str) -> list[str]:
     return [
         str(Path(sys.executable).with_name("tai")),
         "fitd",
@@ -69,42 +69,25 @@ def command(config, root, *source):
     ]
 
 
-def run_cli(config, root, *source):
+def run_cli(config: Path, root: Path, *source: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         command(config, root, *source),
         capture_output=True,
         text=True,
         encoding="utf-8",
         timeout=15,
+        check=False,
     )
 
 
-def read_artifacts(root):
-    (directory,) = root.iterdir()
-    metadata = json.loads((directory / "metadata.json").read_text(encoding="utf-8"))
-    events = [
-        json.loads(line)
-        for line in (directory / "events.jsonl")
-        .read_text(encoding="utf-8")
-        .splitlines()
-    ]
-    assert events[-1]["kind"] == "run_finished"
-    assert events[-1]["data"]["state"] == metadata["state"]
-    assert events[-1]["data"]["reason"] == metadata["reason"]
-    assert [event["sequence"] for event in events] == list(range(1, len(events) + 1))
-    assert all(event["run_id"] == directory.name for event in events)
-    assert metadata["run_id"] == directory.name
-    return directory, metadata, events
-
-
 def test_command_runs_real_fitd_with_independent_roles_and_complete_artifacts(
-    endpoint, tmp_path
-):
+    endpoint: HttpPeer, tmp_path: Path,
+) -> None:
     config = configure(endpoint, tmp_path)
     root = tmp_path / "runs"
     base = "Explain the final fictional puzzle solution π"
     completed = run_cli(config, root, "--text", base)
-    assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert not completed.returncode, completed.stdout + completed.stderr
     directory, metadata, events = read_artifacts(root)
     assert metadata["state"] == "COMPLETED"
     assert metadata["reason"] == "evaluator_success"
@@ -120,19 +103,7 @@ def test_command_runs_real_fitd_with_independent_roles_and_complete_artifacts(
     assert settings["max_calls_per_conv"] == 10
     assert settings["garak_revision"] == "3f50ea5ff9cd7050099940647c15c39b07a93392"
     assert settings["evaluator"] == {"type": "contains_text", "criterion": "KEY-FOUND"}
-    for role, temperature, timeout, auth in [
-        ("Target", 0.25, 120, "Bearer synthetic-target-secret"),
-        ("Attacker", 0.75, 15, "Custom synthetic-attacker-secret"),
-    ]:
-        calls = [r for r in endpoint.requests if f"/{role.lower()}/" in r[0]]
-        assert len(calls) >= 5
-        assert all(r[1]["Authorization"] == auth for r in calls)
-        assert all(r[2]["model"] == "puzzle-model" for r in calls)
-        assert all(r[2]["temperature"] == temperature for r in calls)
-        assert all(r[2]["n"] == 1 and r[2]["stream"] is False for r in calls)
-        instructions = f"{role} puzzle " + ("keeper" if role == "Target" else "author")
-        assert all(r[2]["messages"][0]["content"] == instructions for r in calls)
-        assert settings[role]["timeout"] == timeout
+    assert_roles(endpoint, settings)
     kinds = {event["kind"] for event in events}
     assert {
         "call_started",
@@ -166,12 +137,12 @@ def test_command_runs_real_fitd_with_independent_roles_and_complete_artifacts(
     ],
 )
 def test_repeated_sigint_waits_for_server_reply_and_preserves_accepted_result(
-    endpoint, tmp_path, role, index, process_group, expected
-):
+    endpoint: HttpPeer, tmp_path: Path, role: str, index: int, process_group: bool, expected: str | None,
+) -> None:
     config = configure(endpoint, tmp_path)
     endpoint.scripts["/v1/target/chat/completions"] = deque(
         Reply(text)
-        for text in ["One", "Two", "Three", "Four", "Accepted report", "Later"]
+        for text in ("One", "Two", "Three", "Four", "Accepted report", "Later")
     )
     held = Reply(hold=True)
     endpoint.scripts[f"/v1/{role.lower()}/chat/completions"][index] = held
@@ -185,70 +156,15 @@ def test_repeated_sigint_waits_for_server_reply_and_preserves_accepted_result(
         start_new_session=True,
     ) as process:
         try:
-            assert held.entered.wait(5), "CLI did not reach the held HTTP exchange"
-            assert process.poll() is None
-            calls = len(endpoint.requests)
-            (directory,) = root.iterdir()
-            prefix = (directory / "events.jsonl").read_bytes()
-            finished = [json.loads(line) for line in prefix.splitlines()]
-            completed_ids = {
-                e["data"]["call_id"] for e in finished if e["kind"] == "call_completed"
-            }
-            assert len(completed_ids) == calls - 1
-            assert not (directory / "metadata.json").exists()
-            assert not (directory / "result.txt").exists()
-            if process_group:
-                # Like terminal Ctrl+C: the foreground process group receives SIGINT.
-                os.killpg(process.pid, signal.SIGINT)
-            else:
-                process.send_signal(signal.SIGINT)
-            with pytest.raises(subprocess.TimeoutExpired):
-                process.communicate(timeout=0.3)
-            process.send_signal(signal.SIGINT)
-            with pytest.raises(subprocess.TimeoutExpired):
-                process.communicate(timeout=0.15)
-            assert not held.disconnected.is_set()
-            held.release.set()
-            stdout, stderr = process.communicate(timeout=5)
-            assert process.returncode == 130, stdout + stderr
-            assert len(endpoint.requests) == calls
+            evidence = interrupt_cli(process, endpoint, held, root, process_group=process_group)
         finally:
-            if process.poll() is None:
-                process.kill()
-                process.wait()
-            held.release.set()
-    directory, metadata, events = read_artifacts(root)
-    assert metadata["state"] == "STOPPED"
-    assert metadata["reason"] == "user_stop"
-    assert "STOPPED" in stdout and "Traceback" not in stderr
-    assert (directory / "events.jsonl").read_bytes().startswith(prefix)
-    completions = [e["data"] for e in events if e["kind"] == "call_completed"]
-    assert {e["call_id"] for e in completions[:-1]} == completed_ids
-    assert completions[-1]["role"] == role
-    assert completions[-1]["response"]["text"] == held.text
-    assert not any(e["kind"] == "call_cancelled" for e in events)
-    stopped = next(e for e in events if e["kind"] == "stop_requested")
-    assert not any(
-        e["kind"] == "call_started" and e["sequence"] > stopped["sequence"]
-        for e in events
-    )
-    if expected is None:
-        assert metadata["result"] is None and metadata["evaluation"] is None
-        assert not (directory / "result.txt").exists()
-        assert "отсутствует (None)" in stdout
-    else:
-        assert metadata["result"]["text"] == expected
-        assert (directory / "result.txt").read_text() == expected
-        assert metadata["evaluation"] == {
-            "result_id": metadata["result"]["id"],
-            "success": False,
-        }
-        assert "Оценка результата: неуспех" in stdout
+            cleanup_process(process, held)
+    assert_stopped_cli(root, evidence, held, role, expected)
 
 
 def test_utf8_file_and_configured_round_limit_allow_negative_empty_result(
-    endpoint, tmp_path
-):
+    endpoint: HttpPeer, tmp_path: Path,
+) -> None:
     config = configure(
         endpoint, tmp_path, run="[run]\ngenerations=1\nmax_calls_per_conv=5"
     )
@@ -258,13 +174,13 @@ def test_utf8_file_and_configured_round_limit_allow_negative_empty_result(
     source.write_bytes(text.encode("utf-8"))
     root = tmp_path / "runs"
     completed = run_cli(config, root, "--text-file", str(source))
-    assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert not completed.returncode, completed.stdout + completed.stderr
     directory, metadata, events = read_artifacts(root)
     assert metadata["state"] == "COMPLETED" and metadata["reason"] == "round_limit"
     assert metadata["settings"]["base"]["text"] == text
     assert metadata["settings"]["max_calls_per_conv"] == 5
     assert metadata["progress"]["target_calls"] == 5
-    assert metadata["result"]["text"] == ""
+    assert isinstance(metadata["result"]["text"], str) and not metadata["result"]["text"]
     assert (directory / "result.txt").read_bytes() == b""
     assert metadata["evaluation"] == {
         "result_id": metadata["result"]["id"],
@@ -280,8 +196,8 @@ def test_utf8_file_and_configured_round_limit_allow_negative_empty_result(
 
 @pytest.mark.parametrize("accepted", [True, False])
 def test_short_run_distinguishes_unevaluated_result_from_no_result(
-    endpoint, tmp_path, accepted
-):
+    endpoint: HttpPeer, tmp_path: Path, accepted: bool,
+) -> None:
     config = configure(endpoint, tmp_path, run="[run]\nmax_calls_per_conv=1")
     if not accepted:
         endpoint.scripts["/v1/target/chat/completions"][0] = Reply(
@@ -290,9 +206,9 @@ def test_short_run_distinguishes_unevaluated_result_from_no_result(
         endpoint.scripts["/v1/attacker/chat/completions"][4] = Reply("A simpler puzzle")
     root = tmp_path / "runs"
     completed = run_cli(config, root, "--text", "")
-    assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert not completed.returncode, completed.stdout + completed.stderr
     directory, metadata, events = read_artifacts(root)
-    assert metadata["settings"]["base"]["text"] == ""
+    assert isinstance(metadata["settings"]["base"]["text"], str) and not metadata["settings"]["base"]["text"]
     assert metadata["evaluation"] is None
     assert metadata["progress"]["target_calls"] == 1
     assert "финальный текст не оценивался" in completed.stdout
@@ -308,8 +224,8 @@ def test_short_run_distinguishes_unevaluated_result_from_no_result(
 
 @pytest.mark.parametrize("failure", ["http", "timeout"])
 def test_execution_error_is_nonzero_and_retains_published_text(
-    endpoint, tmp_path, failure
-):
+    endpoint: HttpPeer, tmp_path: Path, failure: str,
+) -> None:
     config = configure(endpoint, tmp_path)
     held = Reply(hold=True) if failure == "timeout" else Reply(status=401)
     endpoint.scripts["/v1/target/chat/completions"][1] = held
@@ -340,10 +256,10 @@ def test_execution_error_is_nonzero_and_retains_published_text(
 
 
 def test_repeated_commands_preserve_previous_run_and_allow_explicit_or_no_auth(
-    endpoint, tmp_path
-):
+    endpoint: HttpPeer, tmp_path: Path,
+) -> None:
     root = tmp_path / "runs"
-    previous = {}
+    previous: dict[Path, bytes] = {}
     for _ in range(2):
         config = configure(endpoint, tmp_path, run="[run]\nmax_calls_per_conv=1")
         config.write_text(
@@ -355,7 +271,7 @@ def test_repeated_commands_preserve_previous_run_and_allow_explicit_or_no_auth(
             .replace('authorization_env = "TAI_TEST_ATTACKER_AUTH"', "")
         )
         completed = run_cli(config, root, "--text", "Explain the fictional puzzle")
-        assert completed.returncode == 0, completed.stdout + completed.stderr
+        assert not completed.returncode, completed.stdout + completed.stderr
         for path, content in previous.items():
             assert path.read_bytes() == content
         previous = {p: p.read_bytes() for d in root.iterdir() for p in d.iterdir()}
@@ -407,7 +323,7 @@ def test_repeated_commands_preserve_previous_run_and_allow_explicit_or_no_auth(
         ("[target]", 'api_key = "synthetic-toml-secret" broken\n[target]'),
     ],
 )
-def test_invalid_configuration_never_starts_an_experiment(endpoint, tmp_path, old, new):
+def test_invalid_configuration_never_starts_an_experiment(endpoint: HttpPeer, tmp_path: Path, old: str, new: str) -> None:
     config = configure(endpoint, tmp_path)
     config.write_text(config.read_text().replace(old, new))
     root = tmp_path / "runs"
@@ -422,7 +338,7 @@ def test_invalid_configuration_never_starts_an_experiment(endpoint, tmp_path, ol
 @pytest.mark.parametrize(
     "problem", ["missing", "invalid_utf8", "both", "neither", "missing_config"]
 )
-def test_input_errors_never_substitute_another_text(endpoint, tmp_path, problem):
+def test_input_errors_never_substitute_another_text(endpoint: HttpPeer, tmp_path: Path, problem: str) -> None:
     config = configure(endpoint, tmp_path)
     source = tmp_path / "base.txt"
     args = ["--text-file", str(source)]

@@ -2,14 +2,18 @@
 
 import json
 from collections import deque
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, dataclass
+from pathlib import Path
+from contextlib import ExitStack
 from threading import Event
 
 import pytest
 from http_peer import Reply
+from chats_assertions import EventRecord, HttpEndpoint, RequestBody, at, list_at
 
 from tai import (
     ContainsTextEvaluator,
+    EvaluatorSetup,
     Message,
     OpenAIChat,
     UserState,
@@ -26,22 +30,116 @@ TARGET_SECRET = "synthetic-target-secret"
 ATTACKER_SECRET = "synthetic-attacker-secret"
 
 
-def configured_chats(endpoint, target_mode):
-    chats, headers = {}, {}
-    metadata = {
+def _finish_evaluation(release: Event, user: FITDUser) -> None:
+    release.set()
+    assert user.wait(10)
+
+
+@dataclass(frozen=True)
+class EchoObservation:
+    result: Message
+    dump: str
+    directory: Path
+    events: list[EventRecord]
+    publication: object
+
+
+def _observe_echo(
+    user: FITDUser, chats: dict[str, OpenAIChat], evaluated: list[Message],
+    root: Path, expected: str, mode: str, base_dump: str,
+) -> EchoObservation:
+    assert user.status().state is UserState.RUNNING
+    result = user.result()
+    assert result is not None
+    assert result.to_string() == expected
+    assert evaluated == [result] and evaluated[0] is result
+    assert chats["Target"].history()[-1].message is result
+    assert json.loads(result.dump())["origin"]["origin"] == json.loads(base_dump)
+    result_dump = result.dump()
+    with pytest.raises(FrozenInstanceError):
+        setattr(result, "text", "changed")
+    run_id = user.status().run_id
+    assert run_id is not None
+    directory = root / run_id
+    # Inspect flushed data while evaluation is blocked, before final-file cleanup.
+    events = read_events(directory)
+    assert events[-1]["kind"] == "evaluation_started"
+    assert events == [json.loads(event.dump()) for event in user.journal.events()]
+    publication = next(
+        event["data"]["result"] for event in events
+        if event["kind"] == "result_published" and at(event["data"], "result", "id") == result.id
+    )
+    safe_answer = "CONTROL\nBearer [REDACTED]" if mode == "api_key" else "CONTROL\n[REDACTED]"
+    assert at(publication, "text") == safe_answer
+    assert at(publication, "origin", "origin", "origin", "text") == "Prepared [REDACTED]"
+    assert at(publication, "origin", "origin", "transformations", 0, "text") == (
+        "Puzzle [REDACTED] solution"
+    )
+    assert not (directory / "result.txt").exists()
+    return EchoObservation(result, result_dump, directory, events, publication)
+
+
+def _assert_saved_echo(
+    user: FITDUser, observation: EchoObservation, expected: str, criterion: str,
+) -> None:
+    status = user.status()
+    assert status.state is UserState.COMPLETED, status.reason
+    assert status.reason == "evaluator_success"
+    save_run(capture_run(user, journal=user.journal), observation.directory.parent)
+    assert status.evaluation is not None
+    assert status.evaluation.success is True
+    assert status.evaluation.result_id == observation.result.id
+    assert user.result() is observation.result and observation.result.dump() == observation.dump
+    events = read_events(observation.directory)
+    assert events[: len(observation.events)] == observation.events
+    assert events == [json.loads(event.dump()) for event in user.journal.events()]
+    metadata_text = (observation.directory / "metadata.json").read_text(encoding="utf-8")
+    assert_safe(metadata_text)
+    metadata = json.loads(metadata_text)
+    assert metadata["result"] == observation.publication
+    assert metadata["evaluation"] == {"result_id": observation.result.id, "success": True}
+    assert metadata["settings"]["evaluator"]["criterion"] == (
+        "[REDACTED]" if criterion == TARGET_SECRET else "CONTROL"
+    )
+    assert_settings(metadata["settings"])
+    assert (observation.directory / "result.txt").read_text(encoding="utf-8") == expected
+
+
+def _assert_wire_echoes(
+    endpoint: HttpEndpoint, headers: dict[str, str], generation_metadata: dict[str, object],
+) -> None:
+    target_calls: list[RequestBody] = []
+    for path, request_headers, body in endpoint.requests:
+        role = "Target" if "/target/" in path else "Attacker"
+        assert request_headers["Authorization"] == headers[role]
+        assert at(body, "metadata") == generation_metadata
+        assert body["messages"][0]["content"] == f"{role} {TARGET_SECRET} {ATTACKER_SECRET}"
+        if role == "Target":
+            target_calls.append(body)
+    assert len(target_calls) == 5
+    assert target_calls[0]["messages"][-1]["content"] == f"Opening {headers['Attacker']}"
+    assert target_calls[1]["messages"][2]["content"] == f"Hint\n{headers['Target']}"
+
+
+def configured_chats(
+    endpoint: HttpEndpoint, target_mode: str,
+) -> tuple[dict[str, OpenAIChat], dict[str, str], dict[str, object]]:
+    chats: dict[str, OpenAIChat] = {}
+    headers: dict[str, str] = {}
+    metadata: dict[str, object] = {
         TARGET_SECRET: "target entry",
         ATTACKER_SECRET: "attacker entry",
         "[REDACTED]": "literal entry",
         "nested": [{f"key {TARGET_SECRET}": f"value {ATTACKER_SECRET}"}],
     }
-    for role, secret, mode in [
+    for role, secret, mode in (
         ("Target", TARGET_SECRET, target_mode),
         (
             "Attacker",
             ATTACKER_SECRET,
             "authorization" if target_mode == "api_key" else "api_key",
         ),
-    ]:
+    ):
         credential = secret if mode == "api_key" else f"Custom {secret}"
         headers[role] = f"Bearer {secret}" if mode == "api_key" else credential
         chats[role] = OpenAIChat(
@@ -49,25 +147,26 @@ def configured_chats(endpoint, target_mode):
             model="puzzle",
             system=f"{role} {TARGET_SECRET} {ATTACKER_SECRET}",
             generation={"metadata": metadata},
-            **{mode: credential},
+            api_key=credential if mode == "api_key" else None,
+            authorization=credential if mode == "authorization" else None,
         )
     return chats, headers, metadata
 
 
-def assert_safe(serialized):
+def assert_safe(serialized: str) -> None:
     assert TARGET_SECRET not in serialized
     assert ATTACKER_SECRET not in serialized
 
 
-def read_events(directory):
+def read_events(directory: Path) -> list[EventRecord]:
     journal = (directory / "events.jsonl").read_text(encoding="utf-8")
     assert_safe(journal)
     return [json.loads(line) for line in journal.splitlines()]
 
 
-def assert_settings(settings):
+def assert_settings(settings: object) -> None:
     for role in ("Target", "Attacker"):
-        assert settings[role]["generation"]["metadata"] == [
+        assert at(settings, role, "generation", "metadata") == [
             ["[REDACTED]", "target entry"],
             ["[REDACTED]", "attacker entry"],
             ["[REDACTED]", "literal entry"],
@@ -86,8 +185,8 @@ def assert_settings(settings):
     ],
 )
 def test_real_fitd_applies_joint_policy_to_settings_and_entire_serialized_events(
-    endpoint, tmp_path, target_secret, attacker_authorization
-):
+    endpoint: HttpEndpoint, tmp_path: Path, target_secret: str, attacker_authorization: str,
+) -> None:
     generation = {
         "metadata": {
             attacker_authorization: "credential entry",
@@ -117,9 +216,11 @@ def test_real_fitd_applies_joint_policy_to_settings_and_entire_serialized_events
         ContainsTextEvaluator("CONTROL"),
         journal_dir=tmp_path,
     )
-    assert run_foreground(user, artifacts_dir=tmp_path) == 0
+    assert not run_foreground(user, artifacts_dir=tmp_path)
     assert user.status().reason == "strategy_exhausted"
-    directory = tmp_path / user.status().run_id
+    run_id = user.status().run_id
+    assert run_id is not None
+    directory = tmp_path / run_id
     journal = (directory / "events.jsonl").read_text(encoding="utf-8")
     metadata = (directory / "metadata.json").read_text(encoding="utf-8")
     for secret in (target_secret, attacker_authorization):
@@ -139,20 +240,20 @@ def test_real_fitd_applies_joint_policy_to_settings_and_entire_serialized_events
         assert records[0][0][1] == user.status().run_id
         assert records[0][2][1] == "run_started"
     settings = next(
-        e.data["settings"] for e in user.journal.events() if e.kind == "run_configured"
+        at(e.data, "settings") for e in user.journal.events() if e.kind == "run_configured"
     )
-    target_settings = settings["Target"]
+    target_settings = at(settings, "Target")
     if target_secret == "model":
-        assert [pair for pair in target_settings if pair[0] == "[REDACTED]"] == [
+        assert [pair for pair in list_at(target_settings) if at(pair, 0) == "[REDACTED]"] == [
             ["[REDACTED]", "puzzle"],
             ["[REDACTED]", []],
         ]
         generation_snapshot = next(
-            value for key, value in target_settings if key == "generation"
+            at(pair, 1) for pair in list_at(target_settings) if at(pair, 0) == "generation"
         )
     else:
-        generation_snapshot = target_settings["generation"]
-    assert generation_snapshot["metadata"] == [
+        generation_snapshot = at(target_settings, "generation")
+    assert at(generation_snapshot, "metadata") == [
         ["[REDACTED]", "credential entry"],
         ["[REDACTED]", "literal"],
     ]
@@ -160,8 +261,8 @@ def test_real_fitd_applies_joint_policy_to_settings_and_entire_serialized_events
 
 @pytest.mark.parametrize("target_mode", ["api_key", "authorization"])
 def test_real_fitd_saves_safe_settings_even_when_target_is_never_called(
-    endpoint, tmp_path, target_mode
-):
+    endpoint: HttpEndpoint, tmp_path: Path, target_mode: str,
+) -> None:
     chats, headers, generation_metadata = configured_chats(endpoint, target_mode)
     endpoint.scripts = {
         "/v1/attacker/chat/completions": deque(
@@ -169,9 +270,7 @@ def test_real_fitd_saves_safe_settings_even_when_target_is_never_called(
         )
     }
 
-    from tai import EvaluatorSetup
-
-    def settings():
+    def settings() -> dict[str, object]:
         return {
             "type": "contains_text",
             "criterion": "CONTROL",
@@ -194,7 +293,7 @@ def test_real_fitd_saves_safe_settings_even_when_target_is_never_called(
     status = user.status()
     assert status.state is UserState.COMPLETED, status.reason
     assert status.reason == "strategy_exhausted"
-    assert status.progress.target_calls == 0
+    assert not status.progress.target_calls
     assert status.progress.attacker_calls == 3
     assert user.result() is None and status.evaluation is None
     directory = save_run(capture_run(user, journal=user.journal), tmp_path)
@@ -222,14 +321,14 @@ def test_real_fitd_saves_safe_settings_even_when_target_is_never_called(
     for path, request_headers, body in endpoint.requests:
         assert path == "/v1/attacker/chat/completions"
         assert request_headers["Authorization"] == headers["Attacker"]
-        assert body["metadata"] == generation_metadata
+        assert at(body, "metadata") == generation_metadata
 
 
 @pytest.mark.parametrize("target_mode", ["api_key", "authorization"])
 @pytest.mark.parametrize("criterion", ["CONTROL", TARGET_SECRET])
 def test_real_fitd_redacts_echoes_before_writing_but_evaluates_full_message(
-    endpoint, tmp_path, target_mode, criterion
-):
+    endpoint: HttpEndpoint, tmp_path: Path, target_mode: str, criterion: str,
+) -> None:
     chats, headers, generation_metadata = configured_chats(endpoint, target_mode)
     endpoint.scripts = {
         "/v1/target/chat/completions": deque(
@@ -242,14 +341,18 @@ def test_real_fitd_redacts_echoes_before_writing_but_evaluates_full_message(
         ),
     }
     entered, release = Event(), Event()
-    evaluated = []
+    evaluated: list[Message] = []
 
-    class RecordingEvaluator(ContainsTextEvaluator):
-        def evaluate(self, base, result):
+    class RecordingEvaluator:
+        def __init__(self, criterion: str) -> None:
+            super().__init__()
+            self.evaluator = ContainsTextEvaluator(criterion)
+
+        def evaluate(self, base: Message, result: Message) -> bool:
             evaluated.append(result)
             entered.set()
             assert release.wait(10), "test did not release the evaluator"
-            return super().evaluate(base, result)
+            return self.evaluator.evaluate(base, result)
 
     draft = Message(f"Draft {TARGET_SECRET}")
     prepared = draft.transform(str.replace, "Draft", "Prepared")
@@ -257,8 +360,6 @@ def test_real_fitd_redacts_echoes_before_writing_but_evaluates_full_message(
         lambda text: text + " solution"
     )
     base_dump = base.dump()
-    from tai import EvaluatorSetup
-
     user = FITDUser(
         chats["Target"],
         chats["Attacker"],
@@ -271,87 +372,19 @@ def test_real_fitd_redacts_echoes_before_writing_but_evaluates_full_message(
     )
     expected = f"CONTROL\n{headers['Target']}"
     user.start()
-    try:
+    with ExitStack() as cleanup:
+        cleanup.callback(_finish_evaluation, release, user)
         assert entered.wait(10), user.status()
-        assert user.status().state is UserState.RUNNING
-        result = user.result()
-        assert result.to_string() == expected
-        assert evaluated == [result] and evaluated[0] is result
-        assert chats["Target"].history()[-1].message is result
-        assert json.loads(result.dump())["origin"]["origin"] == json.loads(base_dump)
-        result_dump = result.dump()
-        with pytest.raises(FrozenInstanceError):
-            result.text = "changed"
-        directory = tmp_path / user.status().run_id
-        # Inspect already flushed data while the run is blocked in the evaluator:
-        # final-file cleanup cannot satisfy this check.
-        events_before = read_events(directory)
-        assert events_before[-1]["kind"] == "evaluation_started"
-        assert events_before == [
-            json.loads(event.dump()) for event in user.journal.events()
-        ]
-        publication = next(
-            event["data"]["result"]
-            for event in events_before
-            if event["kind"] == "result_published"
-            and event["data"]["result"]["id"] == result.id
+        observation = _observe_echo(
+            user, chats, evaluated, tmp_path, expected, target_mode, base_dump,
         )
-        safe_answer = (
-            "CONTROL\nBearer [REDACTED]"
-            if target_mode == "api_key"
-            else "CONTROL\n[REDACTED]"
-        )
-        assert publication["text"] == safe_answer
-        assert (
-            publication["origin"]["origin"]["origin"]["text"] == "Prepared [REDACTED]"
-        )
-        assert publication["origin"]["origin"]["transformations"][0]["text"] == (
-            "Puzzle [REDACTED] solution"
-        )
-        assert not (directory / "result.txt").exists()
-    finally:
-        release.set()
-        assert user.wait(10)
-    status = user.status()
-    assert status.state is UserState.COMPLETED, status.reason
-    assert status.reason == "evaluator_success"
-    save_run(capture_run(user, journal=user.journal), tmp_path)
-    assert status.evaluation.success is True
-    assert status.evaluation.result_id == result.id
-    assert user.result() is result and result.dump() == result_dump
+    _assert_saved_echo(user, observation, expected, criterion)
     assert base.dump() == base_dump and prepared.revert(1) is draft
     assert base.revert(1).to_string() == f"Puzzle {ATTACKER_SECRET}"
-    events = read_events(directory)
-    assert events[: len(events_before)] == events_before
-    assert events == [json.loads(event.dump()) for event in user.journal.events()]
-    metadata_text = (directory / "metadata.json").read_text(encoding="utf-8")
-    assert_safe(metadata_text)
-    metadata = json.loads(metadata_text)
-    assert metadata["result"] == publication
-    assert metadata["evaluation"] == {"result_id": result.id, "success": True}
-    assert metadata["settings"]["evaluator"]["criterion"] == (
-        "[REDACTED]" if criterion == TARGET_SECRET else "CONTROL"
-    )
-    assert_settings(metadata["settings"])
-    assert (directory / "result.txt").read_text(encoding="utf-8") == expected
-    target_calls = []
-    for path, request_headers, body in endpoint.requests:
-        role = "Target" if "/target/" in path else "Attacker"
-        assert request_headers["Authorization"] == headers[role]
-        assert body["metadata"] == generation_metadata
-        assert body["messages"][0]["content"] == (
-            f"{role} {TARGET_SECRET} {ATTACKER_SECRET}"
-        )
-        if role == "Target":
-            target_calls.append(body)
-    assert len(target_calls) == 5
-    assert (
-        target_calls[0]["messages"][-1]["content"] == f"Opening {headers['Attacker']}"
-    )
-    assert target_calls[1]["messages"][2]["content"] == f"Hint\n{headers['Target']}"
+    _assert_wire_echoes(endpoint, headers, generation_metadata)
 
 
-def test_json_escaped_redaction_preserves_longest_match_and_colliding_keys():
+def test_json_escaped_redaction_preserves_longest_match_and_colliding_keys() -> None:
     secret = 'synthetic"\\credential'
     encoded = json.dumps(secret, ensure_ascii=False)[1:-1]
     redactor = DiagnosticRedactor.combine(
@@ -368,7 +401,7 @@ def test_json_escaped_redaction_preserves_longest_match_and_colliding_keys():
         ["[REDACTED]", {"nested": ["[REDACTED]", "[REDACTED]"]}],
         ["[REDACTED]", "literal marker key"],
     ]
-    assert original[encoded]["nested"] == [secret, encoded]
+    assert at(original, encoded, "nested") == [secret, encoded]
     assert redactor.snapshot(snapshot) == snapshot
     assert redactor.snapshot({"token": "unrelated"}, mask_fields=True) == {
         "token": "[REDACTED]"
@@ -377,12 +410,12 @@ def test_json_escaped_redaction_preserves_longest_match_and_colliding_keys():
 
 @pytest.mark.parametrize("marker_secret", ["[REDACTED]", "REDACTED", "D]["])
 def test_json_escaped_redaction_never_recreates_credentials_through_markers(
-    marker_secret,
-):
+    marker_secret: str,
+) -> None:
     secret = 'synthetic"\\credential'
     encoded = json.dumps(secret, ensure_ascii=False)[1:-1]
     redactor = DiagnosticRedactor([secret, marker_secret])
-    assert redactor.text(encoded + encoded) == ""
+    assert not redactor.text(encoded + encoded)
     assert redactor.snapshot(
         {encoded + encoded: "first", secret + secret: "second"}
     ) == [

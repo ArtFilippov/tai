@@ -1,0 +1,3 @@
+"""Native exception identity used by the iterative FITD loop."""
+
+class GarakException(Exception): ...

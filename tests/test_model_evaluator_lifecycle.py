@@ -2,15 +2,20 @@
 
 import json
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from threading import Event
 
 import pytest
-from test_fitd import read_and_assert_final_artifacts
-from test_fitd_restart import HeldResponse, ScriptedModel
+from evaluation_fakes import HeldResponse, ScriptedModel
+from journal_assertions import (
+    at, evaluation_of, mapping, released_worker, result_of, run_directory, sequence, text,
+)
+from runs_artifacts import read_and_assert_final_artifacts
 from test_model_evaluator import make_user
 
 from tai import (
     EvaluatorSetup,
+    ChatTurn,
     LLMChat,
     Message,
     RunJournal,
@@ -21,9 +26,49 @@ from tai import (
 )
 
 
+def assert_active_assessment_stop(
+    user: FITDUser, judge: LLMChat, held: HeldResponse, control: ThreadPoolExecutor,
+) -> tuple[Message, tuple[ChatTurn, ...]]:
+    assert held.entered.wait(5)
+    result = result_of(user)
+    assert user.status().evaluation is None
+    assert control.submit(user.stop).result(timeout=1) is None
+    assert held.cancellation is not None and not held.cancellation.is_set()
+    assert control.submit(user.status).result(timeout=1).state is UserState.STOPPING
+    assert control.submit(user.result).result(timeout=1) is result
+    assert not user.wait(0)
+    assert control.submit(user.stop).result(timeout=1) is None
+    with pytest.raises(RuntimeError, match="active run"):
+        user.start()
+    history = judge.history()
+    assert len(history) == 1  # The previous assessment was reset.
+    return result, history
+
+
+def assert_stopped_artifacts(user: FITDUser, root: Path, result: Message, success: bool) -> None:
+    events, metadata = read_and_assert_final_artifacts(user, root)
+    assert metadata["evaluation"] == {"result_id": result.id, "success": success}
+    completed = [mapping(e["data"]) for e in events if e["kind"] == "evaluation_completed"]
+    assert len(completed) == 2 and completed[0]["success"] is False
+    assert completed[0]["result_id"] != result.id
+    assert {k: completed[-1][k] for k in ("result_id", "success")} == metadata["evaluation"]
+    assert not any(text(e["kind"]).endswith("_cancelled") for e in events)
+    stop = next(e["sequence"] for e in events if e["kind"] == "stop_requested")
+    assert isinstance(stop, int)
+    assert not any(
+        e["kind"] == "call_started" and sequence_number(e) > stop for e in events
+    )
+
+
+def sequence_number(event: dict[str, object]) -> int:
+    value = event["sequence"]
+    assert isinstance(value, int)
+    return value
+
+
 @pytest.mark.parametrize("outcome", ['{"success": true}', '{"success": false}'])
 def test_stop_during_model_assessment_keeps_completed_work_and_waits_for_cleanup(
-    tmp_path, outcome
+    tmp_path: Path, outcome: str
 ):
     held = HeldResponse(outcome)
     model = ScriptedModel(['{"success": false}', held])
@@ -31,31 +76,13 @@ def test_stop_during_model_assessment_keeps_completed_work_and_waits_for_cleanup
     user, target, attacker, _ = make_user(tmp_path, judge)
     user.start()
     with ThreadPoolExecutor(max_workers=1) as control:
-        try:
-            assert held.entered.wait(5)
-            result = user.result()
-            assert result is not None and user.status().evaluation is None
+        with released_worker(user, held.release):
+            result, history = assert_active_assessment_stop(user, judge, held, control)
             requests = len(target.requests), len(attacker.requests), len(model.requests)
-            assert control.submit(user.stop).result(timeout=1) is None
-            assert not held.cancellation.is_set()
-            assert (
-                control.submit(user.status).result(timeout=1).state
-                is UserState.STOPPING
-            )
-            assert control.submit(user.result).result(timeout=1) is result
-            assert not user.wait(0)
-            assert control.submit(user.stop).result(timeout=1) is None
-            with pytest.raises(RuntimeError, match="active run"):
-                user.start()
-            history = judge.history()
-            assert len(history) == 1  # The previous assessment was reset.
-        finally:
-            held.release.set()
-            assert user.wait(10)
     assert user.status().state is UserState.STOPPED, user.status().reason
     success = json.loads(outcome)["success"]
-    assert user.status().evaluation.result_id == result.id
-    assert user.status().evaluation.success is success
+    assert evaluation_of(user).result_id == result.id
+    assert evaluation_of(user).success is success
     assert user.status().progress.evaluator_calls == 2
     assert user.result() is result and judge.history()[:-2] == history
     assert judge.history()[-1].message.to_string() == outcome
@@ -64,17 +91,7 @@ def test_stop_during_model_assessment_keeps_completed_work_and_waits_for_cleanup
         len(attacker.requests),
         len(model.requests),
     ) == requests
-    events, metadata = read_and_assert_final_artifacts(user, tmp_path)
-    assert metadata["evaluation"] == {"result_id": result.id, "success": success}
-    completed = [e["data"] for e in events if e["kind"] == "evaluation_completed"]
-    assert len(completed) == 2 and completed[0]["success"] is False
-    assert completed[0]["result_id"] != result.id
-    assert {k: completed[-1][k] for k in ("result_id", "success")} == metadata[
-        "evaluation"
-    ]
-    assert not any(e["kind"].endswith("_cancelled") for e in events)
-    stop = next(e["sequence"] for e in events if e["kind"] == "stop_requested")
-    assert not any(e["kind"] == "call_started" and e["sequence"] > stop for e in events)
+    assert_stopped_artifacts(user, tmp_path, result, success)
     # Reusing the same chat in a new run gets an independent signal.
     model.responses.append('{"success": true}')
     next_user, _, _, _ = make_user(tmp_path, judge)
@@ -88,20 +105,20 @@ def test_stop_during_model_assessment_keeps_completed_work_and_waits_for_cleanup
 
 @pytest.mark.parametrize("boundary", ["evaluation_started", "call_started"])
 def test_stop_between_assessment_admission_and_send_finishes_whole_assessment(
-    tmp_path, monkeypatch, boundary
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, boundary: str
 ):
     entered, release = Event(), Event()
-    requests = []
-    judge = LLMChat(lambda turns: requests.append(turns) or '{"success": true}')
+    requests: list[tuple[ChatTurn, ...]] = []
+    judge = LLMChat(lambda turns: requests.append(tuple(turns)) or '{"success": true}')
     user, target, attacker, _ = make_user(tmp_path, judge)
     flush = RunJournal.flush
 
-    def held_flush(execution):
+    def held_flush(execution: RunJournal) -> None:
         flush(execution)
         last = execution.events()[-1]
         if (
             last.kind == boundary
-            and (boundary == "evaluation_started" or last.data["role"] == "Evaluator")
+            and (boundary == "evaluation_started" or at(last.data, "role") == "Evaluator")
             and not entered.is_set()
         ):
             entered.set()
@@ -109,36 +126,33 @@ def test_stop_between_assessment_admission_and_send_finishes_whole_assessment(
 
     monkeypatch.setattr(RunJournal, "flush", held_flush)
     user.start()
-    try:
+    with released_worker(user, release):
         assert entered.wait(5)
         user.stop()
         assert user.status().state is UserState.STOPPING
-    finally:
-        release.set()
-        assert user.wait(10)
     assert user.status().state is UserState.STOPPED
-    assert user.status().evaluation.success is True
-    assert user.status().evaluation.result_id == user.result().id
+    assert evaluation_of(user).success is True
+    assert evaluation_of(user).result_id == result_of(user).id
     assert len(requests) == 1
     assert len(target.requests) == 5 and len(attacker.requests) == 9
     events, _ = read_and_assert_final_artifacts(user, tmp_path)
-    stop = next(e["sequence"] for e in events if e["kind"] == "stop_requested")
+    stop = next(sequence_number(e) for e in events if e["kind"] == "stop_requested")
     later_calls = [
-        e["data"]
+        mapping(e["data"])
         for e in events
-        if e["kind"] == "call_started" and e["sequence"] > stop
+        if e["kind"] == "call_started" and sequence_number(e) > stop
     ]
     assert len(later_calls) == (boundary == "evaluation_started")
     assert all(e["role"] == "Evaluator" for e in later_calls)
     assert not any(
-        e["sequence"] > stop and e["kind"] in {"evaluation_started", "branch_selected"}
+        sequence_number(e) > stop and e["kind"] in {"evaluation_started", "branch_selected"}
         for e in events
     )
 
 
 @pytest.mark.parametrize("terminal", ["completed", "stopped", "failed"])
 def test_evaluator_chat_is_reserved_atomically_until_terminal_cleanup(
-    tmp_path, terminal
+    tmp_path: Path, terminal: str
 ):
     held = HeldResponse(
         RuntimeError("Evaluator failed")
@@ -150,26 +164,26 @@ def test_evaluator_chat_is_reserved_atomically_until_terminal_cleanup(
     owner, _, _, _ = make_user(tmp_path, judge)
     contender, _, _, _ = make_user(tmp_path, judge)
     owner.start()
-    try:
+    with released_worker(owner, held.release):
         assert held.entered.wait(5)
         histories = [
-            chat.history() for chat in (contender._target, contender._attacker, judge)
+            chat.history() for chat in (*contender._settings.chats.values(),)
         ]
         with pytest.raises(RuntimeError, match="LLMChat.*active"):
             contender.start()
         assert contender.status().state is UserState.IDLE
         assert contender.journal.events() == ()
         assert [
-            chat.history() for chat in (contender._target, contender._attacker, judge)
+            chat.history() for chat in (*contender._settings.chats.values(),)
         ] == histories
-        assert contender._target._owner is None and contender._attacker._owner is None
+        assert all(
+            chat._execution.owner is None
+            for role, chat in contender._settings.chats.items() if role != "Evaluator"
+        )
         if terminal == "stopped":
             owner.stop()
             with pytest.raises(RuntimeError, match="LLMChat.*active"):
                 contender.start()
-    finally:
-        held.release.set()
-        assert owner.wait(10)
     assert (
         owner.status().state
         is {
@@ -186,7 +200,7 @@ def test_evaluator_chat_is_reserved_atomically_until_terminal_cleanup(
     assert len(model.requests[-1]) == 1
 
 
-def test_restarting_same_user_resets_evaluator_and_preserves_prior_artifacts(tmp_path):
+def test_restarting_same_user_resets_evaluator_and_preserves_prior_artifacts(tmp_path: Path):
     target_model = ScriptedModel(["One", "Two", "Three", "Four", "Presented"] * 2)
     attacker_model = ScriptedModel((["Initial", "L1", "L2", "L3"] + ["yes"] * 5) * 2)
     model = ScriptedModel(['{"success": true}'] * 2)
@@ -203,7 +217,7 @@ def test_restarting_same_user_resets_evaluator_and_preserves_prior_artifacts(tmp
     assert user.wait(10)
     old_status = user.status()
     old_id = judge.conversation_id
-    directory = tmp_path / old_status.run_id
+    directory = run_directory(user, tmp_path)
     old_files = {p.name: p.read_bytes() for p in directory.iterdir()}
     old_checkpoint = judge.checkpoint()
     user.start()
@@ -217,20 +231,20 @@ def test_restarting_same_user_resets_evaluator_and_preserves_prior_artifacts(tmp
         judge.restore(old_checkpoint)
     assert {p.name: p.read_bytes() for p in directory.iterdir()} == old_files
     _, metadata = read_and_assert_final_artifacts(user, tmp_path)
-    assert metadata["settings"]["base"] == json.loads(base.dump())
-    assert len(metadata["settings"]["Evaluator"]["initial_history"]) == 1
+    assert at(metadata, "settings", "base") == json.loads(base.dump())
+    assert len(sequence(at(metadata, "settings", "Evaluator", "initial_history"))) == 1
 
 
 @pytest.mark.parametrize("success", [True, False])
 def test_stop_after_completed_evaluator_exchange_retains_its_verdict(
-    tmp_path, monkeypatch, success
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, success: bool
 ):
     entered, release = Event(), Event()
     judge = LLMChat(lambda turns: json.dumps({"success": success}))
     user, target, attacker, _ = make_user(tmp_path, judge)
     emit = RunJournal.record
 
-    def hold_completed(execution, kind, **data):
+    def hold_completed(execution: RunJournal, kind: str, **data: object) -> None:
         emit(execution, kind, **data)
         if kind == "call_completed" and data["role"] == "Evaluator":
             entered.set()
@@ -238,49 +252,43 @@ def test_stop_after_completed_evaluator_exchange_retains_its_verdict(
 
     monkeypatch.setattr(RunJournal, "record", hold_completed)
     user.start()
-    try:
+    with released_worker(user, release):
         assert entered.wait(5)
         history = judge.history()
         assert json.loads(history[-1].message.to_string())["success"] is success
         user.stop()
         assert user.status().state is UserState.STOPPING
-    finally:
-        release.set()
-        assert user.wait(10)
     assert user.status().state is UserState.STOPPED
-    assert user.status().evaluation.success is success
-    assert user.status().evaluation.result_id == user.result().id
+    assert evaluation_of(user).success is success
+    assert evaluation_of(user).result_id == result_of(user).id
     assert user.status().progress.evaluator_calls == 1
     assert judge.history() == history
     assert len(target.requests) == 5 and len(attacker.requests) == 9
     events, metadata = read_and_assert_final_artifacts(user, tmp_path)
-    assert metadata["evaluation"]["success"] is success
+    assert at(metadata, "evaluation", "success") is success
     assert not any(e["kind"] == "call_cancelled" for e in events)
 
 
 @pytest.mark.parametrize(
     "outcome", [RuntimeError("model failed"), '{"success": "false"}']
 )
-def test_stop_does_not_mask_model_assessment_failure(tmp_path, outcome):
+def test_stop_does_not_mask_model_assessment_failure(tmp_path: Path, outcome: str | Exception):
     held = HeldResponse(outcome)
     judge = LLMChat.cancellable(ScriptedModel([held]))
     user, target, attacker, _ = make_user(tmp_path, judge)
     user.start()
-    try:
+    with released_worker(user, held.release):
         assert held.entered.wait(5)
-        result = user.result()
+        result = result_of(user)
         user.stop()
-        assert not held.cancellation.is_set()
-    finally:
-        held.release.set()
-        assert user.wait(10)
+        assert held.cancellation is not None and not held.cancellation.is_set()
     assert user.status().state is UserState.FAILED
     assert user.result() is result and user.status().evaluation is None
     assert len(target.requests) == 5 and len(attacker.requests) == 9
     events, metadata = read_and_assert_final_artifacts(user, tmp_path)
     assert metadata["evaluation"] is None
     assert any(
-        e["kind"] == "evaluation_failed" and e["data"]["result_id"] == result.id
+        e["kind"] == "evaluation_failed" and at(e, "data", "result_id") == result.id
         for e in events
     )
     expected = (
@@ -288,4 +296,4 @@ def test_stop_does_not_mask_model_assessment_failure(tmp_path, outcome):
         if isinstance(outcome, Exception)
         else "ModelVerdictError"
     )
-    assert expected in user.status().reason
+    assert expected in text(user.status().reason)

@@ -93,7 +93,7 @@ def sync_clean_arch(root: Path, tach: dict[str, Any]) -> None:
         name, layer = module.get("path"), module.get("layer")
         if not name or layer not in LAYERS:
             continue
-        definitions.append({"module": name, "name": "Interface" if layer == "Bootstrap" else layer})
+        definitions.append({"module": name, "name": layer})
         if layer == "Infrastructure":
             infra.append(name)
     config["layers"] = sorted(definitions, key=lambda item: (-len(item["module"]), item["module"]))

@@ -1,10 +1,15 @@
 """Stop at real operation boundaries, including worker-side journal writes."""
 
+import json
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from threading import Event
 
 import pytest
-from test_fitd import RecordingEvaluator, ScriptedModel, read_and_assert_final_artifacts
+from fitd_support import (
+    RecordingEvaluator, ScriptedModel, evaluation, presented as presented_result,
+    read_and_assert_final_artifacts, releasing,
+)
 
 from tai import FITDExperiment as FITDUser
 from tai import LLMChat, Message, RunJournal, UserState
@@ -23,25 +28,53 @@ from tai import LLMChat, Message, RunJournal, UserState
     ],
 )
 def test_stop_at_admission_or_return_prevents_the_next_action(
-    tmp_path,
-    monkeypatch,
-    boundary,
-    role,
-    occurrence,
-    target_calls,
-    attacker_calls,
-    presented,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    boundary: str,
+    role: str | None,
+    occurrence: int,
+    target_calls: int,
+    attacker_calls: int,
+    presented: str | None,
 ):
+    entered, release = hold_boundary(monkeypatch, boundary, role, occurrence)
+    target = ScriptedModel(["One", "Two", "Three", "Four", "Presented"])
+    attacker = ScriptedModel(["Initial", "L1", "L2", "L3"] + ["yes"] * 5)
+    evaluator = RecordingEvaluator("CONTROL")
+    target_chat = LLMChat(target)
+    user = FITDUser(target_chat, LLMChat(attacker), Message("Base"), evaluator, journal_dir=tmp_path)
+    user.start()
+    with ThreadPoolExecutor(max_workers=1) as control, releasing(user, release):
+        assert entered.wait(5)
+        assert control.submit(user.stop).result(timeout=1) is None
+        user.stop()
+        assert user.status().state is UserState.STOPPING
+        assert not user.wait(0)
+    assert user.status().state is UserState.STOPPED, user.status().reason
+    assert len(target.requests) == user.status().progress.target_calls == target_calls
+    assert len(attacker.requests) == user.status().progress.attacker_calls == attacker_calls
+    result = user.result()
+    assert (result.to_string() if result is not None else None) == presented
+    assert len(evaluator.results) == (boundary == "evaluation_completed")
+    if boundary == "evaluation_completed":
+        assert evaluation(user).result_id == presented_result(user).id
+        assert evaluation(user).success is False
+    else:
+        assert user.status().evaluation is None
+    assert_boundary_events(user, tmp_path, target_chat, target_calls)
+
+
+def hold_boundary(monkeypatch: pytest.MonkeyPatch, boundary: str, role: str | None, occurrence: int):
     entered, release = Event(), Event()
     flush = RunJournal.flush
 
-    def held_flush(execution):
+    def held_flush(execution: RunJournal) -> None:
         flush(execution)
         events = execution.events()
         matches = [
             e
             for e in events
-            if e.kind == boundary and (role is None or e.data.get("role") == role)
+            if e.kind == boundary and (role is None or json.loads(e.dump())["data"].get("role") == role)
         ]
         if (
             len(matches) == occurrence
@@ -52,44 +85,11 @@ def test_stop_at_admission_or_return_prevents_the_next_action(
             assert release.wait(5)
 
     monkeypatch.setattr(RunJournal, "flush", held_flush)
-    target = ScriptedModel(["One", "Two", "Three", "Four", "Presented"])
-    attacker = ScriptedModel(["Initial", "L1", "L2", "L3"] + ["yes"] * 5)
-    evaluator = RecordingEvaluator("CONTROL")
-    target_chat = LLMChat(target)
-    user = FITDUser(
-        target_chat,
-        LLMChat(attacker),
-        Message("Base"),
-        evaluator,
-        journal_dir=tmp_path,
-    )
-    user.start()
-    with ThreadPoolExecutor(max_workers=1) as control:
-        try:
-            assert entered.wait(5)
-            assert control.submit(user.stop).result(timeout=1) is None
-            user.stop()
-            assert user.status().state is UserState.STOPPING
-            assert not user.wait(0)
-        finally:
-            release.set()
-            assert user.wait(10)
-    assert user.status().state is UserState.STOPPED, user.status().reason
-    assert len(target.requests) == user.status().progress.target_calls == target_calls
-    assert (
-        len(attacker.requests)
-        == user.status().progress.attacker_calls
-        == attacker_calls
-    )
-    result = user.result()
-    assert (result.to_string() if result is not None else None) == presented
-    assert len(evaluator.results) == (boundary == "evaluation_completed")
-    if boundary == "evaluation_completed":
-        assert user.status().evaluation.result_id == result.id
-        assert user.status().evaluation.success is False
-    else:
-        assert user.status().evaluation is None
-    events, _ = read_and_assert_final_artifacts(user, tmp_path)
+    return entered, release
+
+
+def assert_boundary_events(user: FITDUser, root: Path, target_chat: LLMChat, target_calls: int):
+    events, _ = read_and_assert_final_artifacts(user, root)
     stop = next(e["sequence"] for e in events if e["kind"] == "stop_requested")
     assert not any(
         e["sequence"] > stop

@@ -63,6 +63,13 @@ PYRIGHT_EXTRA = [
     "reportMissingModuleSource",
 ]
 LAYERS = ["Bootstrap", "Interface", "Infrastructure", "UseCase", "Domain"]
+# Approved project policy: framework scaffolding does not consume the
+# max_parents budget; project-defined ancestors still count normally.
+IGNORED_FRAMEWORK_PARENTS = [
+    "builtins.BaseException", "builtins.Exception", "builtins.RuntimeError",
+    "builtins.OSError", "builtins.TimeoutError", "typing.Protocol",
+    "typing_extensions.Protocol", "enum.Enum", "enum.StrEnum",
+]
 LAYER_DIRS = {
     "domain": "Domain", "application": "UseCase", "use_cases": "UseCase",
     "usecase": "UseCase", "usecases": "UseCase", "infrastructure": "Infrastructure",
@@ -175,7 +182,8 @@ def base_pylint(plugins: list[str], scope: dict[str, list[str]]) -> dict[str, An
         "format": {"indent-string": "    ", "indent-after-paren": 4,
                    "single-line-if-stmt": False, "single-line-class-stmt": False},
         "similarities": {"ignore-comments": True, "ignore-docstrings": True,
-                         "ignore-imports": True, "ignore-signatures": True},
+                          "ignore-imports": True, "ignore-signatures": True},
+        "design": {"ignored-parents": IGNORED_FRAMEWORK_PARENTS.copy()},
     }
 
 

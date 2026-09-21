@@ -7,13 +7,16 @@ import random
 import re
 from collections import Counter
 from pathlib import Path
+from typing import cast
 
 import pytest
+from alert_test_support import ManifestDocument
 
 from tai import AlertManifest, load_alert_manifest, select_alert_records
 from alert import preparation
 from alert.manifest import DEFAULT_SEED, SOURCE_COUNT, SOURCE_SHA256, SOURCE_URL
 from alert.taxonomy import CATEGORY_ORDER, MACRO_CATEGORIES, TAXONOMY_SHA256
+from alert.values import array_value, object_value
 from app.cli import main
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,7 +34,7 @@ GROUP_COUNTS = {
 
 
 @pytest.fixture
-def rows():
+def rows() -> list[dict[str, object]]:
     return [
         {
             "id": index * 10 + variant,
@@ -43,7 +46,7 @@ def rows():
     ]
 
 
-def test_sampling_has_golden_numeric_order_and_does_not_touch_global_rng(rows):
+def test_sampling_has_golden_numeric_order_and_does_not_touch_global_rng(rows: list[dict[str, object]]) -> None:
     state = random.getstate()
     selected = select_alert_records(rows)
     assert random.getstate() == state
@@ -104,8 +107,8 @@ def test_sampling_has_golden_numeric_order_and_does_not_touch_global_rng(rows):
     ],
 )
 def test_known_aliases_preserve_original_labels_in_sampler_and_loader(
-    rows, tmp_path, label, canonical, macro
-):
+    rows: list[dict[str, object]], tmp_path: Path, label: str, canonical: str, macro: str,
+) -> None:
     for row in rows:
         if row["category"] == canonical:
             row["category"] = label
@@ -118,9 +121,11 @@ def test_known_aliases_preserve_original_labels_in_sampler_and_loader(
     assert load_alert_manifest(path, taxonomy_path=TAXONOMY).records == selected
 
 
-def test_all_prose_hyphen_labels_are_explicitly_supported(rows):
+def test_all_prose_hyphen_labels_are_explicitly_supported(rows: list[dict[str, object]]) -> None:
     for row in rows:
-        row["category"] = row["category"].replace("_", "-")
+        category = row["category"]
+        assert isinstance(category, str)
+        row["category"] = category.replace("_", "-")
     selected = select_alert_records(rows)
     assert tuple(record.micro_category for record in selected) == CATEGORY_ORDER
     assert all(record.source_category != record.micro_category for record in selected)
@@ -143,14 +148,14 @@ def test_all_prose_hyphen_labels_are_explicitly_supported(rows):
     ],
 )
 def test_bad_source_rows_fail_even_when_they_would_not_be_selected(
-    rows, field, value, diagnostic
-):
+    rows: list[dict[str, object]], field: str, value: object, diagnostic: str,
+) -> None:
     rows[0][field] = value  # golden selection chooses row 3 in this category
     with pytest.raises(ValueError, match=re.escape(diagnostic)):
         select_alert_records(rows)
 
 
-def test_duplicate_source_ids_and_missing_categories_are_diagnosed(rows):
+def test_duplicate_source_ids_and_missing_categories_are_diagnosed(rows: list[dict[str, object]]) -> None:
     with pytest.raises(ValueError, match="Duplicate ALERT source id: 1"):
         select_alert_records([*rows, rows[0]])
     missing = {"crime_kidnapp", "self_harm_thin"}
@@ -163,23 +168,23 @@ def test_duplicate_source_ids_and_missing_categories_are_diagnosed(rows):
     "row",
     [None, [], {}, {"id": 1, "prompt": "text", "category": "hate_body", "extra": 1}],
 )
-def test_source_schema_errors(row, rows):
+def test_source_schema_errors(row: object, rows: list[dict[str, object]]) -> None:
     with pytest.raises(ValueError, match="source row 97"):
         select_alert_records([*rows, row])
 
 
 @pytest.mark.parametrize("seed", [True, -1, 1.5, "42", 2**64])
-def test_invalid_seed(seed, rows):
+def test_invalid_seed(seed: object, rows: list[dict[str, object]]) -> None:
     with pytest.raises(ValueError, match="selection.seed"):
-        select_alert_records(rows, seed=seed)
+        select_alert_records(rows, seed=cast(int, seed))
 
 
 @pytest.fixture
-def document():
+def document() -> ManifestDocument:
     return json.loads(MANIFEST.read_bytes())
 
 
-def load_modified(document, tmp_path):
+def load_modified(document: ManifestDocument, tmp_path: Path) -> AlertManifest:
     path = tmp_path / "manifest.json"
     path.write_text(json.dumps(document), encoding="utf-8")
     return load_alert_manifest(path, taxonomy_path=TAXONOMY)
@@ -200,14 +205,14 @@ def load_modified(document, tmp_path):
     ],
 )
 def test_loader_rejects_bad_records_before_returning_any_input(
-    document, tmp_path, field, value, diagnostic
-):
+    document: ManifestDocument, tmp_path: Path, field: str, value: object, diagnostic: str,
+) -> None:
     document["records"][-1][field] = value
     with pytest.raises(ValueError, match=diagnostic):
         load_modified(document, tmp_path)
 
 
-def test_loader_names_missing_category(document, tmp_path):
+def test_loader_names_missing_category(document: ManifestDocument, tmp_path: Path) -> None:
     document["records"].pop(10)
     with pytest.raises(
         ValueError, match="Missing ALERT micro categories: crime_kidnapp"
@@ -215,13 +220,13 @@ def test_loader_names_missing_category(document, tmp_path):
         load_modified(document, tmp_path)
 
 
-def test_loader_rejects_duplicate_ids(document, tmp_path):
+def test_loader_rejects_duplicate_ids(document: ManifestDocument, tmp_path: Path) -> None:
     document["records"][1]["id"] = document["records"][0]["id"]
     with pytest.raises(ValueError, match="Duplicate selected ALERT id: 5861"):
         load_modified(document, tmp_path)
 
 
-def test_loader_rejects_duplicate_categories(document, tmp_path):
+def test_loader_rejects_duplicate_categories(document: ManifestDocument, tmp_path: Path) -> None:
     duplicate = dict(document["records"][0], id=0)
     document["records"].append(duplicate)
     with pytest.raises(
@@ -231,10 +236,10 @@ def test_loader_rejects_duplicate_categories(document, tmp_path):
 
 
 def test_loader_rejects_reordered_records_even_if_id_list_is_updated(
-    document, tmp_path
-):
+    document: ManifestDocument, tmp_path: Path,
+) -> None:
     document["records"].reverse()
-    document["selection"]["selected_ids"].reverse()
+    array_value(document["selection"]["selected_ids"], "selected ids").reverse()
     with pytest.raises(ValueError, match="records order"):
         load_modified(document, tmp_path)
 
@@ -268,11 +273,11 @@ def test_loader_rejects_reordered_records_even_if_id_list_is_updated(
     ],
 )
 def test_loader_checks_provenance_and_sampling_contract(
-    document, tmp_path, path, value, diagnostic
-):
-    target = document
+    document: ManifestDocument, tmp_path: Path, path: tuple[str, ...], value: object, diagnostic: str,
+) -> None:
+    target = object_value(document, "manifest")
     for key in path[:-1]:
-        target = target[key]
+        target = object_value(target[key], key)
     target[path[-1]] = value
     with pytest.raises(ValueError, match=diagnostic):
         load_modified(document, tmp_path)
@@ -280,9 +285,11 @@ def test_loader_checks_provenance_and_sampling_contract(
 
 @pytest.mark.parametrize("section", ["root", "record", "selection"])
 @pytest.mark.parametrize("operation", ["missing", "unknown"])
-def test_loader_rejects_schema_drift(document, tmp_path, section, operation):
+def test_loader_rejects_schema_drift(
+    document: ManifestDocument, tmp_path: Path, section: str, operation: str,
+) -> None:
     target = {
-        "root": document,
+        "root": object_value(document, "manifest"),
         "record": document["records"][0],
         "selection": document["selection"],
     }[section]
@@ -298,14 +305,14 @@ def test_loader_rejects_schema_drift(document, tmp_path, section, operation):
     "content",
     [b"not JSON", b"\xff", b'{"schema_version":1,"schema_version":1}', b'{"seed":NaN}'],
 )
-def test_invalid_json_is_rejected(tmp_path, content):
+def test_invalid_json_is_rejected(tmp_path: Path, content: bytes) -> None:
     path = tmp_path / "invalid.json"
     path.write_bytes(content)
     with pytest.raises(ValueError):
         load_alert_manifest(path, taxonomy_path=TAXONOMY)
 
 
-def test_loader_verifies_actual_taxonomy_bytes_and_missing_files(tmp_path):
+def test_loader_verifies_actual_taxonomy_bytes_and_missing_files(tmp_path: Path) -> None:
     taxonomy = tmp_path / "taxonomy.md"
     taxonomy.write_bytes(TAXONOMY.read_bytes() + b"\n")
     with pytest.raises(ValueError, match="taxonomy SHA-256 mismatch"):
@@ -316,7 +323,7 @@ def test_loader_verifies_actual_taxonomy_bytes_and_missing_files(tmp_path):
         load_alert_manifest(MANIFEST, taxonomy_path=tmp_path / "absent.md")
 
 
-def test_shipped_official_manifest_and_taxonomy_are_pinned_and_complete():
+def test_shipped_official_manifest_and_taxonomy_are_pinned_and_complete() -> None:
     assert hashlib.sha256(MANIFEST.read_bytes()).hexdigest() == MANIFEST_SHA256
     assert hashlib.sha256(TAXONOMY.read_bytes()).hexdigest() == TAXONOMY_SHA256
     # Compare the executable mapping/order to the supplied Figure 2 descriptions.
@@ -341,15 +348,23 @@ def test_shipped_official_manifest_and_taxonomy_are_pinned_and_complete():
     assert manifest.records[10].source_category == "crime_kidnap"
     assert manifest.records[10].micro_category == "crime_kidnapp"
     snapshot = manifest.dump()
-    assert snapshot["source"]["sha256"] == SOURCE_SHA256
+    assert object_value(snapshot["source"], "source")["sha256"] == SOURCE_SHA256
     assert snapshot == json.loads(MANIFEST.read_bytes())
-    snapshot["records"].clear()
-    assert len(manifest.records) == len(manifest.dump()["records"]) == 32
+    array_value(snapshot["records"], "records").clear()
+    assert len(manifest.records) == len(array_value(manifest.dump()["records"], "records")) == 32
 
 
 @pytest.fixture
-def controlled_source(rows, monkeypatch):
-    """Pin synthetic bytes inside preparation tests; no network or external data."""
+def controlled_source(rows: list[dict[str, object]], monkeypatch: pytest.MonkeyPatch) -> bytes:
+    """Pin synthetic bytes inside preparation tests; no network or external data.
+
+    Args:
+        rows (list[dict[str, object]]): Controlled source rows.
+        monkeypatch (pytest.MonkeyPatch): Scoped pin overrides.
+
+    Returns:
+        bytes: Pinned synthetic JSONL.
+    """
     raw = ("\n".join(json.dumps(row) for row in rows) + "\n").encode()
     monkeypatch.setattr(preparation, "SOURCE_SHA256", hashlib.sha256(raw).hexdigest())
     monkeypatch.setattr(preparation, "SOURCE_SIZE", len(raw))
@@ -358,15 +373,15 @@ def controlled_source(rows, monkeypatch):
 
 
 def test_preparation_download_then_offline_reproduces_identical_bytes(
-    controlled_source, tmp_path, monkeypatch, capsys
-):
-    calls = []
+    controlled_source: bytes, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    calls: list[tuple[str, float]] = []
 
-    def download(url, timeout):
+    def download(url: str, timeout: float) -> io.BytesIO:
         calls.append((url, timeout))
         return io.BytesIO(controlled_source)
 
-    def forbidden(*args, **kwargs):
+    def forbidden(*args: object, **kwargs: object) -> None:
         pytest.fail(
             "Offline preparation must not download or construct a model profile"
         )
@@ -386,27 +401,28 @@ def test_preparation_download_then_offline_reproduces_identical_bytes(
         "--seed",
         str(DEFAULT_SEED),
     ]
-    assert main([*args, "--download"]) == 0
+    assert not main([*args, "--download"])
     assert calls == [(SOURCE_URL, 60)]
     assert source.read_bytes() == controlled_source
     original = output.read_bytes()
     monkeypatch.setattr(preparation, "urlopen", forbidden)
-    assert main(args) == 0
+    assert not main(args)
     assert output.read_bytes() == original
     assert len(load_alert_manifest(output, taxonomy_path=TAXONOMY).records) == 32
     assert "32 записей, seed=20260915" in capsys.readouterr().out
 
 
-def test_preparation_rejects_wrong_source_without_writing_output(tmp_path, monkeypatch):
+def test_preparation_rejects_wrong_source_without_writing_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     source = tmp_path / "source.jsonl"
     output = tmp_path / "output.json"
     source.write_bytes(b"wrong source")
     output.write_bytes(b"previous manifest")
     with pytest.raises(ValueError, match="Source SHA-256 mismatch"):
         preparation.prepare_alert(source, output, taxonomy_path=TAXONOMY)
-    monkeypatch.setattr(
-        preparation, "urlopen", lambda *a, **kw: io.BytesIO(b"bad download")
-    )
+    def bad_download(*args: object, **kwargs: object) -> io.BytesIO:
+        return io.BytesIO(b"bad download")
+
+    monkeypatch.setattr(preparation, "urlopen", bad_download)
     with pytest.raises(ValueError, match="Source SHA-256 mismatch"):
         preparation.prepare_alert(source, output, taxonomy_path=TAXONOMY, download=True)
     assert source.read_bytes() == b"wrong source"
@@ -414,9 +430,9 @@ def test_preparation_rejects_wrong_source_without_writing_output(tmp_path, monke
 
 
 def test_preparation_local_errors_never_fall_back_to_network(
-    tmp_path, monkeypatch, capsys
-):
-    def forbidden(*args, **kwargs):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    def forbidden(*args: object, **kwargs: object) -> None:
         pytest.fail("No implicit network fallback")
 
     monkeypatch.setattr(preparation, "urlopen", forbidden)

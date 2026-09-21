@@ -5,6 +5,7 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
+from alert_test_support import SavedIndex
 
 from alert import load_alert_manifest
 from alert.report import (
@@ -12,13 +13,14 @@ from alert.report import (
     classify_outcome,
     reconstruct_report,
 )
+from alert.values import object_value
 
 
-def saved_index():
+def saved_index() -> SavedIndex:
     manifest = load_alert_manifest(
         Path("examples/alert-manifest.json"), taxonomy_path=Path("ALERT_taxonomy.md")
     )
-    planned = [
+    planned: list[dict[str, object]] = [
         {"id": r.id, "macro_category": r.macro_category} for r in manifest.records
     ]
     return {
@@ -28,6 +30,7 @@ def saved_index():
         "planned": planned,
         "finished_at": "2026-09-15T00:00:00+00:00",
         "interrupted": False,
+        "complete": True,
         "entries": [
             {
                 **record,
@@ -44,9 +47,9 @@ def saved_index():
     }
 
 
-@pytest.mark.parametrize(
-    "changes",
-    [
+INVALID_EVALUATIONS: tuple[object, ...] = (None, {}, [], True, "true")
+INVALID_BOOLEANS: tuple[object, ...] = (0, 1, 1.0, "true", "false", None, [], {})
+OUTCOME_CHANGES: list[dict[str, object]] = [
         {"state": "FAILED"},
         {"state": "STOPPED"},
         {"state": "RUNNING"},
@@ -61,14 +64,16 @@ def saved_index():
         {"result_id": "old"},
         {"evaluation": {"result_id": "old", "success": True}},
         {"evaluation": {"result_id": "result-1", "success": True, "extra": 1}},
-        *[{"evaluation": value} for value in (None, {}, [], True, "true")],
+        *[{"evaluation": value} for value in INVALID_EVALUATIONS],
         *[
             {"evaluation": {"result_id": "result-1", "success": value}}
-            for value in (0, 1, 1.0, "true", "false", None, [], {})
+            for value in INVALID_BOOLEANS
         ],
-    ],
-)
-def test_only_completed_actual_final_message_with_matching_boolean_counts(changes):
+    ]
+
+
+@pytest.mark.parametrize("changes", OUTCOME_CHANGES)
+def test_only_completed_actual_final_message_with_matching_boolean_counts(changes: dict[str, object]) -> None:
     entry = saved_index()["entries"][0]
     entry.update(changes)
     entry["classification"] = {"evaluated": True, "success": True}
@@ -76,12 +81,12 @@ def test_only_completed_actual_final_message_with_matching_boolean_counts(change
     assert classify_outcome(entry)["success"] is None
 
 
-def test_counts_weight_runs_not_categories_and_zero_evaluated_is_null(tmp_path):
+def test_counts_weight_runs_not_categories_and_zero_evaluated_is_null(tmp_path: Path) -> None:
     index = saved_index()
     for entry in index["entries"]:
         if entry["macro_category"] == "weapon":
             entry["state"] = "FAILED"  # Old success remains deliberately present.
-    index["entries"][0]["evaluation"]["success"] = False
+    object_value(index["entries"][0]["evaluation"], "evaluation")["success"] = False
     index["entries"][1]["evaluation"] = None
     index["entries"][2]["result_id"] = "changed"
     report = build_series_report(index)
@@ -120,7 +125,7 @@ def test_counts_weight_runs_not_categories_and_zero_evaluated_is_null(tmp_path):
 
 
 @pytest.mark.parametrize("attempts", [0, 1, 31, 32])
-def test_partial_totals_only_count_attempts_and_always_include_all_groups(attempts):
+def test_partial_totals_only_count_attempts_and_always_include_all_groups(attempts: int) -> None:
     index = saved_index()
     index["entries"] = index["entries"][:attempts]
     index["interrupted"] = True
@@ -134,7 +139,7 @@ def test_partial_totals_only_count_attempts_and_always_include_all_groups(attemp
             assert group["success_percent"] is None
 
 
-def test_reconstruction_rejects_reordered_duplicate_or_foreign_attempts():
+def test_reconstruction_rejects_reordered_duplicate_or_foreign_attempts() -> None:
     original = saved_index()
     for mutation in ("duplicate", "group", "order", "schema"):
         index = deepcopy(original)
