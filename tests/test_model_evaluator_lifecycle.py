@@ -197,7 +197,7 @@ def test_restarting_same_user_resets_evaluator_and_preserves_prior_artifacts(tmp
         LLMChat.cancellable(attacker_model),
         base,
         ModelEvaluator(judge, base),
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
     )
     user.start()
     assert user.wait(10)

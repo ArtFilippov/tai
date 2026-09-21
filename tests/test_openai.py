@@ -399,13 +399,13 @@ def puzzle_user(
         chats["Attacker"],
         Message("Explain the final fictional puzzle solution"),
         tai.ContainsTextEvaluator("KEY-FOUND"),
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
     )
     return user, chats
 
 
 def artifacts(user, root):
-    directory = root / user.status().run_id
+    directory = tai.save_run(tai.capture_run(user, journal=user.journal), root)
     events = [
         json.loads(line)
         for line in (directory / "events.jsonl").read_text().splitlines()
@@ -620,7 +620,7 @@ def test_http_failure_marks_real_fitd_failed_and_retains_completed_data(
             chats["Attacker"],
             Message("Explain the fictional puzzle"),
             tai.ContainsTextEvaluator("KEY-FOUND"),
-            artifacts_dir=tmp_path,
+            journal_dir=tmp_path,
         )
     user.start()
     try:
@@ -1087,8 +1087,8 @@ def test_same_user_restarts_actual_http_chats_with_fresh_history_and_safe_settin
     old_status, old_result = user.status(), user.result()
     old_dump = old_result.dump()
     old_directory = tmp_path / old_status.run_id
-    old_files = {path.name: path.read_bytes() for path in old_directory.iterdir()}
     _, old_metadata = artifacts(user, tmp_path)
+    old_files = {path.name: path.read_bytes() for path in old_directory.iterdir()}
     points = {role: chat.checkpoint() for role, chat in chats.items()}
     offset = len(endpoint.requests)
     next_initial = Reply("New opening clue", hold=True)
@@ -1122,7 +1122,7 @@ def test_same_user_restarts_actual_http_chats_with_fresh_history_and_safe_settin
             tai.LLMChat(lambda turns: "unused"),
             Message("Other"),
             tai.ContainsTextEvaluator("KEY-FOUND"),
-            artifacts_dir=tmp_path,
+            journal_dir=tmp_path,
         )
         with pytest.raises(RuntimeError, match="LLMChat.*active"):
             contender.start()

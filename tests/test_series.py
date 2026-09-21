@@ -269,7 +269,133 @@ def test_repeat_series_has_unique_space_and_cli_reconstructs_without_inference(
     calls = len(lib.requests)
     assert main(["alert-report", "--index", str(first / "index.json")]) == 0
     assert json.loads(capsys.readouterr().out) == first_output
+    relocated = tmp_path / "relocated-series"
+    first.rename(relocated)
+    assert main(["alert-report", "--index", str(relocated / "index.json")]) == 0
+    assert json.loads(capsys.readouterr().out) == first_output
+    index = json.loads((relocated / "index.json").read_text())
+    for entry in index["entries"]:
+        for name, link in entry["artifacts"].items():
+            assert link is not None
+            if name == "directory":
+                assert (relocated / link).is_dir()
+            else:
+                assert (relocated / link).is_file()
     assert len(lib.requests) == calls
+
+
+@pytest.mark.parametrize(
+    ("filename", "interrupt"),
+    [
+        ("result.txt.tmp", False),
+        ("metadata.json.tmp", False),
+        ("metadata.json.tmp", True),
+    ],
+)
+def test_run_storage_failure_is_explicit_and_preserves_actual_completed_outcome(
+    local, tmp_path, monkeypatch, filename, interrupt
+):
+    lib, kwargs, _ = local
+    profile = qwen_profile(tmp_path, kwargs)
+    positive_responses(lib, monkeypatch)
+    users = []
+    factory, write = RoleProfile.create_experiment, Path.write_text
+
+    def create(profile, base, directory):
+        if users:
+            index = json.loads((directory.parent / "index.json").read_text())
+            assert index["entries"][0]["storage_error"]["phase"] == "save"
+            assert users[-1].wait(0)
+        user = factory(profile, base, directory)
+        users.append(user)
+        return user
+
+    def persist(path, *args, **kwargs):
+        if users and path.parent.name == users[0].status().run_id:
+            if path.name == filename:
+                assert users[0].wait(0)
+                assert users[0].status().state == "COMPLETED"
+                if interrupt:
+                    signal.raise_signal(signal.SIGINT)
+                raise OSError("cannot write final artifact")
+        return write(path, *args, **kwargs)
+
+    monkeypatch.setattr(RoleProfile, "create_experiment", create)
+    monkeypatch.setattr(Path, "write_text", persist)
+    result = run_alert_series(
+        MANIFEST, profile, tmp_path / "runs", taxonomy_path=TAXONOMY
+    )
+    assert result.exit_code == (130 if interrupt else 1)
+    index = json.loads((result.directory / "index.json").read_text())
+    first = index["entries"][0]
+    assert first["state"] == "COMPLETED" and first["error"] is None
+    assert first["storage_error"] == {
+        "phase": "save",
+        "type": "OSError",
+        "message": "cannot write final artifact",
+    }
+    assert first["evaluation"]["success"] is True
+    assert first["classification"] == {
+        "evaluated": False,
+        "success": None,
+        "reason": "storage_error",
+    }
+    assert all(u.status().state == "COMPLETED" and u.wait(0) for u in users)
+    assert len(users) == len(index["entries"]) == (1 if interrupt else 32)
+    assert index["interrupted"] is interrupt
+    assert result.report["complete"] is (not interrupt)
+    assert (
+        sum(g["evaluated"] for g in result.report["groups"].values()) == len(users) - 1
+    )
+    assert reconstruct_report(result.directory / "index.json") == result.report
+
+
+@pytest.mark.parametrize(
+    "filename", ["index.json", "report.json", "final-settings.json"]
+)
+def test_shared_series_write_failure_terminates_command_after_join(
+    local, tmp_path, monkeypatch, capsys, filename
+):
+    import tai.series as series
+
+    lib, kwargs, _ = local
+    profile = qwen_profile(tmp_path, kwargs)
+    positive_responses(lib, monkeypatch)
+    users = []
+    factory, write = RoleProfile.create_experiment, series._write_json
+
+    def create(*args):
+        user = factory(*args)
+        users.append(user)
+        return user
+
+    def persist(path, value):
+        if users and path.name == filename:
+            assert users[-1].wait(0)
+            raise OSError("shared series storage unavailable")
+        return write(path, value)
+
+    monkeypatch.setattr(RoleProfile, "create_experiment", create)
+    monkeypatch.setattr(series, "_write_json", persist)
+    assert (
+        main(
+            [
+                "alert-series",
+                "--manifest",
+                str(MANIFEST),
+                "--profile",
+                str(profile),
+                "--artifacts-dir",
+                str(tmp_path / "runs"),
+                "--taxonomy",
+                str(TAXONOMY),
+            ]
+        )
+        == 2
+    )
+    assert "shared series storage unavailable" in capsys.readouterr().err
+    assert len(users) == (32 if filename == "final-settings.json" else 1)
+    assert all(user.wait(0) for user in users)
 
 
 @pytest.mark.parametrize(

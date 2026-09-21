@@ -116,15 +116,12 @@ class RunJournal:
         self._lock = Lock()
         self._stream: TextIO | None = None
         self._begun = False
-        self._directory: Path | None = None
         self._run_id: str | None = None
         self._error: Exception | None = None
         self._done = Event()
         self._status = UserStatus(
             progress=Progress(max_calls_per_conv=max_calls_per_conv)
         )
-        self._revision = 0
-        self._saved_status: UserStatus | None = None
 
     @property
     def error(self) -> Exception | None:
@@ -201,10 +198,10 @@ class RunJournal:
             self.bind(run_id)
         if run_id != self._run_id:
             raise ValueError("Journal belongs to another run")
-        self._directory = directory
         self._begun = True
         try:
             if directory is not None:
+                directory.mkdir(parents=True, exist_ok=False)
                 self._stream = (directory / "events.jsonl").open("w", encoding="utf-8")
             self.flush()
         except Exception as exc:
@@ -443,37 +440,22 @@ class RunJournal:
                 **asdict(outcome.evaluation),
             )
 
-    def save_status(
-        self,
-        status: UserStatus,
-        result: Message | None,
-        revision: int,
-        *,
-        refresh_settings: bool = True,
-    ) -> None:
+    def settings(self) -> Any:
+        """Detached settings observed at initialization, if available."""
+        with self._lock:
+            return json.loads(json.dumps(self._settings))
+
+    def final_settings(self) -> Any:
+        """Detached participant settings captured before ownership release."""
+        with self._lock:
+            return json.loads(json.dumps(self._final_settings))
+
+    def capture_final_settings(self) -> None:
         self.check()
         try:
-            self._revision = revision
-            if self._directory is not None:
-                if refresh_settings:
-                    self._final_settings = self.redactor.snapshot(
-                        _value(self._final_settings_source())
-                    )
-                metadata = {
-                    **asdict(status),
-                    "finalization_revision": revision,
-                    "result": _value(result),
-                    "settings": self._settings,
-                    "final_settings": self._final_settings,
-                }
-                (self._directory / "metadata.json").write_text(
-                    json.dumps(
-                        self.redactor.snapshot(metadata), ensure_ascii=False, indent=2
-                    )
-                    + "\n",
-                    encoding="utf-8",
-                )
-            self._saved_status = status
+            settings = self.redactor.snapshot(_value(self._final_settings_source()))
+            with self._lock:
+                self._final_settings = settings
         except Exception as exc:
             self._poison(exc)
             raise
@@ -498,18 +480,10 @@ class RunJournal:
                 )
             if outcome.released is not None:
                 self.record("resources_released", **asdict(outcome.released))
-            if self._saved_status != outcome.status:
-                self.save_status(
-                    outcome.status,
-                    outcome.result,
-                    self._revision,
-                    refresh_settings=False,
-                )
             self.record(
                 "run_finished",
                 state=outcome.status.state.value,
                 reason=outcome.status.reason,
-                revision=self._revision,
             )
             if report is not None:
                 data, path = report

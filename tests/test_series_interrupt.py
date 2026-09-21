@@ -30,6 +30,7 @@ from tai.series_report import reconstruct_report
         ("before_start", 1),
         ("after_start", 1),
         ("finalization", 1),
+        ("run_save", 1),
         ("first_save", 1),
         ("last_save", 32),
     ],
@@ -49,6 +50,7 @@ def test_interrupt_races_preserve_actual_outcomes_and_attempted_prefix(
         _Execution._finalize,
     )
     write = series._write_json
+    save_run = series.save_run
 
     def interrupt():
         if not raised.is_set():
@@ -87,10 +89,17 @@ def test_interrupt_races_preserve_actual_outcomes_and_attempted_prefix(
             ):
                 interrupt()
 
+    def persist_run(record, directory):
+        if boundary == "run_save":
+            assert record.snapshot.status.state == "COMPLETED"
+            interrupt()
+        return save_run(record, directory)
+
     monkeypatch.setattr(RoleProfile, "create_experiment", create)
     monkeypatch.setattr(FITDUser, "start", begin)
     monkeypatch.setattr(_Execution, "_finalize", finish)
     monkeypatch.setattr(series, "_write_json", persist)
+    monkeypatch.setattr(series, "save_run", persist_run)
     previous = signal.getsignal(signal.SIGINT)
     result = run_alert_series(
         MANIFEST, profile, tmp_path / "runs", taxonomy_path=TAXONOMY
@@ -117,7 +126,7 @@ def test_interrupt_races_preserve_actual_outcomes_and_attempted_prefix(
         assert entry["evaluation"]["success"] is True
         assert entry["classification"]["evaluated"] is False
         assert result.report["groups"]["hate"]["success_percent"] is None
-    if boundary in ("first_save", "last_save"):
+    if boundary in ("run_save", "first_save", "last_save"):
         assert all(e["state"] == "COMPLETED" for e in index["entries"])
 
 

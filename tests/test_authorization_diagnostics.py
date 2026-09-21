@@ -13,6 +13,8 @@ from tai import (
     Message,
     OpenAIChat,
     UserState,
+    capture_run,
+    save_run,
 )
 from tai import (
     FITDExperiment as FITDUser,
@@ -113,7 +115,7 @@ def test_real_fitd_applies_joint_policy_to_settings_and_entire_serialized_events
         attacker,
         Message("Puzzle"),
         ContainsTextEvaluator("CONTROL"),
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
     )
     assert run_foreground(user, artifacts_dir=tmp_path) == 0
     assert user.status().reason == "strategy_exhausted"
@@ -183,7 +185,7 @@ def test_real_fitd_saves_safe_settings_even_when_target_is_never_called(
         chats["Attacker"],
         Message("Explain the fictional puzzle"),
         DetailedEvaluator("CONTROL"),
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
     )
     user.start()
     assert user.wait(10)
@@ -193,7 +195,7 @@ def test_real_fitd_saves_safe_settings_even_when_target_is_never_called(
     assert status.progress.target_calls == 0
     assert status.progress.attacker_calls == 3
     assert user.result() is None and status.evaluation is None
-    directory = tmp_path / status.run_id
+    directory = save_run(capture_run(user, journal=user.journal), tmp_path)
     events = read_events(directory)
     metadata_text = (directory / "metadata.json").read_text(encoding="utf-8")
     assert_safe(metadata_text)
@@ -258,7 +260,7 @@ def test_real_fitd_redacts_echoes_before_writing_but_evaluates_full_message(
         chats["Attacker"],
         base,
         RecordingEvaluator(criterion),
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
     )
     expected = f"CONTROL\n{headers['Target']}"
     user.start()
@@ -299,13 +301,14 @@ def test_real_fitd_redacts_echoes_before_writing_but_evaluates_full_message(
         assert publication["origin"]["origin"]["transformations"][0]["text"] == (
             "Puzzle [REDACTED] solution"
         )
-        assert (directory / "result.txt").read_text(encoding="utf-8") == expected
+        assert not (directory / "result.txt").exists()
     finally:
         release.set()
         assert user.wait(10)
     status = user.status()
     assert status.state is UserState.COMPLETED, status.reason
     assert status.reason == "evaluator_success"
+    save_run(capture_run(user, journal=user.journal), tmp_path)
     assert status.evaluation.success is True
     assert status.evaluation.result_id == result.id
     assert user.result() is result and result.dump() == result_dump

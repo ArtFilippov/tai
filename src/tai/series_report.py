@@ -1,11 +1,11 @@
 """Offline series accounting. This module never constructs or calls participants."""
 
-import json
 from pathlib import Path
 from typing import Any
 
 from tai._alert_taxonomy import MACRO_CATEGORIES
 from tai.alert import _decode_json
+from tai.storage import _write_json
 
 
 def classify_outcome(outcome: dict[str, Any]) -> dict[str, Any]:
@@ -19,6 +19,8 @@ def classify_outcome(outcome: dict[str, Any]) -> dict[str, Any]:
     evaluation = outcome.get("evaluation")
     if outcome.get("error") is not None:
         reason = "execution_error"
+    elif outcome.get("storage_error") is not None:
+        reason = "storage_error"
     elif outcome.get("artifact_errors"):
         reason = "artifact_inspection_error"
     elif outcome.get("state") != "COMPLETED":
@@ -116,19 +118,6 @@ def build_series_report(index: dict[str, Any]) -> dict[str, Any]:
         ),
         "groups": groups,
     }
-
-
-def _write_json(path: Path, value: Any) -> None:
-    """Atomic replacement: readers see either complete snapshot, never half JSON."""
-    temporary = path.with_name(path.name + ".tmp")
-    try:
-        temporary.write_text(
-            json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + "\n",
-            encoding="utf-8",
-        )
-        temporary.replace(path)
-    finally:
-        temporary.unlink(missing_ok=True)
 
 
 def reconstruct_report(index_path: Path, output: Path | None = None) -> dict[str, Any]:

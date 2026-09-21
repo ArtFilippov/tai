@@ -9,6 +9,8 @@ from tai import (
     LLMChat,
     Message,
     UserState,
+    capture_run,
+    save_run,
 )
 from tai import (
     FITDExperiment as FITDUser,
@@ -50,7 +52,7 @@ def test_real_fitd_publishes_full_evaluated_text_and_saves_message_provenance(tm
         LLMChat(ScriptedModel(["Initial", "L1", "L2", "L3"] + ["yes"] * 5)),
         base,
         evaluator,
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
     )
     user.start()
     assert user.wait(10)
@@ -63,7 +65,7 @@ def test_real_fitd_publishes_full_evaluated_text_and_saves_message_provenance(tm
     assert status.evaluation.result_id == result.id
     assert status.evaluation.success is True
 
-    run_dir = tmp_path / status.run_id
+    run_dir = save_run(capture_run(user, journal=user.journal), tmp_path)
     journal = (run_dir / "events.jsonl").read_text(encoding="utf-8")
     events = [json.loads(line) for line in journal.splitlines()]
     metadata_text = (run_dir / "metadata.json").read_text(encoding="utf-8")
@@ -155,7 +157,7 @@ def test_new_publication_keeps_old_results_immutable_and_has_no_unearned_evaluat
         LLMChat(ScriptedModel(["Initial", "L1", "L2", "L3"] + ["yes"] * 6)),
         base,
         evaluator,
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
     )
     user.start()
     try:
@@ -215,7 +217,7 @@ def test_new_publication_keeps_old_results_immutable_and_has_no_unearned_evaluat
     assert old.dump() == old_snapshot
     assert old_status.evaluation is None
     assert publication.dump() == publication_snapshot
-    run_dir = tmp_path / status.run_id
+    run_dir = save_run(capture_run(user, journal=user.journal), tmp_path)
     metadata = json.loads((run_dir / "metadata.json").read_text(encoding="utf-8"))
     assert metadata["result"] == json.loads(current.dump())
     assert metadata["result_id"] == current.id

@@ -61,7 +61,7 @@ def test_stop_at_admission_or_return_prevents_the_next_action(
         LLMChat(attacker),
         Message("Base"),
         evaluator,
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
     )
     user.start()
     with ThreadPoolExecutor(max_workers=1) as control:

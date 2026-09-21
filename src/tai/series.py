@@ -19,6 +19,8 @@ from tai._profile import FITD_PROFILE
 from tai.alert import load_alert_manifest
 from tai.evaluators import MODEL_RUBRIC
 from tai.series_report import _write_json, build_series_report, classify_outcome
+from tai.storage import capture_run, save_run
+from tai.users import RunSnapshot
 
 
 @dataclass(frozen=True)
@@ -57,10 +59,10 @@ def _settings(profile: RoleProfile) -> dict[str, Any]:
 
 
 def _capture(
-    user: FITDExperiment | None, directory: Path, redactor: DiagnosticRedactor
+    snapshot: RunSnapshot | None, directory: Path, redactor: DiagnosticRedactor
 ) -> dict[str, Any]:
-    status = user.journal.status() if user is not None else None
-    result = user.result() if user is not None else None
+    status = snapshot.status if snapshot is not None else None
+    result = snapshot.result if snapshot is not None else None
     run_id = status.run_id if status is not None else None
     run_dir = Path("runs") / run_id if run_id is not None else None
     artifacts = {"directory": str(run_dir) if run_dir is not None else None}
@@ -221,7 +223,23 @@ def run_alert_series(
                 if current is not None and current.status().run_id is not None:
                     current.stop()
                     current.wait()
-            outcome = _capture(current, directory, redactor)
+            snapshot = None
+            storage_error = None
+            if current is not None:
+                if current.status().run_id is None:
+                    snapshot = RunSnapshot(current.status(), None)
+                else:
+                    snapshot = current.snapshot()
+                    try:
+                        record_snapshot = capture_run(current, journal=current.journal)
+                        save_run(record_snapshot, directory / "runs")
+                    except Exception as exc:
+                        storage_error = {
+                            "phase": "save",
+                            "type": type(exc).__name__,
+                            "message": redactor.text(str(exc)),
+                        }
+            outcome = _capture(snapshot, directory, redactor)
             if (
                 error is None
                 and current is not None
@@ -247,6 +265,7 @@ def run_alert_series(
                 "duration_seconds": monotonic() - start_time,
                 **outcome,
                 "error": error,
+                "storage_error": storage_error,
             }
             entry["classification"] = classify_outcome(entry)
             index["entries"].append(entry)
@@ -264,6 +283,7 @@ def run_alert_series(
             report = save()
         failed = any(
             entry["error"] is not None
+            or entry["storage_error"] is not None
             or entry["artifact_errors"]
             or entry["state"] != "COMPLETED"
             for entry in index["entries"]

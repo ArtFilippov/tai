@@ -42,14 +42,14 @@ def _wrap_methods[T](
     )
 
 
-def _execution_type(journal: RunJournal, directory: Path) -> type[_Execution]:
+def _execution_type(journal: RunJournal, directory: Path | None) -> type[_Execution]:
     class ObservedExecution(_Execution):
         def _admit(self, started):
             super()._admit(started)
             journal.bind(started.run_id)
 
         def _initialize(self, run_id):
-            journal.begin(run_id, directory / run_id)
+            journal.begin(run_id, directory / run_id if directory is not None else None)
             super()._initialize(run_id)
             journal.configure()
 
@@ -105,9 +105,10 @@ def _execution_type(journal: RunJournal, directory: Path) -> type[_Execution]:
             )
             return super()._run_strategy(target_type=target_type, probe_type=probe_type)
 
-        def _finalize_status(self, status, result, revision):
-            super()._finalize_status(status, result, revision)
-            journal.save_status(status, result, revision)
+        def _finalize(self, state, reason):
+            # Snapshot while this run still owns its participants. No result I/O.
+            journal.capture_final_settings()
+            super()._finalize(state, reason)
 
         def _complete(self, outcome: WorkerOutcome):
             super()._complete(outcome)
@@ -133,18 +134,18 @@ class FITDExperiment(FITDUser):
         base: Message,
         evaluator: Evaluator,
         *,
-        artifacts_dir: str | Path = "runs",
+        journal_dir: str | Path | None = None,
         max_calls_per_conv: int = 10,
         journal_factory: Callable[..., RunJournal] = RunJournal,
     ) -> None:
         self._journals: dict[_Execution, RunJournal] = {}
         self._journal_factory = journal_factory
+        self._journal_dir = Path(journal_dir) if journal_dir is not None else None
         super().__init__(
             target,
             attacker,
             base,
             evaluator,
-            artifacts_dir=artifacts_dir,
             max_calls_per_conv=max_calls_per_conv,
         )
 
@@ -195,8 +196,6 @@ class FITDExperiment(FITDUser):
             settings=settings,
             final_settings=participants,
         )
-        execution = super()._new_execution(
-            _execution_type(journal, self._artifacts_dir)
-        )
+        execution = super()._new_execution(_execution_type(journal, self._journal_dir))
         self._journals[execution] = journal
         return execution

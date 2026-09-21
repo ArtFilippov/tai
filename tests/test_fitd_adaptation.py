@@ -7,6 +7,8 @@ from tai import (
     LLMChat,
     Message,
     UserState,
+    capture_run,
+    save_run,
 )
 from tai import (
     FITDExperiment as FITDUser,
@@ -44,11 +46,11 @@ def run_puzzle(tmp_path, target_responses, attacker_responses):
         attacker_model, model="puzzle-model", system="Attacker puzzle rules"
     )
     evaluator = RecordingEvaluator()
-    user = FITDUser(target, attacker, Message(BASE), evaluator, artifacts_dir=tmp_path)
+    user = FITDUser(target, attacker, Message(BASE), evaluator, journal_dir=tmp_path)
     user.start()
     assert user.wait(10), "puzzle run did not finish"
     assert user.status().state is UserState.COMPLETED, user.status().reason
-    run_dir = tmp_path / user.status().run_id
+    run_dir = save_run(capture_run(user, journal=user.journal), tmp_path)
     events = [
         json.loads(line) for line in (run_dir / "events.jsonl").read_text().splitlines()
     ]
@@ -298,7 +300,7 @@ def test_completed_target_text_waits_for_the_library_decision_before_publication
         LLMChat(held_alignment),
         Message(BASE),
         evaluator,
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
     )
     user.start()
     try:
@@ -309,7 +311,7 @@ def test_completed_target_text_waits_for_the_library_decision_before_publication
         assert evaluator.results == []
         assert user.status().evaluation is None
         run_dir = tmp_path / user.status().run_id
-        assert (run_dir / "result.txt").read_text() == "Accepted draft"
+        assert not (run_dir / "result.txt").exists()
         events = [
             json.loads(line)
             for line in (run_dir / "events.jsonl").read_text().splitlines()

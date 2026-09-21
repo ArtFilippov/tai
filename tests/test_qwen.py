@@ -22,7 +22,9 @@ from tai import (
     QwenContextError,
     QwenError,
     UserState,
+    capture_run,
     qwen,
+    save_run,
 )
 from tai import (
     FITDExperiment as FITDUser,
@@ -369,7 +371,7 @@ def test_loading_is_background_work_and_user_stop_waits_for_it(local, tmp_path):
         attacker,
         Message("puzzle"),
         ContainsTextEvaluator("key"),
-        artifacts_dir=tmp_path / "runs",
+        journal_dir=tmp_path / "runs",
         max_calls_per_conv=1,
     )
     user.start()
@@ -398,7 +400,7 @@ def test_loading_is_background_work_and_user_stop_waits_for_it(local, tmp_path):
     assert user.wait(3)
     assert user.status().state is UserState.COMPLETED
     assert len(lib.loads) == loads
-    directory = tmp_path / "runs" / user.status().run_id
+    directory = save_run(capture_run(user, journal=user.journal), tmp_path / "runs")
     metadata = json.loads((directory / "metadata.json").read_text())
     assert metadata["final_settings"]["Target"]["actual_dtype"] == "float16"
     assert (directory / "result.txt").read_text() == user.result().to_string()

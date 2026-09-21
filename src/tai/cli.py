@@ -78,6 +78,11 @@ def main(argv: list[str] | None = None) -> int:
                 taxonomy_path=args.taxonomy,
             )
             print(f"Серия: {result.directory}", file=sys.stderr)
+            if result.exit_code == 1:
+                print(
+                    f"Ошибки запуска или сохранения: {result.directory / 'index.json'}",
+                    file=sys.stderr,
+                )
             print(json.dumps(result.report, ensure_ascii=False, indent=2))
             return result.exit_code
         if args.command == "alert-report":
@@ -119,7 +124,7 @@ def main(argv: list[str] | None = None) -> int:
         print("Ошибка: входной файл должен содержать корректный UTF-8", file=sys.stderr)
         return 2
     except (OSError, ValueError) as exc:
-        print(f"Ошибка конфигурации или чтения: {exc}", file=sys.stderr)
+        print(f"Ошибка конфигурации, чтения или записи: {exc}", file=sys.stderr)
         return 2
     return run_foreground(
         experiment, artifacts_dir=args.artifacts_dir, redact=profile.redactor().text

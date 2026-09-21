@@ -26,7 +26,7 @@ def test_terminal_does_not_reevaluate_or_attribute_old_score_to_new_result(
         LLMChat(lambda turns: next(attacker)),
         Message("Explain the fictional puzzle"),
         evaluator,
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
     )
     assert run_foreground(user, artifacts_dir=tmp_path) == 1
     output = capsys.readouterr().out

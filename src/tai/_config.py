@@ -154,13 +154,15 @@ class RoleProfile:
             )
         return self.evaluator
 
-    def create_experiment(self, base: Message, artifacts_dir: Path) -> FITDExperiment:
+    def create_experiment(
+        self, base: Message, journal_dir: Path | None = None
+    ) -> FITDExperiment:
         return FITDExperiment(
             self.target,
             self.attacker,
             base,
             self.create_evaluator(base),
-            artifacts_dir=artifacts_dir,
+            journal_dir=journal_dir,
             max_calls_per_conv=self.max_calls_per_conv,
         )
 

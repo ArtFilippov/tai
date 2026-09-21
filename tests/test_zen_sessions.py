@@ -15,6 +15,8 @@ from tai import (
     OpenAIChat,
     OpenAIHTTPError,
     UserState,
+    capture_run,
+    save_run,
 )
 from tai import (
     FITDExperiment as FITDUser,
@@ -118,7 +120,7 @@ def test_real_fitd_sessions_follow_adaptation_and_independent_repeated_runs(
         *chats,
         Message("Explain the final fictional puzzle solution"),
         ContainsTextEvaluator("KEY-FOUND"),
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
         max_calls_per_conv=6,
     )
     previous_ids = {chat.conversation_id for chat in chats}
@@ -142,6 +144,7 @@ def test_real_fitd_sessions_follow_adaptation_and_independent_repeated_runs(
         endpoint.requests.clear()
         user.start()
         assert user.wait(10)
+        save_run(capture_run(user, journal=user.journal), tmp_path)
         assert user.status().state is UserState.COMPLETED, user.status().reason
         calls = endpoint.requests
         ids = {session(r) for r in calls}

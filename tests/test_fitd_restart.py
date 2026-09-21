@@ -11,6 +11,8 @@ from tai import (
     LLMChat,
     Message,
     UserState,
+    capture_run,
+    save_run,
 )
 from tai import (
     FITDExperiment as FITDUser,
@@ -61,6 +63,7 @@ def snapshot_artifacts(root, run_id):
 
 
 def assert_artifacts(user, root):
+    save_run(capture_run(user, journal=user.journal), root)
     status, result = user.status(), user.result()
     files = snapshot_artifacts(root, status.run_id)
     events = [json.loads(line) for line in files["events.jsonl"].splitlines()]
@@ -96,7 +99,7 @@ def test_terminal_user_starts_an_independent_actual_fitd_run(tmp_path, first_out
     )
     base = Message("Solve this fictional puzzle")
     user = FITDUser(
-        target, attacker, base, ContainsTextEvaluator("CONTROL"), artifacts_dir=tmp_path
+        target, attacker, base, ContainsTextEvaluator("CONTROL"), journal_dir=tmp_path
     )
     cleanup = HeldResponse("Unfinished old response")
     if first_outcome == "COMPLETED":
@@ -254,7 +257,7 @@ def test_chat_ownership_conflict_is_atomic_and_released_after_terminal_state(
         attacker,
         Message("Owner task"),
         ContainsTextEvaluator("CONTROL"),
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
     )
     shared_chat, shared_model = (
         (target, target_model)
@@ -269,7 +272,7 @@ def test_chat_ownership_conflict_is_atomic_and_released_after_terminal_state(
         shared_chat,
         Message("Contender task"),
         ContainsTextEvaluator("CONTROL"),
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
     )
     owner.start()
     try:
@@ -299,7 +302,7 @@ def test_chat_ownership_conflict_is_atomic_and_released_after_terminal_state(
             LLMChat.cancellable(independent_attacker),
             Message("Another task"),
             ContainsTextEvaluator("CONTROL"),
-            artifacts_dir=tmp_path,
+            journal_dir=tmp_path,
         )
         independent.start()
         assert independent.wait(10)
@@ -346,7 +349,7 @@ def test_simultaneous_users_acquire_opposite_role_pairs_without_partial_ownershi
             chats[1 - index],
             Message(f"Task {index}"),
             ContainsTextEvaluator("CONTROL"),
-            artifacts_dir=tmp_path,
+            journal_dir=tmp_path,
         )
         for index in range(2)
     ]
@@ -391,7 +394,7 @@ def test_simultaneous_users_acquire_opposite_role_pairs_without_partial_ownershi
     assert winner.status().state is UserState.STOPPED
 
 
-def test_failed_artifact_setup_releases_chats_for_another_actual_run(
+def test_failed_journal_setup_releases_chats_for_another_actual_run(
     tmp_path, monkeypatch
 ):
     target_model, attacker_model = ScriptedModel(), ScriptedModel()
@@ -404,7 +407,7 @@ def test_failed_artifact_setup_releases_chats_for_another_actual_run(
         attacker,
         Message("Task"),
         ContainsTextEvaluator("CONTROL"),
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
     )
     mkdir = Path.mkdir
 

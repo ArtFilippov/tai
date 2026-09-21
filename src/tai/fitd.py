@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from pathlib import Path
 from threading import Event, Lock, Thread
 from typing import TYPE_CHECKING
 from uuid import uuid4
@@ -24,7 +23,7 @@ from tai._profile import FITD_PROFILE
 from tai.chats import LLMChat, ModelRole, _acquire_chats, _release_chats
 from tai.evaluators import Evaluator, ModelEvaluator
 from tai.messages import Message
-from tai.users import Evaluation, Progress, User, UserState, UserStatus
+from tai.users import Evaluation, Progress, RunSnapshot, User, UserState, UserStatus
 
 if TYPE_CHECKING:
     from tai._fitd import _FITD, _Target
@@ -49,7 +48,6 @@ class FITDUser(User):
         base: Message,
         evaluator: Evaluator,
         *,
-        artifacts_dir: str | Path = "runs",
         max_calls_per_conv: int = 10,
     ) -> None:
         if target is attacker:
@@ -68,7 +66,6 @@ class FITDUser(User):
         if type(max_calls_per_conv) is not int or max_calls_per_conv <= 0:
             raise ValueError("max_calls_per_conv must be a positive integer")
         self._profile = replace(FITD_PROFILE, max_calls_per_conv=max_calls_per_conv)
-        self._artifacts_dir = Path(artifacts_dir)
         self._lock = Lock()
         self._execution = self._new_execution()
 
@@ -80,7 +77,6 @@ class FITDUser(User):
             self._attacker,
             self._base,
             self._evaluator,
-            artifacts_dir=self._artifacts_dir,
             max_calls_per_conv=self._profile.max_calls_per_conv,
         )
 
@@ -109,6 +105,10 @@ class FITDUser(User):
             execution = self._execution
         return execution.wait(timeout)
 
+    def snapshot(self) -> RunSnapshot:
+        with self._lock:
+            return self._execution.snapshot()
+
 
 class _Execution:
     """One generation's work and ownership. Callbacks cannot address a later run."""
@@ -120,7 +120,6 @@ class _Execution:
         base: Message,
         evaluator: Evaluator,
         *,
-        artifacts_dir: Path,
         max_calls_per_conv: int,
     ) -> None:
         self._participants: dict[ModelRole, tuple[LLMChat, str]] = {
@@ -132,7 +131,6 @@ class _Execution:
         self._chats = tuple(chat for chat, _ in self._participants.values())
         self._base = base
         self._evaluator = evaluator
-        self._artifacts_dir = Path(artifacts_dir)
         self._profile = replace(FITD_PROFILE, max_calls_per_conv=max_calls_per_conv)
         self._lock = Lock()
         self._status = UserStatus(
@@ -141,8 +139,6 @@ class _Execution:
         self._result: Message | None = None
         self._worker: Thread | None = None
         self._stop_requested = Event()
-        self._stop_revision = 0
-        self._run_dir: Path | None = None
         self._closed = False
 
     def start(self) -> RunStarted:
@@ -182,7 +178,6 @@ class _Execution:
             return False
         self._status = replace(self._status, state=UserState.STOPPING)
         self._stop_requested.set()
-        self._stop_revision += 1
         return True
 
     def status(self) -> UserStatus:
@@ -200,6 +195,12 @@ class _Execution:
             return False
         worker.join(timeout)
         return not worker.is_alive()
+
+    def snapshot(self) -> RunSnapshot:
+        with self._lock:
+            if self._worker is None or self._worker.is_alive():
+                raise RuntimeError("Snapshot requires a finished worker; wait first")
+            return RunSnapshot(self._status, self._result)
 
     def _send(
         self,
@@ -310,14 +311,6 @@ class _Execution:
                 evaluation,
                 None,
             )
-        # Result persistence is a separate slice from diagnostic observation.
-        assert self._run_dir is not None
-        if result is None:
-            (self._run_dir / "result.txt").unlink(missing_ok=True)
-        else:
-            (self._run_dir / "result.txt").write_text(
-                result.to_string(), encoding="utf-8"
-            )
         return change
 
     def _check_running(self) -> None:
@@ -414,8 +407,6 @@ class _Execution:
         error: Exception | None = None
         released: ResourcesReleased | None = None
         try:
-            self._run_dir = self._artifacts_dir / run_id
-            self._run_dir.mkdir(parents=True, exist_ok=False)
             self._initialize(run_id)
             reason = self._run_strategy()
         except _RunStopped:
@@ -458,22 +449,10 @@ class _Execution:
         return ResourcesReleased(run_id, tuple(self._participants))
 
     def _finalize(self, state: UserState, reason: str) -> None:
-        while True:
-            with self._lock:
-                revision = self._stop_revision
-                if state is not UserState.FAILED and self._stop_requested.is_set():
-                    state, reason = UserState.STOPPED, "user_stop"
-                status = replace(self._status, state=state, reason=reason)
-            self._finalize_status(status, self.result(), revision)
-            with self._lock:
-                if revision == self._stop_revision:
-                    self._status = status
-                    return
-
-    def _finalize_status(
-        self, status: UserStatus, result: Message | None, revision: int
-    ) -> None:
-        """Finalize a candidate; a concurrent stop invalidates its revision."""
+        with self._lock:
+            if state is not UserState.FAILED and self._stop_requested.is_set():
+                state, reason = UserState.STOPPED, "user_stop"
+            self._status = replace(self._status, state=state, reason=reason)
 
     def _complete(self, outcome: WorkerOutcome) -> None:
         """Worker completion boundary after finalization and participant release."""

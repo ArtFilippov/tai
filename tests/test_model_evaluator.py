@@ -156,7 +156,7 @@ def test_fitd_rejects_shared_third_role_or_wrong_base_before_any_execution(
     with pytest.raises(
         ValueError, match="base Message" if shared == "base" else "independent"
     ):
-        FITDUser(target, attacker, base, evaluator, artifacts_dir=tmp_path)
+        FITDUser(target, attacker, base, evaluator, journal_dir=tmp_path)
     assert not list(tmp_path.iterdir())
 
 
@@ -174,7 +174,7 @@ def make_user(tmp_path, judge, *, rounds=6, base=None):
         attacker,
         base,
         evaluator,
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
         max_calls_per_conv=rounds,
     )
     return user, target_model, attacker_model, evaluator
@@ -305,7 +305,7 @@ def test_discarded_real_fitd_branch_cannot_supply_classification_evidence(tmp_pa
         attacker,
         base,
         ModelEvaluator(LLMChat(model), base),
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
         max_calls_per_conv=6,
     )
     user.start()

@@ -39,6 +39,14 @@ class UserStatus:
     evaluation: Evaluation | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class RunSnapshot:
+    """One finished execution's actual state and original, immutable Message."""
+
+    status: UserStatus
+    result: Message | None
+
+
 class User:
     def start(self) -> None:
         raise NotImplementedError
@@ -54,5 +62,9 @@ class User:
         raise NotImplementedError
 
     def wait(self, timeout: float | None = None) -> bool:
-        """Wait for worker execution, artifact writes, and participant release."""
+        """Wait for worker execution and participant release; never save results."""
+        raise NotImplementedError
+
+    def snapshot(self) -> RunSnapshot:
+        """Capture a finished worker atomically; reject idle or active execution."""
         raise NotImplementedError

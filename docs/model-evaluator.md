@@ -89,26 +89,28 @@ HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 \
 
 ```python
 from pathlib import Path
-from tai import Message
+from tai import Message, capture_run, save_run
 from tai._config import load_profile
 
 profile = load_profile(Path("examples/fitd-alert-qwen.toml"))
 base = Message("A selected base request")
-user = profile.create_user(base, Path("runs"))
+user = profile.create_experiment(base, journal_dir=Path("runs"))
 user.start()
-user.wait()  # Завершение работы, записи артефактов и освобождение участников.
-status, result = user.status(), user.result()
+user.wait()  # Завершение работы и освобождение участников.
+record = capture_run(user, journal=user.journal)
+save_run(record, "runs")
+status, result = record.snapshot.status, record.snapshot.result
 ```
 
 `RoleProfile.create_evaluator(base)` создаёт новую привязку `ModelEvaluator` к
-базовому Message; `create_user` делает это автоматически. `RoleProfile.evaluator`
+базовому Message; `create_experiment` делает это автоматически. `RoleProfile.evaluator`
 содержит `ModelEvaluatorProfile(chat, rubric_version)` либо прежний
 `ContainsTextEvaluator`. Для `type="model"` обязательны `rubric_version` и
 `[evaluator.chat]`, использующий ту же схему Qwen/OpenAI, что остальные роли.
 `contains_text` по-прежнему требует только `criterion`.
 
 Профиль рассчитан на последовательное использование: перед следующим запуском
-нужно дождаться `wait()`. Все три чата резервируются атомарно на время выполнения
+нужно дождаться `wait()` и сохранить итог внешним кодом. Все три чата резервируются атомарно на время выполнения
 и финализации. Перед каждой оценкой чат Evaluator сбрасывается, сохраняя системные
 инструкции; новые UUID и недействительные старые checkpoint исключают перенос
 предыдущих оценок. Повторный `start()` того же User также начинает чистый запуск.
@@ -122,6 +124,10 @@ status, result = user.status(), user.result()
 даже если в журнале есть более ранний валидный вердикт.
 
 ## Артефакты и остановка
+
+`result.txt` и `metadata.json` записываются внешним `save_run` после ожидания и
+освобождения участников, без дополнительных модельных обращений или оценивания.
+Ход атаки доступен через независимый журнал.
 
 - `evaluation_started/completed/failed/cancelled` связаны с `result_id`.
   `evaluation_completed` сохраняет `{result_id, success}`; ошибка — текст исключения.

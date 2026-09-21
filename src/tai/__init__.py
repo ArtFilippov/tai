@@ -31,7 +31,8 @@ from tai.openai import (
     OpenAITransportError,
 )
 from tai.qwen import QwenChat, QwenContextError, QwenError
-from tai.users import Evaluation, Progress, User, UserState, UserStatus
+from tai.storage import RunRecord, capture_run, save_run
+from tai.users import Evaluation, Progress, RunSnapshot, User, UserState, UserStatus
 
 __all__ = [
     "AlertManifest",
@@ -65,9 +66,13 @@ __all__ = [
     "QwenError",
     "RunEvent",
     "RunJournal",
+    "RunRecord",
+    "RunSnapshot",
     "User",
     "UserState",
     "UserStatus",
+    "capture_run",
     "load_alert_manifest",
+    "save_run",
     "select_alert_records",
 ]

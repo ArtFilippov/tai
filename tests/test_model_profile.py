@@ -10,7 +10,14 @@ from test_cli import configure, read_artifacts, run_cli
 from test_preflight import preflight
 from test_zen_sessions import session
 
-from tai import ContainsTextEvaluator, Message, ModelEvaluator, UserState
+from tai import (
+    ContainsTextEvaluator,
+    Message,
+    ModelEvaluator,
+    UserState,
+    capture_run,
+    save_run,
+)
 from tai._config import ModelEvaluatorProfile, load_profile
 
 ALERT_PROFILE = Path("examples/fitd-alert-qwen.toml")
@@ -247,7 +254,7 @@ def test_evaluator_json_credentials_are_redacted_before_journaling_and_in_proven
             assert_safe_tree(event.data)
         result = user.result()
         assert result.to_string() == final
-        assert (directory / "result.txt").read_text() == final
+        assert not (directory / "result.txt").exists()
         wire = endpoint.requests[-1]
         assert wire[1]["Authorization"] == f"Bearer {judge_secret}"
         raw_request = wire[2]["messages"][-1]["content"]
@@ -261,6 +268,7 @@ def test_evaluator_json_credentials_are_redacted_before_journaling_and_in_proven
 
     valid = verdict == '{"success": true}'
     assert user.status().state is (UserState.COMPLETED if valid else UserState.FAILED)
+    save_run(capture_run(user, journal=user.journal), tmp_path / "runs")
     directory, metadata, events = read_artifacts(tmp_path / "runs")
     assert metadata["evaluation"] == (
         {"result_id": result.id, "success": True} if valid else None

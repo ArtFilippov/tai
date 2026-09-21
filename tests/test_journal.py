@@ -17,6 +17,8 @@ from tai import (
     ModelEvaluator,
     RunJournal,
     UserState,
+    capture_run,
+    save_run,
 )
 from tai._config import ModelEvaluatorProfile, RoleProfile
 from tai._preflight import run_preflight
@@ -82,7 +84,7 @@ def test_wrapping_preserves_native_checks_calls_order_and_presented_text(
             attacker,
             base,
             evaluator,
-            artifacts_dir=tmp_path,
+            **({"journal_dir": tmp_path} if user_type is FITDExperiment else {}),
             max_calls_per_conv=len(targets),
         )
         user.start()
@@ -132,9 +134,7 @@ def test_real_fitd_journal_connects_initialization_rollback_and_model_verdicts(
         ["yes"] * 5 + ["Rephrase", "yes"],
         ['{"success": false}', '{"success": true}'],
     )
-    experiment = FITDExperiment(
-        target, attacker, base, evaluator, artifacts_dir=tmp_path
-    )
+    experiment = FITDExperiment(target, attacker, base, evaluator, journal_dir=tmp_path)
     experiment.start()
     journal = experiment.journal
     assert journal.wait(10)  # No User.wait required to finalize the journal.
@@ -276,7 +276,7 @@ def test_storage_failure_prevents_next_work_and_survives_library_handlers_and_cl
         attacker,
         base,
         evaluator,
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
         journal_factory=BrokenJournal,
     )
     experiment.start()
@@ -296,6 +296,11 @@ def test_storage_failure_prevents_next_work_and_survives_library_handlers_and_cl
         journal.record("retry")
     assert raised.value is failure
     assert all(chat._owner is None for chat in (target, attacker, evaluator.chat))
+    directory = save_run(capture_run(experiment, journal=journal), tmp_path)
+    metadata = json.loads((directory / "metadata.json").read_text())
+    assert metadata["state"] == "FAILED"
+    assert metadata["reason"] == experiment.status().reason
+    assert metadata["progress"]["target_calls"] == expected[0]
     if kind == "call_completed" and role == "Target":
         assert target.history()[-1].message.to_string() == "One"
         assert experiment.result() is None
@@ -329,7 +334,7 @@ def test_completion_follows_resource_release_and_retained_journal_is_independent
         LLMChat(lambda turns: next(attackers)),
         Message("Puzzle"),
         ContainsTextEvaluator("CONTROL"),
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
         max_calls_per_conv=1,
     )
     experiment.start()
@@ -372,7 +377,7 @@ def test_cli_and_preflight_fail_on_journal_errors_without_extra_calls(tmp_path, 
         attacker,
         base,
         evaluator,
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
         journal_factory=BrokenJournal,
     )
     assert run_foreground(experiment, artifacts_dir=tmp_path) == 1
@@ -408,7 +413,7 @@ def test_cleanup_failure_is_the_final_journal_outcome(tmp_path, monkeypatch):
     monkeypatch.setattr(implementation, "_release_chats", fail_cleanup)
     target, attacker, base, evaluator, _ = participants(["Opening"], ["yes"])
     experiment = FITDExperiment(
-        target, attacker, base, evaluator, artifacts_dir=tmp_path, max_calls_per_conv=1
+        target, attacker, base, evaluator, journal_dir=tmp_path, max_calls_per_conv=1
     )
     experiment.start()
     assert experiment.wait(10)
@@ -417,6 +422,7 @@ def test_cleanup_failure_is_the_final_journal_outcome(tmp_path, monkeypatch):
     assert journal.status() == experiment.status()
     assert journal.status().state is UserState.FAILED
     assert journal.events()[-1].data["reason"] == "RuntimeError: cleanup failed"
+    save_run(capture_run(experiment, journal=journal), tmp_path)
     metadata = json.loads(
         (tmp_path / journal.status().run_id / "metadata.json").read_text()
     )

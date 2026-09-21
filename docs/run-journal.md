@@ -1,16 +1,16 @@
 # Независимый журнал запуска (#20)
 
 `FITDUser` выполняет стратегию. `FITDExperiment` собирает его с обёртками методов
-и новым `RunJournal` для каждого допуска запуска. События и `metadata.json`
-формирует и хранит журнал; сохранение полного `result.txt` остаётся отдельной
-ответственностью User до следующего среза.
+и новым `RunJournal` для каждого допуска запуска. Журнал формирует и хранит события
+и диагностические снимки настроек. `result.txt` и `metadata.json` записывает
+[внешний модуль сохранения](result-storage.md) после ожидания User.
 
 ## Python interface
 
 ```python
-from tai import FITDExperiment
+from tai import FITDExperiment, capture_run, save_run
 
-experiment = FITDExperiment(target, attacker, base, evaluator, artifacts_dir="runs")
+experiment = FITDExperiment(target, attacker, base, evaluator, journal_dir="runs")
 experiment.start()
 journal = experiment.journal
 
@@ -24,8 +24,9 @@ while not journal.wait(0.05):
 for event in journal.events(after=cursor):
     print(event.dump())
 experiment.wait()  # также дождаться выхода самого потока перед следующим start()
-result = experiment.result()  # исходный полный Message, не диагностическая копия
-status = journal.status()
+record = capture_run(experiment, journal=journal)
+save_run(record, "runs")
+result, status = record.snapshot.result, record.snapshot.status
 if journal.error is not None:
     raise journal.error
 ```
@@ -36,6 +37,8 @@ if journal.error is not None:
 записи не требуется вызов `User.wait()`. Сохранённая ссылка `journal` после нового
 `experiment.start()` продолжает читать прежний запуск; `experiment.journals`
 содержит все допущенные запуски в порядке допуска. `User.events()` удалён.
+Без `journal_dir` журнал работает в памяти. `settings()` и `final_settings()`
+возвращают отделённые снимки, либо `None`, если соответствующая граница не достигнута.
 
 ## Как подключены обёртки
 
@@ -75,9 +78,8 @@ if journal.error is not None:
 
 Начальное событие и `stop_requested` можно читать ещё до их сохранения: управляющий
 поток только добавляет снимок в память. Все записи на диск выполняет рабочий поток
-перед следующей операцией. Остановка во время записи кандидата `metadata.json`
-увеличивает ревизию и пересчитывает кандидат; `run_finished` появляется после
-фактической финализации и освобождения участников.
+перед следующей операцией. `run_finished` появляется после фиксации исхода и
+освобождения участников. Итоговые файлы результата в рабочем потоке не записываются.
 
 ## Fail fast и диагностические копии
 
@@ -91,14 +93,16 @@ if journal.error is not None:
 
 При отказе хранилища файлы могут быть неполными, а хвост событий существовать только
 в памяти. Ошибку следует читать из `journal.error`, а не пытаться восстановить
-успешный исход по частичному `metadata.json`.
+успешный исход по частичному журналу. Внешний writer всё равно может сохранить
+фактический `User.snapshot()` после ожидания, включая `FAILED` и доступный результат.
 
 Сборка объединяет настроенные секреты Target, Attacker и модельного оценщика.
 Журнал применяет существующую редактуру к копиям, включая JSON-экранированные
 значения, ключи, provenance и оболочку события. Исходные Message, вход оценщика и
 `result.txt` не изменяются. Результат никогда не восстанавливается из снимка.
 
-CLI и серия читают `journal.status()` и события непосредственно. Preflight использует
+CLI читает `journal.status()` и события непосредственно; окончательный исход CLI
+и серии поступает из `User.snapshot()`. Preflight использует
 тот же журнал для реальных обменов и модельного оценивания, включая безопасное
 форматирование отчёта. Офлайн-проверки: `tests/test_journal.py` и существующие
 сквозные тесты FITD, остановки, provenance, трёх ролей и серии.

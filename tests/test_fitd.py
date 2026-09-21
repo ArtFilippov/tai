@@ -14,6 +14,8 @@ from tai import (
     LLMChat,
     Message,
     UserState,
+    capture_run,
+    save_run,
 )
 from tai import (
     FITDExperiment as FITDUser,
@@ -44,6 +46,7 @@ class RecordingEvaluator(Evaluator):
 
 
 def read_and_assert_final_artifacts(user, root):
+    save_run(capture_run(user, journal=user.journal), root)
     run_dir = root / user.status().run_id
     events = [
         json.loads(line) for line in (run_dir / "events.jsonl").read_text().splitlines()
@@ -53,7 +56,6 @@ def read_and_assert_final_artifacts(user, root):
     assert events[-1]["kind"] == "run_finished"
     assert metadata["state"] == user.status().state.value
     assert events[-1]["data"]["state"] == metadata["state"]
-    assert events[-1]["data"]["revision"] == metadata["finalization_revision"]
     assert events[-1]["data"]["reason"] == metadata["reason"] == user.status().reason
     result = user.result()
     if result is None:
@@ -114,7 +116,7 @@ def test_stop_finishes_current_call_without_admitting_more_strategy_work(
         chats["Attacker"],
         Message("Custom request"),
         evaluator,
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
     )
     assert user.stop() is None
     assert user.status().state is UserState.IDLE
@@ -132,9 +134,8 @@ def test_stop_finishes_current_call_without_admitting_more_strategy_work(
                 assert not (tmp_path / running.run_id / "result.txt").exists()
             else:
                 assert result.to_string() == presented
-                assert (
-                    tmp_path / running.run_id / "result.txt"
-                ).read_text() == presented
+            assert not (tmp_path / running.run_id / "result.txt").exists()
+            assert not (tmp_path / running.run_id / "metadata.json").exists()
             histories = {role: chat.history() for role, chat in chats.items()}
             requests = {role: len(model.requests) for role, model in models.items()}
             assert control.submit(user.stop).result(timeout=1) is None
@@ -240,7 +241,7 @@ def test_real_fitd_uses_the_supplied_request_and_publishes_the_evaluated_result(
     )
     evaluator = RecordingEvaluator("CONTROL")
     base = Message("Explain the final fictional puzzle solution")
-    user = FITDUser(target, attacker, base, evaluator, artifacts_dir=tmp_path)
+    user = FITDUser(target, attacker, base, evaluator, journal_dir=tmp_path)
 
     assert user.status().state is UserState.IDLE
     assert user.result() is None
@@ -269,7 +270,7 @@ def test_real_fitd_uses_the_supplied_request_and_publishes_the_evaluated_result(
     assert status.evaluation.result_id == result.id
     assert status.evaluation.success is True
 
-    run_dir = tmp_path / status.run_id
+    run_dir = save_run(capture_run(user, journal=user.journal), tmp_path)
     assert (run_dir / "result.txt").read_text() == result.to_string()
     metadata = json.loads((run_dir / "metadata.json").read_text())
     assert metadata["state"] == "COMPLETED"
@@ -316,7 +317,7 @@ def test_control_methods_remain_responsive_during_model_calls(tmp_path, held_rol
     )
     evaluator = RecordingEvaluator("CONTROL")
     user = FITDUser(
-        target, attacker, Message("Custom request"), evaluator, artifacts_dir=tmp_path
+        target, attacker, Message("Custom request"), evaluator, journal_dir=tmp_path
     )
     with ThreadPoolExecutor(max_workers=1) as control:
         try:
@@ -367,7 +368,7 @@ def test_one_chat_cannot_serve_both_roles(tmp_path):
             chat,
             Message("request"),
             ContainsTextEvaluator("CONTROL"),
-            artifacts_dir=tmp_path,
+            journal_dir=tmp_path,
         )
 
 
@@ -387,7 +388,7 @@ def test_negative_evaluation_continues_and_is_not_attributed_to_new_result(tmp_p
         ScriptedModel(["One", "Two", "Three", "Four", "Not yet", "CONTROL"])
     )
     user = FITDUser(
-        target, attacker, Message("Custom request"), evaluator, artifacts_dir=tmp_path
+        target, attacker, Message("Custom request"), evaluator, journal_dir=tmp_path
     )
     user.start()
     try:
@@ -421,7 +422,7 @@ def test_round_limit_is_normal_completion_and_empty_result_is_present(tmp_path):
     target = LLMChat(ScriptedModel([""] * 10))
     attacker = LLMChat(ScriptedModel(["Initial", "L1", "L2", "L3"] + ["yes"] * 10))
     user = FITDUser(
-        target, attacker, Message("Custom request"), evaluator, artifacts_dir=tmp_path
+        target, attacker, Message("Custom request"), evaluator, journal_dir=tmp_path
     )
     user.start()
     assert user.wait(10)
@@ -433,7 +434,7 @@ def test_round_limit_is_normal_completion_and_empty_result_is_present(tmp_path):
     # Only adversarial-level results are evaluated, rather than each exchange.
     assert len(evaluator.results) == 6
     assert user.result() is evaluator.results[-1]
-    run_dir = tmp_path / status.run_id
+    run_dir = save_run(capture_run(user, journal=user.journal), tmp_path)
     assert (run_dir / "result.txt").read_text() == ""
     metadata = json.loads((run_dir / "metadata.json").read_text())
     assert metadata["result"] is not None
@@ -466,7 +467,7 @@ def test_fitd_realigns_a_response_before_continuing_the_ladder(tmp_path):
         attacker,
         Message("Custom request"),
         ContainsTextEvaluator("CONTROL"),
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
     )
     user.start()
     assert user.wait(10)
@@ -488,7 +489,7 @@ def test_run_without_a_presented_result_has_no_result_file_or_evaluation(tmp_pat
         LLMChat(unavailable),
         Message("request"),
         ContainsTextEvaluator("CONTROL"),
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
     )
     user.start()
     assert user.wait(10)
@@ -496,7 +497,7 @@ def test_run_without_a_presented_result_has_no_result_file_or_evaluation(tmp_pat
     assert status.state is UserState.FAILED
     assert user.result() is None
     assert status.evaluation is None
-    run_dir = tmp_path / status.run_id
+    run_dir = save_run(capture_run(user, journal=user.journal), tmp_path)
     assert not (run_dir / "result.txt").exists()
     metadata = json.loads((run_dir / "metadata.json").read_text())
     assert metadata["result"] is None
@@ -512,9 +513,10 @@ def test_required_evaluation_failure_preserves_new_result_without_an_old_score(
     class FailingEvaluator(RecordingEvaluator):
         def is_success(self, result):
             if self.results:
-                # The new text and all completed calls must already be durable.
+                # Observation is durable; the presented result is not yet saved.
                 run_dir = tmp_path / user.status().run_id
-                assert (run_dir / "result.txt").read_text() == "Unchecked"
+                assert not (run_dir / "result.txt").exists()
+                assert user.result() is result
                 raise error_type("required evaluation unavailable")
             return super().is_success(result)
 
@@ -528,7 +530,7 @@ def test_required_evaluation_failure_preserves_new_result_without_an_old_score(
         LLMChat(attacker_model),
         Message("Custom request"),
         evaluator,
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
     )
     user.start()
     assert user.wait(10)
@@ -582,7 +584,7 @@ def test_provider_failure_keeps_completed_exchanges_and_blocks_further_calls(
         chats["Attacker"],
         Message("Custom request"),
         ContainsTextEvaluator("CONTROL"),
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
     )
     user.start()
     assert user.wait(10)
@@ -629,7 +631,7 @@ def test_failure_after_native_restore_preserves_accepted_result_and_discarded_jo
         LLMChat(attacker_model),
         Message("Custom request"),
         ContainsTextEvaluator("CONTROL"),
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
     )
     user.start()
     assert user.wait(10)
@@ -689,7 +691,7 @@ def test_stop_during_evaluation_waits_for_execution_and_retains_its_outcome(
         LLMChat(attacker_model),
         Message("Custom request"),
         HoldingEvaluator(),
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
     )
     user.start()
     try:
@@ -714,14 +716,14 @@ def test_stop_during_evaluation_waits_for_execution_and_retains_its_outcome(
         assert metadata["evaluation"] == {"result_id": result.id, "success": outcome}
 
 
-def test_stop_during_artifact_finalization_is_responsive_and_updates_the_outcome(
+def test_stop_during_external_saving_is_responsive_and_preserves_the_outcome(
     tmp_path, monkeypatch
 ):
     entered, release = Event(), Event()
     write_text = Path.write_text
 
     def hold_metadata(path, *args, **kwargs):
-        if path.name == "metadata.json" and not entered.is_set():
+        if path.name == "metadata.json.tmp" and not entered.is_set():
             entered.set()
             assert release.wait(5), "test did not release artifact write"
         return write_text(path, *args, **kwargs)
@@ -734,28 +736,31 @@ def test_stop_during_artifact_finalization_is_responsive_and_updates_the_outcome
         LLMChat(attacker),
         Message("Custom request"),
         ContainsTextEvaluator("CONTROL"),
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
     )
     user.start()
+    assert user.wait(10)
+    record = capture_run(user, journal=user.journal)
     with ThreadPoolExecutor(max_workers=1) as control:
+        saving = control.submit(save_run, record, tmp_path)
         try:
             assert entered.wait(5)
-            assert user.status().state is UserState.RUNNING
-            assert control.submit(user.stop).result(timeout=1) is None
-            assert user.status().state is UserState.STOPPING
-            assert not user.wait(0)
+            assert user.status().state is UserState.COMPLETED
+            assert user.stop() is None
+            assert user.snapshot() == record.snapshot
+            assert user.wait(0)
         finally:
             release.set()
-            assert user.wait(10)
-    assert user.status().state is UserState.STOPPED
-    assert user.status().reason == "user_stop"
+            saving.result(timeout=5)
+    assert user.status().state is UserState.COMPLETED
+    assert user.status().reason == "evaluator_success"
     assert user.status().evaluation.success is True
     assert len(target.requests) == 5
     assert len(attacker.requests) == 9
     events, metadata = read_and_assert_final_artifacts(user, tmp_path)
     finishes = [e["data"] for e in events if e["kind"] == "run_finished"]
-    assert [e["revision"] for e in finishes] == [1]
-    assert metadata["finalization_revision"] == 1
+    assert len(finishes) == 1
+    assert metadata["state"] == "COMPLETED"
 
 
 def test_initial_request_exhaustion_completes_without_fabricating_a_result(tmp_path):
@@ -767,7 +772,7 @@ def test_initial_request_exhaustion_completes_without_fabricating_a_result(tmp_p
         attacker,
         Message("Custom request"),
         evaluator,
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
     )
     user.start()
     assert user.wait(10)
@@ -779,7 +784,7 @@ def test_initial_request_exhaustion_completes_without_fabricating_a_result(tmp_p
     assert evaluator.results == []
     assert user.result() is None
     assert status.evaluation is None
-    run_dir = tmp_path / status.run_id
+    run_dir = save_run(capture_run(user, journal=user.journal), tmp_path)
     assert not (run_dir / "result.txt").exists()
     metadata = json.loads((run_dir / "metadata.json").read_text())
     assert metadata["state"] == "COMPLETED"

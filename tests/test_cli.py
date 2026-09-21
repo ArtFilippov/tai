@@ -196,8 +196,7 @@ def test_repeated_sigint_waits_for_server_reply_and_preserves_accepted_result(
             }
             assert len(completed_ids) == calls - 1
             assert not (directory / "metadata.json").exists()
-            if expected is not None:
-                assert (directory / "result.txt").read_text() == expected
+            assert not (directory / "result.txt").exists()
             if process_group:
                 # Like terminal Ctrl+C: the foreground process group receives SIGINT.
                 os.killpg(process.pid, signal.SIGINT)

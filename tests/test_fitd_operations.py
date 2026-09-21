@@ -14,6 +14,7 @@ from tai import (
     ContainsTextEvaluator,
     LLMChat,
     Message,
+    RunJournal,
     UserState,
 )
 from tai import (
@@ -112,7 +113,7 @@ def puzzle(tmp_path, targets, attackers, rounds):
         attacker,
         Message("Solve the fictional puzzle"),
         ContainsTextEvaluator("CONTROL"),
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
         max_calls_per_conv=rounds,
     )
     return user, target, attacker
@@ -386,7 +387,7 @@ def test_initial_exhaustion_exposes_attacker_refusals_and_the_worker_outcome(
     assert outcome.result is None
 
 
-@pytest.mark.parametrize("failure", ["provider", "decision", "artifacts", "setup"])
+@pytest.mark.parametrize("failure", ["provider", "decision", "journal", "setup"])
 def test_worker_returns_actual_failures_including_errors_caught_by_garak(
     tmp_path, observed, monkeypatch, failure
 ):
@@ -398,15 +399,15 @@ def test_worker_returns_actual_failures_including_errors_caught_by_garak(
             raise error
 
         monkeypatch.setattr(FITD, "_is_refusal", fail)
-    elif failure == "artifacts":
-        write = Path.write_text
+    elif failure == "journal":
+        write = RunJournal._write_event
 
-        def fail_metadata(path, *args, **kwargs):
-            if path.name == "metadata.json":
+        def fail_journal(journal, event):
+            if event.kind == "run_finished":
                 raise error
-            return write(path, *args, **kwargs)
+            return write(journal, event)
 
-        monkeypatch.setattr(Path, "write_text", fail_metadata)
+        monkeypatch.setattr(RunJournal, "_write_event", fail_journal)
     elif failure == "setup":
         mkdir = Path.mkdir
 
@@ -432,7 +433,7 @@ def test_worker_returns_actual_failures_including_errors_caught_by_garak(
         attacker,
         Message("Another puzzle"),
         ContainsTextEvaluator("CONTROL"),
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
         max_calls_per_conv=1,
     )
     next_user.start()
@@ -468,7 +469,7 @@ def test_start_return_is_distinct_from_work_and_resource_cleanup(
         LLMChat(scripted(["Initial", "L1", "L2", "L3", "yes"])),
         Message("Puzzle"),
         ContainsTextEvaluator("CONTROL"),
-        artifacts_dir=tmp_path,
+        journal_dir=tmp_path,
         max_calls_per_conv=1,
     )
     try:
