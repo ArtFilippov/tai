@@ -1,4 +1,4 @@
-"""Real FITD cancellation/admission and atomic ownership of the third role."""
+"""Real FITD assessment admission/completion and ownership of the third role."""
 
 import json
 from concurrent.futures import ThreadPoolExecutor
@@ -29,7 +29,7 @@ def test_stop_during_model_assessment_keeps_completed_work_and_waits_for_cleanup
             assert result is not None and user.status().evaluation is None
             requests = len(target.requests), len(attacker.requests), len(model.requests)
             assert control.submit(user.stop).result(timeout=1) is None
-            assert held.cancellation.wait(1)
+            assert not held.cancellation.is_set()
             assert (
                 control.submit(user.status).result(timeout=1).state
                 is UserState.STOPPING
@@ -45,28 +45,27 @@ def test_stop_during_model_assessment_keeps_completed_work_and_waits_for_cleanup
             held.release.set()
             assert user.wait(10)
     assert user.status().state is UserState.STOPPED, user.status().reason
-    assert user.status().evaluation is None
-    assert user.status().progress.evaluator_calls == 1
-    assert user.result() is result and judge.history() == history
+    success = json.loads(outcome)["success"]
+    assert user.status().evaluation.result_id == result.id
+    assert user.status().evaluation.success is success
+    assert user.status().progress.evaluator_calls == 2
+    assert user.result() is result and judge.history()[:-2] == history
+    assert judge.history()[-1].message.to_string() == outcome
     assert (
         len(target.requests),
         len(attacker.requests),
         len(model.requests),
     ) == requests
     events, metadata = read_and_assert_final_artifacts(user, tmp_path)
-    assert metadata["evaluation"] is None
+    assert metadata["evaluation"] == {"result_id": result.id, "success": success}
     completed = [e["data"] for e in events if e["kind"] == "evaluation_completed"]
-    assert len(completed) == 1 and completed[0]["success"] is False
+    assert len(completed) == 2 and completed[0]["success"] is False
     assert completed[0]["result_id"] != result.id
-    cancelled = [e["data"] for e in events if e["kind"] == "call_cancelled"]
-    assert len(cancelled) == 1
-    assert cancelled[0]["role"] == "Evaluator"
-    assert cancelled[0]["result_id"] == result.id
-    assert cancelled[0]["response"]["text"] == outcome
-    assert any(e["kind"] == "evaluation_cancelled" for e in events)
+    assert completed[-1] == metadata["evaluation"]
+    assert not any(e["kind"].endswith("_cancelled") for e in events)
     stop = next(e["sequence"] for e in events if e["kind"] == "stop_requested")
     assert not any(e["kind"] == "call_started" and e["sequence"] > stop for e in events)
-    # Reusing the same chat in a new run does not inherit the cancelled signal.
+    # Reusing the same chat in a new run gets an independent signal.
     model.responses.append('{"success": true}')
     next_user, _, _, _ = make_user(tmp_path, judge)
     next_user.start()
@@ -78,7 +77,7 @@ def test_stop_during_model_assessment_keeps_completed_work_and_waits_for_cleanup
 
 
 @pytest.mark.parametrize("boundary", ["evaluation_started", "call_started"])
-def test_stop_between_assessment_admission_and_send_cannot_start_model_work(
+def test_stop_between_assessment_admission_and_send_finishes_whole_assessment(
     tmp_path, monkeypatch, boundary
 ):
     entered, release = Event(), Event()
@@ -108,12 +107,23 @@ def test_stop_between_assessment_admission_and_send_cannot_start_model_work(
         release.set()
         assert user.wait(10)
     assert user.status().state is UserState.STOPPED
-    assert user.status().evaluation is None
-    assert requests == []
+    assert user.status().evaluation.success is True
+    assert user.status().evaluation.result_id == user.result().id
+    assert len(requests) == 1
     assert len(target.requests) == 5 and len(attacker.requests) == 9
     events, _ = read_and_assert_final_artifacts(user, tmp_path)
     stop = next(e["sequence"] for e in events if e["kind"] == "stop_requested")
-    assert not any(e["kind"] == "call_started" and e["sequence"] > stop for e in events)
+    later_calls = [
+        e["data"]
+        for e in events
+        if e["kind"] == "call_started" and e["sequence"] > stop
+    ]
+    assert len(later_calls) == (boundary == "evaluation_started")
+    assert all(e["role"] == "Evaluator" for e in later_calls)
+    assert not any(
+        e["sequence"] > stop and e["kind"] in {"evaluation_started", "branch_selected"}
+        for e in events
+    )
 
 
 @pytest.mark.parametrize("terminal", ["completed", "stopped", "failed"])
@@ -236,3 +246,36 @@ def test_stop_after_completed_evaluator_exchange_retains_its_verdict(
     events, metadata = read_and_assert_final_artifacts(user, tmp_path)
     assert metadata["evaluation"]["success"] is success
     assert not any(e["kind"] == "call_cancelled" for e in events)
+
+
+@pytest.mark.parametrize(
+    "outcome", [RuntimeError("model failed"), '{"success": "false"}']
+)
+def test_stop_does_not_mask_model_assessment_failure(tmp_path, outcome):
+    held = HeldResponse(outcome)
+    judge = LLMChat.cancellable(ScriptedModel([held]))
+    user, target, attacker, _ = make_user(tmp_path, judge)
+    user.start()
+    try:
+        assert held.entered.wait(5)
+        result = user.result()
+        user.stop()
+        assert not held.cancellation.is_set()
+    finally:
+        held.release.set()
+        assert user.wait(10)
+    assert user.status().state is UserState.FAILED
+    assert user.result() is result and user.status().evaluation is None
+    assert len(target.requests) == 5 and len(attacker.requests) == 9
+    events, metadata = read_and_assert_final_artifacts(user, tmp_path)
+    assert metadata["evaluation"] is None
+    assert any(
+        e["kind"] == "evaluation_failed" and e["data"]["result_id"] == result.id
+        for e in events
+    )
+    expected = (
+        "ModelEvaluationError"
+        if isinstance(outcome, Exception)
+        else "ModelVerdictError"
+    )
+    assert expected in user.status().reason

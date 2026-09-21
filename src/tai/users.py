@@ -78,7 +78,7 @@ class User:
         raise NotImplementedError
 
     def stop(self) -> None:
-        """Request cancellation of active execution without waiting for it."""
+        """Close admission without waiting; the current model/evaluation finishes."""
         raise NotImplementedError
 
     def status(self) -> UserStatus:
@@ -91,5 +91,5 @@ class User:
         raise NotImplementedError
 
     def wait(self, timeout: float | None = None) -> bool:
-        """Optionally block until worker execution and artifact writes finish."""
+        """Wait for worker execution, artifact writes, and participant release."""
         raise NotImplementedError

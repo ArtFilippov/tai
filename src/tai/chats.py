@@ -177,7 +177,10 @@ class LLMChat:
             self._sending.release()
 
     def send(self, message: Message, *, cancellation: Event | None = None) -> Message:
-        """Complete one exchange, optionally governed by an owner's stop signal."""
+        """Complete one exchange, optionally with explicit per-call cancellation.
+
+        User.stop() closes admission between calls and does not set this signal.
+        """
         if not self._sending.acquire(blocking=False):
             raise RuntimeError("LLMChat already has an active exchange")
         try:

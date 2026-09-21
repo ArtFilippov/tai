@@ -84,6 +84,7 @@ class _Target:
         reset: _Reset,
         emit: _Emit,
         conversation_id: _ConversationId,
+        check_running: Callable[[], None],
     ) -> None:
         self._send = send
         self._publish = publish
@@ -91,6 +92,7 @@ class _Target:
         self._restore = restore
         self._reset = reset
         self._emit = emit
+        self._check_running = check_running
         self._history: _History = ()
         self._snapshots: dict[_History, ConversationPoint] = {}
         self._get_conversation_id = conversation_id
@@ -135,6 +137,7 @@ class _Target:
         return snapshot
 
     def synchronize(self, prompt: Conversation, cause: Cause) -> Synchronization:
+        self._check_running()
         turns = _history(prompt)
         if not turns or turns[-1][0] != "user":
             raise RuntimeError("FITD must supply a final user turn")
@@ -181,12 +184,13 @@ class _Target:
     def accept(self, cause: Cause) -> ResultChange:
         snapshot = self.current
         assert snapshot.response is not None
-        self._snapshots[self._history] = replace(snapshot, result=snapshot.response)
-        return self._publish(
+        change = self._publish(
             snapshot.response,
             replace(snapshot.checkpoint.context, cause=cause),
             snapshot.checkpoint.id,
         )
+        self._snapshots[self._history] = replace(snapshot, result=change.current)
+        return change
 
     def exchange(
         self, prompt: Conversation, request: Message, cause: Cause
@@ -266,6 +270,7 @@ class _FITD(FITD):
         try:
             self.raise_if_interrupted()
             yield
+            self.raise_if_interrupted()
         except Exception as exc:
             if self.failure is None:
                 self.failure = exc
@@ -342,6 +347,7 @@ class _FITD(FITD):
         context: Context,
         checkpoint_id: str | None,
     ) -> LocalDecision:
+        self.raise_if_interrupted()
         value = super()._is_refusal(response.to_string())
         decision = LocalDecision(
             "refusal", value, context, request, response, checkpoint_id
@@ -375,6 +381,7 @@ class _FITD(FITD):
         context: Context,
         checkpoint_id: str,
     ) -> LocalDecision:
+        self.raise_if_interrupted()
         value = super()._is_response_aligned(request.to_string(), response.to_string())
         judgment = self._last_attacker_exchange
         assert judgment is not None
@@ -397,9 +404,11 @@ class _FITD(FITD):
             goal = self._base.to_string()
             self.target_prompts = [goal]
             initial = self._generate_init_turn(goal)
+            self.raise_if_interrupted()
             if initial is None:
                 return []
             self.level_queries_per_goal = {goal: self._get_level_queries(goal, initial)}
+            self.raise_if_interrupted()
             attempt = self._create_attempt(initial)
             self._requests[str(attempt.uuid)] = self._base.spawn(initial)
             attempt.notes.update(
@@ -431,6 +440,7 @@ class _FITD(FITD):
 
     def generate_next_turn_attempt(self, conversation, last_attempt):
         continuation = self.select_continuation(conversation, last_attempt)
+        self.raise_if_interrupted()
         decision, next_attempt = continuation.decision, continuation.attempt
         cause = replace(decision.context.cause, reason=decision.branch)
         if decision.branch == "continue":
@@ -440,6 +450,7 @@ class _FITD(FITD):
                 evaluation = self._evaluate(
                     accepted.current, accepted.context, accepted.checkpoint_id
                 )
+                self.raise_if_interrupted()
                 self.success = evaluation.evaluation.success
                 if self.success:
                     return None
@@ -449,6 +460,7 @@ class _FITD(FITD):
         return next_attempt
 
     def select_continuation(self, conversation, last_attempt) -> _Continuation:
+        self.raise_if_interrupted()
         # Observe the actual library-selected continuation; do not duplicate its
         # ladder indexing, refusal handling, rephrasing, or realignment logic.
         branch_id = str(uuid4())
@@ -551,7 +563,9 @@ def run_fitd(
     emit: _Emit,
     profile: _FITDProfile = FITD_PROFILE,
 ) -> str:
-    target = _Target(send, publish, checkpoint, restore, reset, emit, conversation_id)
+    target = _Target(
+        send, publish, checkpoint, restore, reset, emit, conversation_id, check_running
+    )
     probe = _FITD(
         base,
         send,

@@ -23,7 +23,7 @@ def run_foreground(
     """Run on the main thread; SIGINT requests stop outside the signal handler.
 
     The handler never takes a User lock or raises through Thread.join. Repeated
-    interrupts still let the worker finish its cancellation and artifact writes.
+    interrupts still let the worker finish its current call and artifact writes.
     """
     interrupted = False
 
@@ -45,7 +45,7 @@ def run_foreground(
         show(f"Артефакты: {artifacts_dir / str(initial.run_id)}")
         show(
             f"Лимит FITD: {initial.progress.max_calls_per_conv} библиотечных раундов; "
-            "это не общий бюджет обращений. Ctrl+C — остановить."
+            "это не общий бюджет обращений. Ctrl+C — остановить после текущего вызова."
         )
         previous = None
         cursor = 0

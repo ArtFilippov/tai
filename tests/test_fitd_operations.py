@@ -464,6 +464,10 @@ def test_start_return_is_distinct_from_work_and_resource_cleanup(
         )
         assert not observed.finished.is_set()
         assert observed.values["_release_resources"] == []
+        terminal = user.status()
+        user.stop()
+        assert user.status() == terminal
+        assert not user.wait(0)
         with pytest.raises(RuntimeError, match="active run"):
             user.start()
     finally:
@@ -481,7 +485,10 @@ def test_start_return_is_distinct_from_work_and_resource_cleanup(
     assert outcome.status.state is (UserState.STOPPED if stop else UserState.COMPLETED)
     if stop:
         assert outcome.status.reason == "user_stop"
-        assert outcome.error is observed.errors["_send"][0]
+        assert not observed.errors["_send"]
+        assert (
+            observed.values["exchange"][-1].exchange.response.to_string() == "Opening"
+        )
 
 
 def test_operation_contexts_and_checkpoints_are_independent_across_repeated_runs(

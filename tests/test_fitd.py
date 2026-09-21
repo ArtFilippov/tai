@@ -74,11 +74,14 @@ def read_and_assert_final_artifacts(user, root):
         ("Attacker", 4, "", None),
     ],
 )
-@pytest.mark.parametrize("swallowed", [False, True])
-def test_stop_cancels_real_fitd_and_preserves_only_completed_work(
-    tmp_path, held_role, held_index, raw_response, presented, swallowed
+@pytest.mark.parametrize(
+    "error_type", [None, RuntimeError, GarakException, ChatCancelled]
+)
+def test_stop_finishes_current_call_without_admitting_more_strategy_work(
+    tmp_path, held_role, held_index, raw_response, presented, error_type
 ):
-    entered, cancelled, cleanup = Event(), Event(), Event()
+    entered, cleanup = Event(), Event()
+    signals = []
     models = {
         "Target": ScriptedModel([raw_response, "Second", "Third", "Fourth", "CONTROL"]),
         "Attacker": ScriptedModel(["Initial", "L1", "L2", "L3"] + ["yes"] * 5),
@@ -89,18 +92,13 @@ def test_stop_cancels_real_fitd_and_preserves_only_completed_work(
         if len(model.requests) != held_index:
             return model(turns)
         model.requests.append(turns)
+        signals.append(cancellation)
         entered.set()
-        assert cancellation.wait(5), "stop did not cancel the active generation"
-        cancelled.set()
         assert cleanup.wait(5), "test did not allow model cleanup"
-        if swallowed:
-            # Exercise garak's real exception handler, including a branch that
-            # returns previously completed attempts after swallowing the error.
-            class SwallowedCancellation(ChatCancelled, GarakException):
-                pass
-
-            raise SwallowedCancellation()
-        return "Unfinished response"
+        assert not cancellation.is_set()
+        if error_type is not None:
+            raise error_type()
+        return "Completed after stop"
 
     chats = {
         role: LLMChat.cancellable(held_generate, system=f"{role} instructions")
@@ -138,7 +136,7 @@ def test_stop_cancels_real_fitd_and_preserves_only_completed_work(
             histories = {role: chat.history() for role, chat in chats.items()}
             requests = {role: len(model.requests) for role, model in models.items()}
             assert control.submit(user.stop).result(timeout=1) is None
-            assert cancelled.wait(1)
+            assert not signals[0].is_set()
             assert control.submit(user.stop).result(timeout=1) is None
             assert len([e for e in user.events() if e.kind == "stop_requested"]) == 1
             assert (
@@ -154,33 +152,57 @@ def test_stop_cancels_real_fitd_and_preserves_only_completed_work(
             cleanup.set()
             assert user.wait(10)
     stopped = user.status()
-    assert stopped.state is UserState.STOPPED, stopped.reason
-    assert stopped.reason == "user_stop"
+    assert stopped.state is (
+        UserState.STOPPED if error_type is None else UserState.FAILED
+    ), stopped.reason
+    if error_type is None:
+        assert stopped.reason == "user_stop"
+    else:
+        assert stopped.reason.startswith(error_type.__name__ + ":")
     assert stopped.evaluation is None
     assert user.result() is result
     assert user.stop() is None
     assert user.status() == stopped
     assert evaluator.results == []
     assert {role: len(model.requests) for role, model in models.items()} == requests
-    assert {role: chat.history() for role, chat in chats.items()} == histories
+    for role, chat in chats.items():
+        if role == held_role and error_type is None:
+            assert chat.history()[:-2] == histories[role]
+            assert chat.history()[-1].message.to_string() == "Completed after stop"
+        else:
+            assert chat.history() == histories[role]
     events, metadata = read_and_assert_final_artifacts(user, tmp_path)
     assert metadata["evaluation"] is None
     starts = [e["data"] for e in events if e["kind"] == "call_started"]
     ends = [e["data"] for e in events if e["kind"] == "call_completed"]
-    interruptions = [e["data"] for e in events if e["kind"] == "call_cancelled"]
-    assert len(starts) == len(ends) + 1 == sum(requests.values())
-    assert len(interruptions) == 1
-    kinds = [e["kind"] for e in events]
-    assert kinds.index("stop_requested") < kinds.index("call_cancelled")
-    assert interruptions[0]["call_id"] == starts[-1]["call_id"]
-    assert interruptions[0]["role"] == held_role
-    if swallowed:
-        assert interruptions[0]["response"] is None
-    else:
-        assert interruptions[0]["response"]["text"] == "Unfinished response"
-    assert stopped.progress.target_calls == requests["Target"] - (held_role == "Target")
+    assert len(starts) == len(ends) + (error_type is not None) == sum(requests.values())
+    stop = next(e["sequence"] for e in events if e["kind"] == "stop_requested")
+    assert not any(
+        e["sequence"] > stop
+        and e["kind"]
+        in {
+            "call_started",
+            "local_decision",
+            "branch_selected",
+            "result_published",
+            "result_withdrawn",
+            "evaluation_started",
+            "history_reset",
+            "history_restored",
+        }
+        for e in events
+    )
+    if error_type is None:
+        assert ends[-1]["call_id"] == starts[-1]["call_id"]
+        assert ends[-1]["response"] == json.loads(
+            chats[held_role].history()[-1].message.dump()
+        )
+        assert not any(e["kind"] == "call_cancelled" for e in events)
+    assert stopped.progress.target_calls == requests["Target"] - (
+        held_role == "Target" and error_type is not None
+    )
     assert stopped.progress.attacker_calls == requests["Attacker"] - (
-        held_role == "Attacker"
+        held_role == "Attacker" and error_type is not None
     )
     if held_role == "Attacker" and held_index == 4:
         assert chats["Target"].history()[-1].message.to_string() == raw_response

@@ -541,7 +541,7 @@ def test_generation_and_settings_are_detached_from_caller_mutations(endpoint):
 @pytest.mark.parametrize(
     ("role", "index"), [("Target", 1), ("Attacker", 0), ("Attacker", 4)]
 )
-def test_user_stop_cancels_target_initial_and_internal_attacker_http_before_response(
+def test_user_stop_waits_for_target_initial_and_internal_attacker_http_response(
     endpoint, tmp_path, role, index
 ):
     user, chats = puzzle_user(endpoint, tmp_path)
@@ -559,25 +559,22 @@ def test_user_stop_cancels_target_initial_and_internal_attacker_http_before_resp
             histories = {name: chat.history() for name, chat in chats.items()}
             calls = len(endpoint.requests)
             assert control.submit(user.stop).result(timeout=1) is None
-            assert user.wait(2), (
-                "worker waited for the server instead of cancelling HTTP"
-            )
-            assert not held.release.is_set()
-            assert held.disconnected.wait(1), "local HTTP I/O survived STOPPED"
+            assert not user.wait(0.05)
+            assert not held.disconnected.is_set()
+            assert user.status().state is tai.UserState.STOPPING
+            held.release.set()
+            assert user.wait(5)
             assert user.status().state is tai.UserState.STOPPED, user.status().reason
             assert user.result() is presented
             assert len(endpoint.requests) == calls
-            assert {name: chat.history() for name, chat in chats.items()} == histories
+            assert chats[role].history()[:-2] == histories[role]
+            assert chats[role].history()[-1].message.to_string() == held.text
             events, metadata = artifacts(user, tmp_path)
             assert metadata["reason"] == "user_stop"
-            cancelled = [
-                event["data"] for event in events if event["kind"] == "call_cancelled"
-            ]
-            assert len(cancelled) == 1 and cancelled[0]["role"] == role
-            assert cancelled[0]["response"] is None
+            assert not any(event["kind"] == "call_cancelled" for event in events)
             assert (
                 len([event for event in events if event["kind"] == "call_completed"])
-                == calls - 1
+                == calls
             )
             assert (
                 len([event for event in events if event["kind"] == "call_started"])
@@ -986,12 +983,13 @@ def test_real_fitd_interrupted_body_is_only_a_diagnostic(
         calls = len(endpoint.requests)
         if stop == "cancel":
             user.stop()
+            # Explicit exchange cancellation is independent of User.stop(); its
+            # exception remains a failure even with a pending run stop request.
+            chats["Target"].cancel()
         assert user.wait(3)
         assert held.disconnected.wait(1)
         assert not held.release.is_set()
-        assert user.status().state is (
-            tai.UserState.STOPPED if stop == "cancel" else tai.UserState.FAILED
-        )
+        assert user.status().state is tai.UserState.FAILED
         assert user.result() is result
         assert result.to_string() == "Accepted report"
         assert user.status().evaluation == evaluation
@@ -1009,7 +1007,7 @@ def test_real_fitd_interrupted_body_is_only_a_diagnostic(
         }
         if stop == "cancel":
             assert interrupted["response"] is None
-            assert user.status().reason == "user_stop"
+            assert "ChatCancelled" in user.status().reason
         else:
             assert interrupted["error"] == user.status().reason
             assert "OpenAITimeoutError" in user.status().reason
@@ -1078,11 +1076,10 @@ def test_same_user_restarts_actual_http_chats_with_fresh_history_and_safe_settin
         if first_outcome == "STOPPED":
             assert held.entered.wait(5)
             user.stop()
+            assert not user.wait(0)
+            held.release.set()
         assert user.wait(10)
         assert user.status().state.value == first_outcome, user.status().reason
-        if first_outcome == "STOPPED":
-            assert held.disconnected.wait(1)
-            assert not held.release.is_set()
     finally:
         held.release.set()
         user.stop()

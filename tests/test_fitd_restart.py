@@ -118,7 +118,7 @@ def test_terminal_user_starts_an_independent_actual_fitd_run(tmp_path, first_out
                     control.submit(user.start).result(timeout=1)
                 assert user.status() == before
                 assert control.submit(user.stop).result(timeout=1) is None
-                assert cleanup.cancellation.wait(1)
+                assert not cleanup.cancellation.is_set()
                 assert user.status().state is UserState.STOPPING
                 assert not user.wait(0)
                 with pytest.raises(RuntimeError, match="active run"):

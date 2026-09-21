@@ -165,7 +165,7 @@ def test_command_runs_real_fitd_with_independent_roles_and_complete_artifacts(
         ("Target", 5, True, "Accepted report"),
     ],
 )
-def test_sigint_interrupts_local_wait_and_saves_completed_work_before_server_reply(
+def test_repeated_sigint_waits_for_server_reply_and_preserves_accepted_result(
     endpoint, tmp_path, role, index, process_group, expected
 ):
     config = configure(endpoint, tmp_path)
@@ -203,10 +203,15 @@ def test_sigint_interrupts_local_wait_and_saves_completed_work_before_server_rep
                 os.killpg(process.pid, signal.SIGINT)
             else:
                 process.send_signal(signal.SIGINT)
-            stdout, stderr = process.communicate(timeout=3)
+            with pytest.raises(subprocess.TimeoutExpired):
+                process.communicate(timeout=0.3)
+            process.send_signal(signal.SIGINT)
+            with pytest.raises(subprocess.TimeoutExpired):
+                process.communicate(timeout=0.15)
+            assert not held.disconnected.is_set()
+            held.release.set()
+            stdout, stderr = process.communicate(timeout=5)
             assert process.returncode == 130, stdout + stderr
-            assert not held.release.is_set()
-            assert held.disconnected.wait(1), "HTTP socket survived command exit"
             assert len(endpoint.requests) == calls
         finally:
             if process.poll() is None:
@@ -218,12 +223,11 @@ def test_sigint_interrupts_local_wait_and_saves_completed_work_before_server_rep
     assert metadata["reason"] == "user_stop"
     assert "STOPPED" in stdout and "Traceback" not in stderr
     assert (directory / "events.jsonl").read_bytes().startswith(prefix)
-    assert {
-        e["data"]["call_id"] for e in events if e["kind"] == "call_completed"
-    } == completed_ids
-    cancelled = [e for e in events if e["kind"] == "call_cancelled"]
-    assert len(cancelled) == 1 and cancelled[0]["data"]["role"] == role
-    assert cancelled[0]["data"]["response"] is None
+    completions = [e["data"] for e in events if e["kind"] == "call_completed"]
+    assert {e["call_id"] for e in completions[:-1]} == completed_ids
+    assert completions[-1]["role"] == role
+    assert completions[-1]["response"]["text"] == held.text
+    assert not any(e["kind"] == "call_cancelled" for e in events)
     stopped = next(e for e in events if e["kind"] == "stop_requested")
     assert not any(
         e["kind"] == "call_started" and e["sequence"] > stopped["sequence"]

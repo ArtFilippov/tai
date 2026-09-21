@@ -1,4 +1,4 @@
-"""SIGINT admission/finalization/persistence races and real CLI cancellation."""
+"""SIGINT admission/finalization/persistence races and real CLI stop requests."""
 
 import json
 import os
@@ -220,13 +220,21 @@ def test_terminal_status_before_worker_cleanup_does_not_admit_next_run(
     assert len(users) == 32
 
 
-@pytest.mark.parametrize("role", ["target", "evaluator"])
-def test_installed_cli_sigint_cancels_current_http_run_and_rebuilds_offline(
-    endpoint, tmp_path, monkeypatch, role
+@pytest.mark.parametrize(
+    ("role", "response", "state", "success"),
+    [
+        ("target", "Returned", "STOPPED", None),
+        ("evaluator", '{"success": true}', "STOPPED", True),
+        ("evaluator", '{"success": false}', "STOPPED", False),
+        ("evaluator", '{"success": "false"}', "FAILED", None),
+    ],
+)
+def test_installed_cli_sigint_finishes_current_call_and_rebuilds_offline(
+    endpoint, tmp_path, monkeypatch, role, response, state, success
 ):
     profile = http_profile(endpoint, tmp_path, monkeypatch)
     profile.write_text(profile.read_text() + "\n[run]\nmax_calls_per_conv=20\n")
-    held = Reply(hold=True)
+    held = Reply(response, hold=True)
     if role == "target":
         endpoint.scripts["/v1/target/chat/completions"][0] = held
     else:
@@ -254,10 +262,15 @@ def test_installed_cli_sigint_cancels_current_http_run_and_rebuilds_offline(
             assert held.entered.wait(10), "series did not reach held exchange"
             calls = len(endpoint.requests)
             os.killpg(process.pid, signal.SIGINT)
+            with pytest.raises(subprocess.TimeoutExpired):
+                process.communicate(timeout=0.3)
+            os.killpg(process.pid, signal.SIGINT)
+            with pytest.raises(subprocess.TimeoutExpired):
+                process.communicate(timeout=0.15)
+            assert not held.disconnected.is_set()
+            held.release.set()
             stdout, stderr = process.communicate(timeout=5)
             assert process.returncode == 130, stdout + stderr
-            assert held.disconnected.wait(1)
-            assert not held.release.is_set()
             assert len(endpoint.requests) == calls
         finally:
             if process.poll() is None:
@@ -268,7 +281,31 @@ def test_installed_cli_sigint_cancels_current_http_run_and_rebuilds_offline(
     report = json.loads(stdout)
     index = json.loads((directory / "index.json").read_text())
     assert len(index["entries"]) == 1 and index["interrupted"] is True
-    assert index["entries"][0]["state"] == "STOPPED"
+    entry = index["entries"][0]
+    assert entry["state"] == state
+    if success is not None:
+        assert entry["evaluation"] == {
+            "result_id": entry["result_id"],
+            "success": success,
+        }
+    else:
+        assert entry["evaluation"] is None
+    if role == "target":
+        assert entry["result"] is None
+    else:
+        assert entry["result"]["id"] == entry["result_id"]
+    metadata = json.loads((directory / entry["artifacts"]["metadata.json"]).read_text())
+    assert metadata["state"] == entry["state"]
+    assert metadata["reason"] == entry["reason"]
+    assert metadata["evaluation"] == entry["evaluation"]
+    events = [
+        json.loads(line)
+        for line in (directory / entry["artifacts"]["events.jsonl"])
+        .read_text()
+        .splitlines()
+    ]
+    assert len([e for e in events if e["kind"] == "call_completed"]) == calls
+    assert not any(e["kind"].endswith("_cancelled") for e in events)
     assert report["groups"]["hate"] == {
         "total": 1,
         "evaluated": 0,

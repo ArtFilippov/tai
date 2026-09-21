@@ -382,9 +382,10 @@ def test_loading_is_background_work_and_user_stop_waits_for_it(local, tmp_path):
         release.set()
         assert user.wait(3)
     assert user.status().state is UserState.STOPPED
-    assert not target.history() and not attacker.history()
-    assert not lib.generations
-    # The interrupted load was not published; a subsequent run can load and finish.
+    assert not target.history() and len(attacker.history()) == 2
+    assert len(lib.generations) == 1
+    assert user.status().progress.attacker_calls == 1
+    # Loading and the admitted generation finish; later runs reuse the weights.
     lib.load_action = lambda: None
     user.start()
     assert user.wait(3)

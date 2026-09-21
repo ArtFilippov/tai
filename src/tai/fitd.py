@@ -30,6 +30,10 @@ from tai.messages import Message
 from tai.users import Evaluation, Progress, RunEvent, User, UserState, UserStatus
 
 
+class _RunStopped(Exception):
+    """Admission of the next action was refused, not cancellation of a call."""
+
+
 class FITDUser(User):
     """Independent FITD experiments, defaulting to ten library rounds each.
 
@@ -181,8 +185,8 @@ class _Execution:
             if self._status.state is not UserState.RUNNING:
                 return
             self._status = replace(self._status, state=UserState.STOPPING)
-            # The same signal governs admission and the active generation, so a
-            # stop between call_started and send cannot miss the next exchange.
+            # Only admission observes this signal. Already admitted operations
+            # finish, including their return values and artifact writes.
             self._stop_requested.set()
             self._stop_revision += 1
             self._record_event("stop_requested")
@@ -245,15 +249,19 @@ class _Execution:
         cause: Cause,
         *,
         result_id: str | None = None,
+        within_evaluation: bool = False,
     ) -> Exchange:
         chat, counter = self._participants[role]
         context = self._context(role, cause)
         call_id = str(uuid4())
         link = {"result_id": result_id} if result_id is not None else {}
         with self._lock:
-            # Admission is serialized with stop for all roles. Work already
-            # admitted shares the stop signal even before entering chat.send.
-            self._check_running()
+            # An assessment is admitted as a whole, including its nested model
+            # exchange. All other calls compete with stop at this boundary.
+            if within_evaluation:
+                self._ensure_open()
+            else:
+                self._ensure_running()
             self._record_event(
                 "call_started",
                 role=role,
@@ -264,7 +272,7 @@ class _Execution:
             )
         self._flush_events()
         try:
-            response = chat.send(message, cancellation=self._stop_requested)
+            response = chat.send(message)
         except ChatCancelled as exc:
             self._emit(
                 "call_cancelled",
@@ -312,7 +320,9 @@ class _Execution:
         return Context(run_id, role, self._conversation_id(role), cause)
 
     def _checkpoint(self, role: ModelRole, cause: Cause) -> Checkpoint:
-        self._check_running()
+        # Capturing a returned exchange is completion, not a new strategy action.
+        with self._lock:
+            self._ensure_open()
         token = self._participants[role][0].checkpoint()
         return Checkpoint(self._context(role, cause), str(uuid4()), token)
 
@@ -326,8 +336,14 @@ class _Execution:
             "restored", context, context.conversation_id, checkpoint
         )
 
-    def _reset(self, role: ModelRole, cause: Cause) -> ConversationChange:
-        self._check_running()
+    def _reset(
+        self, role: ModelRole, cause: Cause, *, within_evaluation: bool = False
+    ) -> ConversationChange:
+        with self._lock:
+            if within_evaluation:
+                self._ensure_open()
+            else:
+                self._ensure_running()
         previous = self._conversation_id(role)
         self._participants[role][0].reset()
         return ConversationChange("reset", self._context(role, cause), previous)
@@ -350,6 +366,7 @@ class _Execution:
                     evaluation,
                     evaluation,
                 )
+            self._ensure_running()
             self._result = result
             self._status = replace(
                 self._status,
@@ -377,14 +394,26 @@ class _Execution:
         return change
 
     def _check_running(self) -> None:
-        if self._closed or self._stop_requested.is_set():
-            raise ChatCancelled()
+        """Admit the next strategy action atomically with a stop request."""
+        with self._lock:
+            self._ensure_running()
+
+    def _ensure_running(self) -> None:
+        """Check admission while holding _lock; never guard operation completion."""
+        self._ensure_open()
+        if self._stop_requested.is_set():
+            raise _RunStopped()
+
+    def _ensure_open(self) -> None:
+        """Completion callbacks may outlive stop, but not their execution."""
+        if self._closed:
+            raise RuntimeError("Execution is closed")
 
     def _evaluate(
         self, result: Message, context: Context, checkpoint_id: str
     ) -> EvaluationResult:
         with self._lock:
-            self._check_running()
+            self._ensure_running()
             if self._result is not result:
                 raise RuntimeError(
                     "FITD requested evaluation of an unpresented Message"
@@ -396,12 +425,16 @@ class _Execution:
         if isinstance(evaluator, ModelEvaluator):
 
             def reset_evaluator() -> None:
-                self._reset("Evaluator", context.cause)
+                self._reset("Evaluator", context.cause, within_evaluation=True)
 
             evaluator = evaluator._with_io(
                 lambda message: (
                     self._send(
-                        "Evaluator", message, context.cause, result_id=result.id
+                        "Evaluator",
+                        message,
+                        context.cause,
+                        result_id=result.id,
+                        within_evaluation=True,
                     ).response
                 ),
                 reset_evaluator,
@@ -477,7 +510,7 @@ class _Execution:
                     )
                 except Exception as exc:
                     error = exc
-                    if isinstance(exc, ChatCancelled) and self._stop_requested.is_set():
+                    if isinstance(exc, _RunStopped):
                         state, reason = UserState.STOPPED, "user_stop"
                     else:
                         state, reason = UserState.FAILED, f"{type(exc).__name__}: {exc}"

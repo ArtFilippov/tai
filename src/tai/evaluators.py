@@ -102,8 +102,9 @@ class ModelEvaluator(Evaluator):
 
     ``is_success`` performs exactly one exchange and returns a strict bool or
     raises ModelEvaluationError (ChatCancelled on cancellation). No history or
-    provenance is sent as classification data. FITD owns admission, cancellation,
-    and exchange journaling through the private, execution-local I/O binding.
+    provenance is sent as classification data. FITD admits the entire assessment
+    and journals its exchanges through the private, execution-local I/O binding.
+    User.stop() lets the admitted assessment finish and retain its verdict.
     """
 
     chat: LLMChat
