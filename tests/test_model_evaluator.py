@@ -6,7 +6,9 @@ import pytest
 from test_fitd import ScriptedModel, read_and_assert_final_artifacts
 
 from tai import (
-    FITDUser,
+    FITDExperiment as FITDUser,
+)
+from tai import (
     LLMChat,
     Message,
     ModelEvaluationError,

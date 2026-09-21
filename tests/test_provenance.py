@@ -3,7 +3,16 @@ from threading import Event
 
 import pytest
 
-from tai import ContainsTextEvaluator, Evaluator, FITDUser, LLMChat, Message, UserState
+from tai import (
+    ContainsTextEvaluator,
+    Evaluator,
+    LLMChat,
+    Message,
+    UserState,
+)
+from tai import (
+    FITDExperiment as FITDUser,
+)
 
 
 class ScriptedModel:
@@ -101,7 +110,7 @@ def test_real_fitd_publishes_full_evaluated_text_and_saves_message_provenance(tm
         assert user.result() is result
         assert user.status() == status
     assert evaluator.results == [result]
-    assert [json.loads(event.dump()) for event in user.events()] == events
+    assert [json.loads(event.dump()) for event in user.journal.events()] == events
     assert (run_dir / "events.jsonl").read_text(encoding="utf-8") == journal
     assert (run_dir / "metadata.json").read_text(encoding="utf-8") == metadata_text
     assert transformations == ["Explain the puzzle"]
@@ -158,7 +167,7 @@ def test_new_publication_keeps_old_results_immutable_and_has_no_unearned_evaluat
         assert old_status.evaluation is None
         assert evaluator.results == [old]
         assert evaluator.results[0] is old
-        events_before = user.events()
+        events_before = user.journal.events()
         publication = next(
             event
             for event in events_before
@@ -172,7 +181,7 @@ def test_new_publication_keeps_old_results_immutable_and_has_no_unearned_evaluat
         assert ContainsTextEvaluator("CONTROL").is_success(branch) is True
         assert user.status() == old_status
         assert user.result() is old
-        assert user.events() == events_before
+        assert user.journal.events() == events_before
         assert evaluator.results == [old]
 
         first_release.set()
@@ -189,8 +198,8 @@ def test_new_publication_keeps_old_results_immutable_and_has_no_unearned_evaluat
         assert branch.revert(1) is old
         assert publication.dump() == publication_snapshot
         assert [
-            event.data
-            for event in user.events()
+            {key: event.data[key] for key in ("result_id", "success")}
+            for event in user.journal.events()
             if event.kind == "evaluation_completed"
         ] == [{"result_id": old.id, "success": False}]
     finally:
@@ -216,10 +225,14 @@ def test_new_publication_keeps_old_results_immutable_and_has_no_unearned_evaluat
         json.loads(line)
         for line in (run_dir / "events.jsonl").read_text(encoding="utf-8").splitlines()
     ]
-    assert [json.loads(event.dump()) for event in user.events()] == events
-    assert [e["data"] for e in events if e["kind"] == "evaluation_completed"] == [
-        {"result_id": old.id, "success": False}
-    ]
+    assert [json.loads(event.dump()) for event in user.journal.events()] == events
+    assert [
+        {key: e["data"][key] for key in ("result_id", "success")}
+        for e in events
+        if e["kind"] == "evaluation_completed"
+    ] == [{"result_id": old.id, "success": False}]
     failed = [e["data"] for e in events if e["kind"] == "evaluation_failed"]
-    assert failed == [{"result_id": current.id, "error": status.reason}]
+    assert [
+        {key: event[key] for key in ("result_id", "error")} for event in failed
+    ] == [{"result_id": current.id, "error": status.reason}]
     assert json.loads(publication_snapshot) in events

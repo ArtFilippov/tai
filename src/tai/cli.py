@@ -114,7 +114,7 @@ def main(argv: list[str] | None = None) -> int:
             else args.text
         )
         profile = load_profile(args.config)
-        user = profile.create_user(Message(text), args.artifacts_dir)
+        experiment = profile.create_experiment(Message(text), args.artifacts_dir)
     except UnicodeError:
         print("Ошибка: входной файл должен содержать корректный UTF-8", file=sys.stderr)
         return 2
@@ -122,5 +122,5 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Ошибка конфигурации или чтения: {exc}", file=sys.stderr)
         return 2
     return run_foreground(
-        user, artifacts_dir=args.artifacts_dir, redact=profile.redactor().text
+        experiment, artifacts_dir=args.artifacts_dir, redact=profile.redactor().text
     )

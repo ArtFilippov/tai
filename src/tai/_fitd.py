@@ -44,7 +44,6 @@ type _Reset = Callable[[ModelRole, Cause], ConversationChange]
 type _Publish = Callable[[Message | None, Context, str], ResultChange]
 type _Evaluate = Callable[[Message, Context, str], EvaluationResult]
 type _ConversationId = Callable[[ModelRole], str]
-type _Emit = Callable[..., None]
 type _History = tuple[tuple[str, str], ...]
 
 
@@ -82,7 +81,6 @@ class _Target:
         checkpoint: _Checkpoint,
         restore: _Restore,
         reset: _Reset,
-        emit: _Emit,
         conversation_id: _ConversationId,
         check_running: Callable[[], None],
     ) -> None:
@@ -91,7 +89,6 @@ class _Target:
         self._checkpoint = checkpoint
         self._restore = restore
         self._reset = reset
-        self._emit = emit
         self._check_running = check_running
         self._history: _History = ()
         self._snapshots: dict[_History, ConversationPoint] = {}
@@ -126,14 +123,6 @@ class _Target:
             self._checkpoint("Target", cause), request, response, result
         )
         self._snapshots[self._history] = snapshot
-        self._emit(
-            "checkpoint_created",
-            role="Target",
-            conversation_id=self._conversation_id,
-            checkpoint_id=snapshot.checkpoint.id,
-            response_id=response.id if response is not None else None,
-            result_id=result.id if result is not None else None,
-        )
         return snapshot
 
     def synchronize(self, prompt: Conversation, cause: Cause) -> Synchronization:
@@ -150,18 +139,9 @@ class _Target:
             )
         elif not prefix:
             change = self._reset("Target", cause)
-            old_conversation_id = self._conversation_id
             self._conversation_id = self._get_conversation_id("Target")
             self._history = ()
             self._snapshots.clear()
-            self._emit(
-                "history_reset",
-                role="Target",
-                conversation_id=self._conversation_id,
-                previous_conversation_id=old_conversation_id,
-                from_checkpoint_id=previous.checkpoint.id,
-                cause_id=cause.id,
-            )
             self.save(None, None, None, cause)
         else:
             snapshot = self._snapshots.get(prefix)
@@ -169,14 +149,6 @@ class _Target:
                 raise RuntimeError("FITD requested an unknown conversation prefix")
             change = self._restore("Target", snapshot.checkpoint, cause)
             self._history = prefix
-            self._emit(
-                "history_restored",
-                role="Target",
-                conversation_id=self._conversation_id,
-                checkpoint_id=snapshot.checkpoint.id,
-                from_checkpoint_id=previous.checkpoint.id,
-                cause_id=cause.id,
-            )
         current = self.current
         result = self._publish(current.result, change.context, current.checkpoint.id)
         return Synchronization(change, previous, current, result)
@@ -202,13 +174,6 @@ class _Target:
         response = exchange.response
         self._history = turns + (("assistant", response.to_string()),)
         point = self.save(request, response, result, cause)
-        self._emit(
-            "target_exchange",
-            conversation_id=self._conversation_id,
-            checkpoint_id=point.checkpoint.id,
-            request_id=request.id,
-            response_id=response.id,
-        )
         return TargetExchange(exchange, synchronization, point)
 
     def generate(self, prompt: Conversation, generations_this_call: int):
@@ -235,9 +200,7 @@ class _FITD(FITD):
         check_running: Callable[[], None],
         target: _Target,
         reset: _Reset,
-        emit: _Emit,
         profile: _FITDProfile,
-        conversation_id: _ConversationId,
     ) -> None:
         self._profile = profile
         self._base = base
@@ -246,9 +209,6 @@ class _FITD(FITD):
         self._check_running = check_running
         self._target = target
         self._reset = reset
-        self._emit = emit
-        self._get_conversation_id = conversation_id
-        self._attacker_conversation_id: str | None = None
         self._last_attacker_exchange: Exchange | None = None
         self._attempt_id: str | None = None
         self._decision_cause: Cause | None = None
@@ -304,17 +264,7 @@ class _FITD(FITD):
             # for each red-team request. Preserve that semantics via LLMChat.
             cause = self._decision_cause or Cause("prepare_attack", self._attempt_id)
             self._reset("Attacker", cause)
-            previous = self._attacker_conversation_id
-            self._attacker_conversation_id = self._get_conversation_id("Attacker")
             request = self._base.spawn(prompt)
-            self._emit(
-                "history_reset",
-                role="Attacker",
-                conversation_id=self._attacker_conversation_id,
-                previous_conversation_id=previous,
-                request_id=request.id,
-                cause_id=self._attempt_id,
-            )
             exchange = self._send("Attacker", request, cause)
             self._last_attacker_exchange = exchange
             return exchange.response.to_string()
@@ -352,13 +302,6 @@ class _FITD(FITD):
         decision = LocalDecision(
             "refusal", value, context, request, response, checkpoint_id
         )
-        self._emit(
-            "local_decision",
-            decision="refusal",
-            value=value,
-            attempt_id=context.cause.attempt_id,
-            response_id=response.id,
-        )
         return decision
 
     def _is_response_aligned(self, request: str, response: str) -> bool:
@@ -387,14 +330,6 @@ class _FITD(FITD):
         assert judgment is not None
         decision = LocalDecision(
             "alignment", value, context, request, response, checkpoint_id, judgment
-        )
-        self._emit(
-            "local_decision",
-            decision="alignment",
-            value=value,
-            attempt_id=context.cause.attempt_id,
-            response_id=response.id,
-            judgment_response_id=judgment.response.id,
         )
         return decision
 
@@ -512,22 +447,6 @@ class _FITD(FITD):
             else None,
             tuple(self._checks),
         )
-        self._emit(
-            "branch_selected",
-            branch_id=branch_id,
-            attempt_id=str(last_attempt.uuid),
-            next_attempt_id=str(next_attempt.uuid)
-            if next_attempt is not None
-            else None,
-            branch=branch,
-            response_id=response.id,
-            checkpoint_id=point.checkpoint.id,
-            accepted=branch == "continue",
-            levels_completed=last_attempt.notes["levels_completed"],
-            next_levels_completed=next_attempt.notes["levels_completed"]
-            if next_attempt is not None
-            else None,
-        )
         return _Continuation(decision, next_attempt)
 
     def _execute_attempt(self, attempt):
@@ -541,7 +460,7 @@ class _FITD(FITD):
 
     def _execute_all(self, attempts):
         # The base implementation writes to a process-global reportfile. Keep
-        # library execution/postprocessing, with reporting owned by our User.
+        # library execution/postprocessing; observation belongs to wrappers.
         with self._guard_execution():
             return [
                 self._postprocess_attempt(self._execute_attempt(attempt))
@@ -560,22 +479,21 @@ def run_fitd(
     restore: _Restore,
     reset: _Reset,
     conversation_id: _ConversationId,
-    emit: _Emit,
     profile: _FITDProfile = FITD_PROFILE,
+    target_type: type[_Target] = _Target,
+    probe_type: type[_FITD] = _FITD,
 ) -> str:
-    target = _Target(
-        send, publish, checkpoint, restore, reset, emit, conversation_id, check_running
+    target = target_type(
+        send, publish, checkpoint, restore, reset, conversation_id, check_running
     )
-    probe = _FITD(
+    probe = probe_type(
         base,
         send,
         evaluate,
         check_running,
         target,
         reset,
-        emit,
         profile,
-        conversation_id,
     )
     probe.probe(target)
     # IterativeProbe catches GarakException. Never infer normal completion from

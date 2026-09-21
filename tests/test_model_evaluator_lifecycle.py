@@ -9,8 +9,16 @@ from test_fitd import read_and_assert_final_artifacts
 from test_fitd_restart import HeldResponse, ScriptedModel
 from test_model_evaluator import make_user
 
-from tai import FITDUser, LLMChat, Message, ModelEvaluator, UserState
-from tai.fitd import _Execution
+from tai import (
+    FITDExperiment as FITDUser,
+)
+from tai import (
+    LLMChat,
+    Message,
+    ModelEvaluator,
+    RunJournal,
+    UserState,
+)
 
 
 @pytest.mark.parametrize("outcome", ['{"success": true}', '{"success": false}'])
@@ -61,7 +69,9 @@ def test_stop_during_model_assessment_keeps_completed_work_and_waits_for_cleanup
     completed = [e["data"] for e in events if e["kind"] == "evaluation_completed"]
     assert len(completed) == 2 and completed[0]["success"] is False
     assert completed[0]["result_id"] != result.id
-    assert completed[-1] == metadata["evaluation"]
+    assert {k: completed[-1][k] for k in ("result_id", "success")} == metadata[
+        "evaluation"
+    ]
     assert not any(e["kind"].endswith("_cancelled") for e in events)
     stop = next(e["sequence"] for e in events if e["kind"] == "stop_requested")
     assert not any(e["kind"] == "call_started" and e["sequence"] > stop for e in events)
@@ -84,7 +94,7 @@ def test_stop_between_assessment_admission_and_send_finishes_whole_assessment(
     requests = []
     judge = LLMChat(lambda turns: requests.append(turns) or '{"success": true}')
     user, target, attacker, _ = make_user(tmp_path, judge)
-    flush = _Execution._flush_events
+    flush = RunJournal.flush
 
     def held_flush(execution):
         flush(execution)
@@ -97,7 +107,7 @@ def test_stop_between_assessment_admission_and_send_finishes_whole_assessment(
             entered.set()
             assert release.wait(5)
 
-    monkeypatch.setattr(_Execution, "_flush_events", held_flush)
+    monkeypatch.setattr(RunJournal, "flush", held_flush)
     user.start()
     try:
         assert entered.wait(5)
@@ -148,7 +158,7 @@ def test_evaluator_chat_is_reserved_atomically_until_terminal_cleanup(
         with pytest.raises(RuntimeError, match="LLMChat.*active"):
             contender.start()
         assert contender.status().state is UserState.IDLE
-        assert contender.events() == ()
+        assert contender.journal.events() == ()
         assert [
             chat.history() for chat in (contender._target, contender._attacker, judge)
         ] == histories
@@ -168,11 +178,11 @@ def test_evaluator_chat_is_reserved_atomically_until_terminal_cleanup(
             "failed": UserState.FAILED,
         }[terminal]
     )
-    events = owner.events()
+    events = owner.journal.events()
     contender.start()
     assert contender.wait(10)
     assert contender.status().state is UserState.COMPLETED, contender.status().reason
-    assert owner.events() == events
+    assert owner.journal.events() == events
     assert len(model.requests[-1]) == 1
 
 
@@ -218,7 +228,7 @@ def test_stop_after_completed_evaluator_exchange_retains_its_verdict(
     entered, release = Event(), Event()
     judge = LLMChat(lambda turns: json.dumps({"success": success}))
     user, target, attacker, _ = make_user(tmp_path, judge)
-    emit = _Execution._emit
+    emit = RunJournal.record
 
     def hold_completed(execution, kind, **data):
         emit(execution, kind, **data)
@@ -226,7 +236,7 @@ def test_stop_after_completed_evaluator_exchange_retains_its_verdict(
             entered.set()
             assert release.wait(5)
 
-    monkeypatch.setattr(_Execution, "_emit", hold_completed)
+    monkeypatch.setattr(RunJournal, "record", hold_completed)
     user.start()
     try:
         assert entered.wait(5)

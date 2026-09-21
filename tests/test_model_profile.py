@@ -201,7 +201,7 @@ def test_evaluator_json_credentials_are_redacted_before_journaling_and_in_proven
     held = Reply(verdict, hold=True)
     endpoint.scripts["/v1/evaluator/chat/completions"] = deque([held])
     profile = load_profile(config)
-    user = profile.create_user(base, tmp_path / "runs")
+    user = profile.create_experiment(base, tmp_path / "runs")
     base_dump = base.dump()
     expected = {
         "base_request": "Explicit base [REDACTED]; [REDACTED]; [REDACTED]",
@@ -237,13 +237,13 @@ def test_evaluator_json_credentials_are_redacted_before_journaling_and_in_proven
             json.loads(line)
             for line in (directory / "events.jsonl").read_text().splitlines()
         ]
-        assert events_before == [json.loads(e.dump()) for e in user.events()]
+        assert events_before == [json.loads(e.dump()) for e in user.journal.events()]
         assert events_before[-1]["kind"] == "call_started"
         assert events_before[-1]["data"]["role"] == "Evaluator"
         request_snapshot = events_before[-1]["data"]["input"]
         assert_safe_request(request_snapshot)
         assert_safe_tree(events_before)
-        for event in user.events():
+        for event in user.journal.events():
             assert_safe_tree(event.data)
         result = user.result()
         assert result.to_string() == final
@@ -266,7 +266,7 @@ def test_evaluator_json_credentials_are_redacted_before_journaling_and_in_proven
         {"result_id": result.id, "success": True} if valid else None
     )
     assert events[: len(events_before)] == events_before
-    assert events == [json.loads(e.dump()) for e in user.events()]
+    assert events == [json.loads(e.dump()) for e in user.journal.events()]
     assert_safe_tree(events)
     assert_safe_tree(metadata)
     assert metadata["settings"]["evaluator"]["base"]["text"] == expected["base_request"]

@@ -31,7 +31,7 @@ HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 \
 `tai preflight`, её вызовы не добавляются к эксперименту автоматически.
 
 Один `RoleProfile` остаётся жив на протяжении серии, удерживая общие веса Qwen.
-Каждая запись создаёт новый базовый Message и `FITDUser` через `profile.create_user`;
+Каждая запись создаёт новый базовый Message и `FITDExperiment` через `profile.create_experiment`;
 оценщик привязан к этому Message, а FITD сбрасывает рабочие диалоги всех ролей.
 Настоящий закреплённый garak управляет стратегией и точками оценивания. Следующая
 запись начинается только после `wait()`: состояния `COMPLETED` самого по себе
@@ -115,7 +115,7 @@ HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 \
 | `base_id` | ID нового базового Message; текст берётся из манифеста. |
 | `started_at`, `finished_at`, `duration_seconds` | UTC и монотонная длительность попытки, включая создание User и ожидание финализации. |
 | `state`, `reason`, `run_id`, `progress` | Фактический `status()` после `wait()`. При ошибке создания User — `null`; при отклонённом старте обычно `IDLE`, `reason=null`, `run_id=null`. Ошибка не подменяет фактическое состояние искусственным `FAILED`. |
-| `error` | `null` либо `{phase, type, message}` для исключения оркестрации (`create_user`, `start`, `wait`). Ошибки рабочего FITD/оценщика представлены его `FAILED` и `reason`, подробности — в журнале. |
+| `error` | `null` либо `{phase, type, message}` для исключения оркестрации (`create_experiment`, `start`, `wait`) или отказа журнала (`journal`). Итог берётся из независимого `RunJournal`; ошибки рабочего FITD/оценщика представлены его `FAILED` и `reason`, подробности — в событиях. |
 | `result_id` | ID результата из финального статуса, либо `null`. |
 | `result` | `{kind: "Message", id: "…"}`, только если финальный `result()` действительно вернул Message; иначе `null`. Это компактное свидетельство наличия результата, полный Message сохраняет FITD. Пустой текст также является Message. |
 | `evaluation` | Сохранённая финальная оценка `{result_id, success}`, либо `null`; не ищется в старых событиях. |

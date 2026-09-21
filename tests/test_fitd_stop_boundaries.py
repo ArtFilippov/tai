@@ -6,8 +6,8 @@ from threading import Event
 import pytest
 from test_fitd import RecordingEvaluator, ScriptedModel, read_and_assert_final_artifacts
 
-from tai import FITDUser, LLMChat, Message, UserState
-from tai.fitd import _Execution
+from tai import FITDExperiment as FITDUser
+from tai import LLMChat, Message, RunJournal, UserState
 
 
 @pytest.mark.parametrize(
@@ -33,7 +33,7 @@ def test_stop_at_admission_or_return_prevents_the_next_action(
     presented,
 ):
     entered, release = Event(), Event()
-    flush = _Execution._flush_events
+    flush = RunJournal.flush
 
     def held_flush(execution):
         flush(execution)
@@ -51,7 +51,7 @@ def test_stop_at_admission_or_return_prevents_the_next_action(
             entered.set()
             assert release.wait(5)
 
-    monkeypatch.setattr(_Execution, "_flush_events", held_flush)
+    monkeypatch.setattr(RunJournal, "flush", held_flush)
     target = ScriptedModel(["One", "Two", "Three", "Four", "Presented"])
     attacker = ScriptedModel(["Initial", "L1", "L2", "L3"] + ["yes"] * 5)
     evaluator = RecordingEvaluator("CONTROL")

@@ -1,10 +1,8 @@
 """Public execution and observation contracts, independent of any strategy library."""
 
-import json
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from tai._diagnostics import DiagnosticObject, DiagnosticRedactor
 from tai.messages import Message
 
 
@@ -41,38 +39,6 @@ class UserStatus:
     evaluation: Evaluation | None = None
 
 
-@dataclass(frozen=True, slots=True)
-class RunEvent:
-    run_id: str
-    sequence: int
-    kind: str
-    timestamp: str
-    _data_json: str = field(repr=False)
-    _redactor: DiagnosticRedactor = field(
-        default_factory=DiagnosticRedactor, repr=False, compare=False
-    )
-
-    @property
-    def data(self) -> DiagnosticObject:
-        """Detached diagnostics; colliding object keys are retained as pairs."""
-        return json.loads(self._data_json)
-
-    def dump(self) -> str:
-        """Serialize a diagnostic copy, including redaction of envelope fields."""
-        return json.dumps(
-            self._redactor.snapshot(
-                {
-                    "run_id": self.run_id,
-                    "sequence": self.sequence,
-                    "kind": self.kind,
-                    "timestamp": self.timestamp,
-                    "data": self.data,
-                }
-            ),
-            ensure_ascii=False,
-        )
-
-
 class User:
     def start(self) -> None:
         raise NotImplementedError
@@ -85,9 +51,6 @@ class User:
         raise NotImplementedError
 
     def result(self) -> Message | None:
-        raise NotImplementedError
-
-    def events(self, after: int = 0) -> tuple[RunEvent, ...]:
         raise NotImplementedError
 
     def wait(self, timeout: float | None = None) -> bool:

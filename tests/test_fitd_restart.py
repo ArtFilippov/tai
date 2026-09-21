@@ -6,7 +6,15 @@ from threading import Event
 
 import pytest
 
-from tai import ContainsTextEvaluator, FITDUser, LLMChat, Message, UserState
+from tai import (
+    ContainsTextEvaluator,
+    LLMChat,
+    Message,
+    UserState,
+)
+from tai import (
+    FITDExperiment as FITDUser,
+)
 
 
 class HeldResponse:
@@ -57,7 +65,7 @@ def assert_artifacts(user, root):
     files = snapshot_artifacts(root, status.run_id)
     events = [json.loads(line) for line in files["events.jsonl"].splitlines()]
     metadata = json.loads(files["metadata.json"])
-    assert events == [json.loads(event.dump()) for event in user.events()]
+    assert events == [json.loads(event.dump()) for event in user.journal.events()]
     assert all(event["run_id"] == status.run_id for event in events)
     assert [event["sequence"] for event in events] == list(range(1, len(events) + 1))
     assert events[-1]["kind"] == "run_finished"
@@ -147,7 +155,7 @@ def test_terminal_user_starts_an_independent_actual_fitd_run(tmp_path, first_out
     user.stop()
     assert user.status() == old_status
     old_dump = old_result.dump()
-    old_events = user.events()
+    old_events = user.journal.events()
     old_files = assert_artifacts(user, tmp_path)
     old_points = {chat: chat.checkpoint() for chat in (target, attacker)}
     target_offset, attacker_offset = (
@@ -176,8 +184,8 @@ def test_terminal_user_starts_an_independent_actual_fitd_run(tmp_path, first_out
         with pytest.raises(ValueError, match="checkpoint"):
             target.restore(old_points[target])
         assert target.history() == clean_target
-        assert all(event.run_id == fresh.run_id for event in user.events())
-        assert all(event not in old_events for event in user.events())
+        assert all(event.run_id == fresh.run_id for event in user.journal.events())
+        assert all(event not in old_events for event in user.journal.events())
         assert held.cancellation is not attacker_model.signals[0]
         assert not held.cancellation.is_set()
     finally:
@@ -268,7 +276,7 @@ def test_chat_ownership_conflict_is_atomic_and_released_after_terminal_state(
         assert held.entered.wait(5)
         owner_status, owner_events, owner_result = (
             owner.status(),
-            owner.events(),
+            owner.journal.events(),
             owner.result(),
         )
         histories = [chat.history() for chat in (target, attacker, free_chat)]
@@ -276,10 +284,10 @@ def test_chat_ownership_conflict_is_atomic_and_released_after_terminal_state(
             contender.start()
         assert contender.status().state is UserState.IDLE
         assert contender.status().run_id is None
-        assert contender.events() == ()
+        assert contender.journal.events() == ()
         assert contender.result() is None
         assert owner.status() == owner_status
-        assert owner.events() == owner_events
+        assert owner.journal.events() == owner_events
         assert owner.result() is owner_result
         assert [chat.history() for chat in (target, attacker, free_chat)] == histories
 
@@ -366,7 +374,7 @@ def test_simultaneous_users_acquire_opposite_role_pairs_without_partial_ownershi
             assert entered.wait(5)
             assert winner.status().state is UserState.RUNNING
             assert loser.status().state is UserState.IDLE
-            assert loser.events() == ()
+            assert loser.journal.events() == ()
             assert all(chat.history() == () for chat in chats)
             assert len(list(tmp_path.iterdir())) == 1
             winner.stop()

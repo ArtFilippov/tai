@@ -10,7 +10,15 @@ import pytest
 from garak.exception import GarakException
 from garak.probes.fitd import FITD
 
-from tai import ContainsTextEvaluator, FITDUser, LLMChat, Message, UserState
+from tai import (
+    ContainsTextEvaluator,
+    LLMChat,
+    Message,
+    UserState,
+)
+from tai import (
+    FITDExperiment as FITDUser,
+)
 from tai._fitd import _FITD, _Target
 from tai._operations import Cause
 from tai.fitd import _Execution
@@ -340,6 +348,19 @@ def test_result_rollback_withdrawal_and_stale_verdict_contract(
     assert withdrawn.current is unchanged.current is accepted.previous is None
     assert user.result() is accepted.current
     assert user.status().evaluation is None
+
+    journal_changes = [
+        event.data
+        for event in user.journal.events()
+        if event.kind in {"result_published", "result_withdrawn", "result_unchanged"}
+    ]
+    withdrawal = next(
+        change for change in journal_changes if change["change"] == "withdrawn"
+    )
+    assert withdrawal["previous"]["id"] == withdrawn.previous.id
+    assert withdrawal["result"] is None
+    assert withdrawal["checkpoint_id"] == withdrawn.checkpoint_id
+    assert withdrawal["context"]["cause"]["reason"] == "restore"
 
 
 def test_initial_exhaustion_exposes_attacker_refusals_and_the_worker_outcome(

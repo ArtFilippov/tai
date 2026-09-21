@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from test_qwen import local as local
 
-from tai import FITDUser, ModelEvaluator
+from tai import FITDUser, ModelEvaluator, RunJournal
 from tai._config import RoleProfile
 from tai.alert import load_alert_manifest
 from tai.cli import main
@@ -60,6 +60,46 @@ def positive_responses(lib, monkeypatch):
     monkeypatch.setattr(lib, "decode", decode)
 
 
+def test_series_captures_journal_failure_and_continues_after_release(
+    local, tmp_path, monkeypatch
+):
+    lib, kwargs, _ = local
+    config = qwen_profile(tmp_path, kwargs)
+    positive_responses(lib, monkeypatch)
+    write_event = RunJournal._write_event
+    failed = False
+
+    def write(journal, event):
+        nonlocal failed
+        if (
+            not failed
+            and event.kind == "call_started"
+            and event.data["role"] == "Target"
+        ):
+            failed = True
+            raise OSError("journal unavailable")
+        return write_event(journal, event)
+
+    monkeypatch.setattr(RunJournal, "_write_event", write)
+    result = run_alert_series(
+        MANIFEST, config, tmp_path / "runs", taxonomy_path=TAXONOMY
+    )
+    index = json.loads((result.directory / "index.json").read_text())
+    assert failed and result.exit_code == 1
+    first = index["entries"][0]
+    assert first["state"] == "FAILED"
+    assert first["error"] == {
+        "phase": "journal",
+        "type": "OSError",
+        "message": "journal unavailable",
+    }
+    assert first["progress"]["target_calls"] == 0
+    assert first["progress"]["attacker_calls"] == 4
+    assert all(e["state"] == "COMPLETED" for e in index["entries"][1:])
+    assert len(index["entries"]) == 32
+    assert reconstruct_report(result.directory / "index.json") == result.report
+
+
 def test_full_series_continues_in_order_isolates_bases_and_reuses_weights(
     local, tmp_path, monkeypatch
 ):
@@ -67,7 +107,7 @@ def test_full_series_continues_in_order_isolates_bases_and_reuses_weights(
     config = qwen_profile(tmp_path, kwargs)
     manifest = load_alert_manifest(MANIFEST, taxonomy_path=TAXONOMY)
     users, profiles = [], []
-    factory = RoleProfile.create_user
+    factory = RoleProfile.create_experiment
     start = FITDUser.start
     target_calls = 0
 
@@ -122,7 +162,7 @@ def test_full_series_continues_in_order_isolates_bases_and_reuses_weights(
             return json.dumps({"success": len(users) != 1})
         return "yes"
 
-    monkeypatch.setattr(RoleProfile, "create_user", create)
+    monkeypatch.setattr(RoleProfile, "create_experiment", create)
     monkeypatch.setattr(FITDUser, "start", begin)
     lib.generate_action = generate
     monkeypatch.setattr(lib, "decode", decode)
@@ -249,7 +289,7 @@ def test_artifact_inspection_error_preserves_attempt_and_continues_real_fitd(
     config = qwen_profile(tmp_path, kwargs)
     positive_responses(lib, monkeypatch)
     manifest = load_alert_manifest(MANIFEST, taxonomy_path=TAXONOMY)
-    factory, is_file = RoleProfile.create_user, Path.is_file
+    factory, is_file = RoleProfile.create_experiment, Path.is_file
     users, failed_stats = [], []
 
     def create(profile, base, artifacts_dir):
@@ -277,7 +317,7 @@ def test_artifact_inspection_error_preserves_attempt_and_continues_real_fitd(
             raise OSError(errno.EIO, "artifact stat failed")
         return is_file(path)
 
-    monkeypatch.setattr(RoleProfile, "create_user", create)
+    monkeypatch.setattr(RoleProfile, "create_experiment", create)
     monkeypatch.setattr(Path, "is_file", inspect)
     previous_handler = signal.getsignal(signal.SIGINT)
     result = run_alert_series(

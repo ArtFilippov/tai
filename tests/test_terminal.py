@@ -1,6 +1,7 @@
 """Terminal observation uses the public User and never supplies an evaluation."""
 
-from tai import Evaluator, FITDUser, LLMChat, Message
+from tai import Evaluator, LLMChat, Message
+from tai import FITDExperiment as FITDUser
 from tai.terminal import run_foreground
 
 

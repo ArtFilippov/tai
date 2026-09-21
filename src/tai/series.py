@@ -12,7 +12,7 @@ from types import FrameType
 from typing import Any
 from uuid import uuid4
 
-from tai import Message, User
+from tai import FITDExperiment, Message
 from tai._config import ModelEvaluatorProfile, RoleProfile, load_profile
 from tai._diagnostics import DiagnosticRedactor
 from tai._profile import FITD_PROFILE
@@ -57,9 +57,9 @@ def _settings(profile: RoleProfile) -> dict[str, Any]:
 
 
 def _capture(
-    user: User | None, directory: Path, redactor: DiagnosticRedactor
+    user: FITDExperiment | None, directory: Path, redactor: DiagnosticRedactor
 ) -> dict[str, Any]:
-    status = user.status() if user is not None else None
+    status = user.journal.status() if user is not None else None
     result = user.result() if user is not None else None
     run_id = status.run_id if status is not None else None
     run_dir = Path("runs") / run_id if run_id is not None else None
@@ -141,7 +141,7 @@ def run_alert_series(
             interrupted = True
 
     previous_handler = signal.signal(signal.SIGINT, interrupt)
-    current: User | None = None
+    current: FITDExperiment | None = None
     try:
         series_id = str(uuid4())
         directory = artifacts_dir / series_id
@@ -195,9 +195,9 @@ def run_alert_series(
             base = Message(record.base_request)
             started_at, start_time = _now(), monotonic()
             error = None
-            phase = "create_user"
+            phase = "create_experiment"
             try:
-                current = profile.create_user(base, directory / "runs")
+                current = profile.create_experiment(base, directory / "runs")
                 # Interrupt during construction has not attempted start. Do not
                 # count this or any later unstarted record in the denominator.
                 if interrupted:
@@ -222,6 +222,17 @@ def run_alert_series(
                     current.stop()
                     current.wait()
             outcome = _capture(current, directory, redactor)
+            if (
+                error is None
+                and current is not None
+                and current.journal.error is not None
+            ):
+                failure = current.journal.error
+                error = {
+                    "phase": "journal",
+                    "type": type(failure).__name__,
+                    "message": redactor.text(str(failure)),
+                }
             outcome["reason"] = (
                 redactor.text(outcome["reason"])
                 if outcome["reason"] is not None

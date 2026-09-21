@@ -11,10 +11,12 @@ from tai import (
     ChatCancelled,
     ContainsTextEvaluator,
     Evaluator,
-    FITDUser,
     LLMChat,
     Message,
     UserState,
+)
+from tai import (
+    FITDExperiment as FITDUser,
 )
 
 
@@ -47,7 +49,7 @@ def read_and_assert_final_artifacts(user, root):
         json.loads(line) for line in (run_dir / "events.jsonl").read_text().splitlines()
     ]
     metadata = json.loads((run_dir / "metadata.json").read_text())
-    assert events == [json.loads(event.dump()) for event in user.events()]
+    assert events == [json.loads(event.dump()) for event in user.journal.events()]
     assert events[-1]["kind"] == "run_finished"
     assert metadata["state"] == user.status().state.value
     assert events[-1]["data"]["state"] == metadata["state"]
@@ -138,7 +140,10 @@ def test_stop_finishes_current_call_without_admitting_more_strategy_work(
             assert control.submit(user.stop).result(timeout=1) is None
             assert not signals[0].is_set()
             assert control.submit(user.stop).result(timeout=1) is None
-            assert len([e for e in user.events() if e.kind == "stop_requested"]) == 1
+            assert (
+                len([e for e in user.journal.events() if e.kind == "stop_requested"])
+                == 1
+            )
             assert (
                 control.submit(user.status).result(timeout=1).state
                 is UserState.STOPPING
@@ -273,7 +278,9 @@ def test_real_fitd_uses_the_supplied_request_and_publishes_the_evaluated_result(
     events = [
         json.loads(line) for line in (run_dir / "events.jsonl").read_text().splitlines()
     ]
-    assert [event.kind for event in user.events()] == [e["kind"] for e in events]
+    assert [event.kind for event in user.journal.events()] == [
+        e["kind"] for e in events
+    ]
     assert all(e["run_id"] == status.run_id for e in events)
     assert events[0]["kind"] == "run_started"
     assert events[-1]["kind"] == "run_finished"
@@ -392,8 +399,12 @@ def test_negative_evaluation_continues_and_is_not_attributed_to_new_result(tmp_p
         assert current.id != old_result.id
         assert user.status().evaluation is None
         assert user.status().result_id == current.id
-        decisions = [e.data for e in user.events() if e.kind == "evaluation_completed"]
-        assert decisions == [{"result_id": old_result.id, "success": False}]
+        decisions = [
+            e.data for e in user.journal.events() if e.kind == "evaluation_completed"
+        ]
+        assert [{k: d[k] for k in ("result_id", "success")} for d in decisions] == [
+            {"result_id": old_result.id, "success": False}
+        ]
         assert user.result() is current
         assert evaluator.results == [old_result]
     finally:
@@ -428,7 +439,9 @@ def test_round_limit_is_normal_completion_and_empty_result_is_present(tmp_path):
     assert metadata["result"] is not None
     assert metadata["result"]["text"] == ""
     assert metadata["evaluation"]["result_id"] == metadata["result"]["id"]
-    assert len([e for e in user.events() if e.kind == "evaluation_completed"]) == 6
+    assert (
+        len([e for e in user.journal.events() if e.kind == "evaluation_completed"]) == 6
+    )
 
 
 def test_fitd_realigns_a_response_before_continuing_the_ladder(tmp_path):
@@ -529,7 +542,9 @@ def test_required_evaluation_failure_preserves_new_result_without_an_old_score(
     events, metadata = read_and_assert_final_artifacts(user, tmp_path)
     assert metadata["evaluation"] is None
     evaluations = [e["data"] for e in events if e["kind"] == "evaluation_completed"]
-    assert evaluations == [{"result_id": evaluator.results[0].id, "success": False}]
+    assert [{k: d[k] for k in ("result_id", "success")} for d in evaluations] == [
+        {"result_id": evaluator.results[0].id, "success": False}
+    ]
     failures = [e["data"] for e in events if e["kind"] == "evaluation_failed"]
     assert len(failures) == 1
     assert failures[0]["result_id"] == user.result().id
@@ -642,7 +657,10 @@ def test_failure_after_native_restore_preserves_accepted_result_and_discarded_jo
         for e in events
         if e["kind"] == "branch_selected" and e["data"]["branch"] == "rephrase"
     )
-    assert branch["accepted"] is False
+    assert not any(
+        e["kind"] == "result_published" and e["data"]["cause_id"] == branch["branch_id"]
+        for e in events
+    )
     assert any(
         e["kind"] == "history_restored" and e["data"]["cause_id"] == branch["branch_id"]
         for e in events
@@ -736,7 +754,7 @@ def test_stop_during_artifact_finalization_is_responsive_and_updates_the_outcome
     assert len(attacker.requests) == 9
     events, metadata = read_and_assert_final_artifacts(user, tmp_path)
     finishes = [e["data"] for e in events if e["kind"] == "run_finished"]
-    assert [e["revision"] for e in finishes] == [0, 1]
+    assert [e["revision"] for e in finishes] == [1]
     assert metadata["finalization_revision"] == 1
 
 

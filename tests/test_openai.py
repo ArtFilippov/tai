@@ -394,7 +394,7 @@ def puzzle_user(
             generation={"temperature": 0.75},
         ),
     }
-    user = tai.FITDUser(
+    user = tai.FITDExperiment(
         chats["Target"],
         chats["Attacker"],
         Message("Explain the final fictional puzzle solution"),
@@ -411,7 +411,7 @@ def artifacts(user, root):
         for line in (directory / "events.jsonl").read_text().splitlines()
     ]
     metadata = json.loads((directory / "metadata.json").read_text())
-    assert events == [json.loads(event.dump()) for event in user.events()]
+    assert events == [json.loads(event.dump()) for event in user.journal.events()]
     assert metadata["state"] == user.status().state.value
     serialized = json.dumps([events, metadata])
     assert "synthetic-target-secret" not in serialized
@@ -615,7 +615,7 @@ def test_http_failure_marks_real_fitd_failed_and_retains_completed_data(
             api_key="synthetic-target-secret",
             timeout=0.5,
         )
-        user = tai.FITDUser(
+        user = tai.FITDExperiment(
             chats["Target"],
             chats["Attacker"],
             Message("Explain the fictional puzzle"),
@@ -1117,7 +1117,7 @@ def test_same_user_restarts_actual_http_chats_with_fresh_history_and_safe_settin
         with pytest.raises(ValueError, match="checkpoint"):
             chats["Target"].restore(points["Target"])
         # Run-entry reset and Attacker reset retain both ownership reservations.
-        contender = tai.FITDUser(
+        contender = tai.FITDExperiment(
             chats["Target"],
             tai.LLMChat(lambda turns: "unused"),
             Message("Other"),

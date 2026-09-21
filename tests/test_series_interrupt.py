@@ -44,7 +44,7 @@ def test_interrupt_races_preserve_actual_outcomes_and_attempted_prefix(
     positive_responses(lib, monkeypatch)
     raised = Event()
     factory, start, finalize = (
-        RoleProfile.create_user,
+        RoleProfile.create_experiment,
         FITDUser.start,
         _Execution._finalize,
     )
@@ -87,7 +87,7 @@ def test_interrupt_races_preserve_actual_outcomes_and_attempted_prefix(
             ):
                 interrupt()
 
-    monkeypatch.setattr(RoleProfile, "create_user", create)
+    monkeypatch.setattr(RoleProfile, "create_experiment", create)
     monkeypatch.setattr(FITDUser, "start", begin)
     monkeypatch.setattr(_Execution, "_finalize", finish)
     monkeypatch.setattr(series, "_write_json", persist)
@@ -128,7 +128,7 @@ def test_creation_or_post_admission_error_is_saved_and_next_run_waits(
     lib, kwargs, _ = local
     profile = qwen_profile(tmp_path, kwargs)
     positive_responses(lib, monkeypatch)
-    factory, start = RoleProfile.create_user, FITDUser.start
+    factory, start = RoleProfile.create_experiment, FITDUser.start
     users = []
     constructed = 0
 
@@ -148,7 +148,7 @@ def test_creation_or_post_admission_error_is_saved_and_next_run_waits(
         if phase == "after_start" and constructed == 2:
             raise RuntimeError("start admitted before raising")
 
-    monkeypatch.setattr(RoleProfile, "create_user", create)
+    monkeypatch.setattr(RoleProfile, "create_experiment", create)
     monkeypatch.setattr(FITDUser, "start", begin)
     result = run_alert_series(
         MANIFEST, profile, tmp_path / "runs", taxonomy_path=TAXONOMY
@@ -158,7 +158,7 @@ def test_creation_or_post_admission_error_is_saved_and_next_run_waits(
     assert len(index["entries"]) == constructed == 32
     failed = index["entries"][1]
     assert failed["error"]["phase"] == (
-        "create_user" if phase == "construction" else "start"
+        "create_experiment" if phase == "construction" else "start"
     )
     assert failed["classification"]["evaluated"] is False
     if phase == "construction":
@@ -180,7 +180,7 @@ def test_terminal_status_before_worker_cleanup_does_not_admit_next_run(
     entered, release, checked = Event(), Event(), Event()
     release_chats = fitd._release_chats
     users = []
-    factory = RoleProfile.create_user
+    factory = RoleProfile.create_experiment
 
     def create(*args):
         user = factory(*args)
@@ -205,7 +205,7 @@ def test_terminal_status_before_worker_cleanup_does_not_admit_next_run(
         finally:
             release.set()
 
-    monkeypatch.setattr(RoleProfile, "create_user", create)
+    monkeypatch.setattr(RoleProfile, "create_experiment", create)
     monkeypatch.setattr(fitd, "_release_chats", cleanup)
     controller = Thread(target=control)
     controller.start()

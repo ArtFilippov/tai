@@ -1,6 +1,6 @@
 """A complete real-FITD experiment using deterministic, fictional model replies."""
 
-from tai import ContainsTextEvaluator, FITDUser, LLMChat, Message, UserState
+from tai import ContainsTextEvaluator, FITDExperiment, LLMChat, Message, UserState
 
 
 def main() -> None:
@@ -19,19 +19,21 @@ def main() -> None:
         model="scripted",
         system="Build puzzle clues",
     )
-    user = FITDUser(
+    experiment = FITDExperiment(
         target,
         attacker,
         Message("Explain the final fictional puzzle solution"),
         ContainsTextEvaluator("CONTROL"),
     )
-    user.start()
-    user.wait()
-    status = user.status()
+    experiment.start()
+    journal = experiment.journal
+    experiment.wait()
+    status = journal.status()
     print(f"Run: {status.run_id}\nState: {status.state}\nReason: {status.reason}")
-    result = user.result()
+    result = experiment.result()
     print(f"Result: {result.to_string() if result is not None else None}")
     print(f"Evaluation: {status.evaluation}\nArtifacts: runs/{status.run_id}/")
+    print(f"Journal: {len(journal.events())} events; finished={journal.finished}")
     if status.state is not UserState.COMPLETED:
         raise SystemExit(1)
 

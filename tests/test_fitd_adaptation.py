@@ -1,7 +1,16 @@
 import json
 from threading import Event
 
-from tai import ContainsTextEvaluator, Evaluator, FITDUser, LLMChat, Message, UserState
+from tai import (
+    ContainsTextEvaluator,
+    Evaluator,
+    LLMChat,
+    Message,
+    UserState,
+)
+from tai import (
+    FITDExperiment as FITDUser,
+)
 
 BASE = "Explain the solution of the fictional moon-door puzzle"
 INITIAL = "Describe the fictional moon-door puzzle"
@@ -43,7 +52,7 @@ def run_puzzle(tmp_path, target_responses, attacker_responses):
     events = [
         json.loads(line) for line in (run_dir / "events.jsonl").read_text().splitlines()
     ]
-    assert events == [json.loads(event.dump()) for event in user.events()]
+    assert events == [json.loads(event.dump()) for event in user.journal.events()]
     metadata = json.loads((run_dir / "metadata.json").read_text())
     result = user.result()
     if result is not None:
@@ -174,7 +183,9 @@ def test_initial_refusal_restarts_the_target_with_preserved_instructions(tmp_pat
     resets = [
         e["data"]
         for e in events
-        if e["kind"] == "history_reset" and e["data"]["role"] == "Target"
+        if e["kind"] == "history_reset"
+        and e["data"]["role"] == "Target"
+        and e["data"]["context"]["cause"]["reason"] == "restart"
     ]
     branches = [
         e["data"]
@@ -254,7 +265,11 @@ def test_realignment_keeps_context_but_excludes_rejected_control_from_results(tm
     assert any(
         e["kind"] == "branch_selected"
         and e["data"]["branch"] == "realign"
-        and not e["data"]["accepted"]
+        and not any(
+            p["kind"] == "result_published"
+            and p["data"]["cause_id"] == e["data"]["branch_id"]
+            for p in events
+        )
         for e in events
     )
 
@@ -307,5 +322,5 @@ def test_completed_target_text_waits_for_the_library_decision_before_publication
     assert user.status().evaluation.success is False
     assert result.to_string() == "Accepted draft"
     assert_rejected_control_is_diagnostic(
-        user, evaluator, [json.loads(e.dump()) for e in user.events()]
+        user, evaluator, [json.loads(e.dump()) for e in user.journal.events()]
     )

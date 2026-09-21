@@ -9,7 +9,7 @@ from typing import Any
 from tai import (
     ContainsTextEvaluator,
     Evaluator,
-    FITDUser,
+    FITDExperiment,
     LLMChat,
     Message,
     ModelEvaluator,
@@ -154,8 +154,8 @@ class RoleProfile:
             )
         return self.evaluator
 
-    def create_user(self, base: Message, artifacts_dir: Path) -> FITDUser:
-        return FITDUser(
+    def create_experiment(self, base: Message, artifacts_dir: Path) -> FITDExperiment:
+        return FITDExperiment(
             self.target,
             self.attacker,
             base,

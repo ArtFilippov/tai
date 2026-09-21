@@ -8,7 +8,15 @@ from threading import Event
 import pytest
 from http_peer import Reply
 
-from tai import ContainsTextEvaluator, FITDUser, Message, OpenAIChat, UserState
+from tai import (
+    ContainsTextEvaluator,
+    Message,
+    OpenAIChat,
+    UserState,
+)
+from tai import (
+    FITDExperiment as FITDUser,
+)
 from tai._diagnostics import DiagnosticRedactor
 from tai.terminal import run_foreground
 
@@ -114,9 +122,9 @@ def test_real_fitd_applies_joint_policy_to_settings_and_entire_serialized_events
     metadata = (directory / "metadata.json").read_text(encoding="utf-8")
     for secret in (target_secret, attacker_authorization):
         assert secret not in journal + metadata
-        assert all(secret not in event.dump() for event in user.events())
+        assert all(secret not in event.dump() for event in user.journal.events())
     records = [json.loads(line) for line in journal.splitlines()]
-    assert records == [json.loads(event.dump()) for event in user.events()]
+    assert records == [json.loads(event.dump()) for event in user.journal.events()]
     if target_secret == "run_id":
         # Both envelope keys survive as separate pairs after becoming identical.
         assert [key for key, _ in records[0]] == [
@@ -128,7 +136,9 @@ def test_real_fitd_applies_joint_policy_to_settings_and_entire_serialized_events
         ]
         assert records[0][0][1] == user.status().run_id
         assert records[0][2][1] == "run_started"
-    settings = user.events()[0].data["settings"]
+    settings = next(
+        e.data["settings"] for e in user.journal.events() if e.kind == "run_configured"
+    )
     target_settings = settings["Target"]
     if target_secret == "model":
         assert [pair for pair in target_settings if pair[0] == "[REDACTED]"] == [
@@ -188,8 +198,12 @@ def test_real_fitd_saves_safe_settings_even_when_target_is_never_called(
     metadata_text = (directory / "metadata.json").read_text(encoding="utf-8")
     assert_safe(metadata_text)
     metadata = json.loads(metadata_text)
-    assert_settings(events[0]["data"]["settings"])
-    assert metadata["settings"] == events[0]["data"]["settings"]
+    assert_settings(
+        next(e["data"]["settings"] for e in events if e["kind"] == "run_configured")
+    )
+    assert metadata["settings"] == next(
+        e["data"]["settings"] for e in events if e["kind"] == "run_configured"
+    )
     assert metadata["settings"]["evaluator"]["notes"] == [
         {"7": "[REDACTED] [REDACTED]"}
     ]
@@ -199,7 +213,7 @@ def test_real_fitd_saves_safe_settings_even_when_target_is_never_called(
     ]
     assert metadata["result"] is None
     assert not (directory / "result.txt").exists()
-    assert events == [json.loads(event.dump()) for event in user.events()]
+    assert events == [json.loads(event.dump()) for event in user.journal.events()]
     assert len(endpoint.requests) == 3
     for path, request_headers, body in endpoint.requests:
         assert path == "/v1/attacker/chat/completions"
@@ -264,7 +278,9 @@ def test_real_fitd_redacts_echoes_before_writing_but_evaluates_full_message(
         # final-file cleanup cannot satisfy this check.
         events_before = read_events(directory)
         assert events_before[-1]["kind"] == "evaluation_started"
-        assert events_before == [json.loads(event.dump()) for event in user.events()]
+        assert events_before == [
+            json.loads(event.dump()) for event in user.journal.events()
+        ]
         publication = next(
             event["data"]["result"]
             for event in events_before
@@ -297,7 +313,7 @@ def test_real_fitd_redacts_echoes_before_writing_but_evaluates_full_message(
     assert base.revert(1).to_string() == f"Puzzle {ATTACKER_SECRET}"
     events = read_events(directory)
     assert events[: len(events_before)] == events_before
-    assert events == [json.loads(event.dump()) for event in user.events()]
+    assert events == [json.loads(event.dump()) for event in user.journal.events()]
     metadata_text = (directory / "metadata.json").read_text(encoding="utf-8")
     assert_safe(metadata_text)
     metadata = json.loads(metadata_text)

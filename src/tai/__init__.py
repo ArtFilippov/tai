@@ -14,7 +14,9 @@ from tai.evaluators import (
     ModelEvaluator,
     ModelVerdictError,
 )
+from tai.experiment import FITDExperiment
 from tai.fitd import FITDUser
+from tai.journal import RunEvent, RunJournal
 from tai.messages import Message
 from tai.openai import (
     OpenAIAuthenticationError,
@@ -29,7 +31,7 @@ from tai.openai import (
     OpenAITransportError,
 )
 from tai.qwen import QwenChat, QwenContextError, QwenError
-from tai.users import Evaluation, Progress, RunEvent, User, UserState, UserStatus
+from tai.users import Evaluation, Progress, User, UserState, UserStatus
 
 __all__ = [
     "AlertManifest",
@@ -40,6 +42,7 @@ __all__ = [
     "Evaluation",
     "Evaluator",
     "FITDUser",
+    "FITDExperiment",
     "LLMChat",
     "Message",
     "ModelEvaluationError",
@@ -61,6 +64,7 @@ __all__ = [
     "QwenContextError",
     "QwenError",
     "RunEvent",
+    "RunJournal",
     "User",
     "UserState",
     "UserStatus",

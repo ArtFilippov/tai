@@ -15,7 +15,6 @@ import pytest
 from tai import (
     ChatCancelled,
     ContainsTextEvaluator,
-    FITDUser,
     Message,
     ModelEvaluationError,
     ModelEvaluator,
@@ -24,6 +23,9 @@ from tai import (
     QwenError,
     UserState,
     qwen,
+)
+from tai import (
+    FITDExperiment as FITDUser,
 )
 from tai._config import load_profile
 from tai._preflight import run_preflight
@@ -375,7 +377,7 @@ def test_loading_is_background_work_and_user_stop_waits_for_it(local, tmp_path):
         assert entered.wait(2)
         user.stop()
         assert user.status().state is UserState.STOPPING
-        assert user.events() and user.result() is None
+        assert user.journal.events() and user.result() is None
         assert not user.wait(0.01)
         assert not lib.generations
     finally:
@@ -622,7 +624,7 @@ def test_three_role_preflight_and_real_fitd_reuse_one_load_across_base_requests(
         for response in ("One", "Two", "Three", "Four", "Presented"):
             lib.responses.extend([response, "yes"])
         lib.responses.append('{"success": true}')
-        user = profile.create_user(base, tmp_path / "runs")
+        user = profile.create_experiment(base, tmp_path / "runs")
         user.start()
         assert user.wait(10)
         assert user.status().state is UserState.COMPLETED, user.status().reason

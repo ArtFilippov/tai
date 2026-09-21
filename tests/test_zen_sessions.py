@@ -11,11 +11,13 @@ from http_peer import Reply
 from tai import (
     ChatCancelled,
     ContainsTextEvaluator,
-    FITDUser,
     Message,
     OpenAIChat,
     OpenAIHTTPError,
     UserState,
+)
+from tai import (
+    FITDExperiment as FITDUser,
 )
 
 
@@ -160,13 +162,18 @@ def test_real_fitd_sessions_follow_adaptation_and_independent_repeated_runs(
         else:
             assert len(set(target_ids)) == 1
             assert targets[2][2]["messages"][:-1] == targets[1][2]["messages"][:-1]
-        events = user.events()
+        events = user.journal.events()
         assert any(
             e.kind == "branch_selected" and e.data["branch"] == branch for e in events
         )
         started = [e.data for e in events if e.kind == "call_started"]
         assert [e["conversation_id"] for e in started] == [session(r) for r in calls]
-        resets = [e.data for e in events if e.kind == "history_reset"]
+        resets = [
+            e.data
+            for e in events
+            if e.kind == "history_reset"
+            and e.data["context"]["cause"]["reason"] != "run_started"
+        ]
         assert {e["conversation_id"] for e in resets} <= ids | {
             c.conversation_id for c in chats
         }
