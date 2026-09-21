@@ -23,13 +23,18 @@
 не является форматом событий: токены не сериализуются, а Message сохраняет свой
 контракт `dump()`.
 
-## 1. Решения FITD и выбор продолжения — `attacks.fitd.garak_adapter._FITD`
+## 1. Решения FITD и выбор продолжения — `attacks.fitd.probe.FITDProbe`
+
+Согласованная интеграция сохраняет фасад `FITDProbe(ProbeOperations)` и внутренний
+`_NativeFITD(FITD)`. Внутренний подкласс связывает библиотечные hooks с портами
+запуска и вызывает наблюдаемые операции через фасад. Подготовка и переходы FITD,
+а также цикл `IterativeProbe`, исполняются закреплённой библиотекой garak.
 
 | Операция | Результат |
 | --- | --- |
 | `check_refusal(request, response, context, checkpoint_id)` | `LocalDecision`: отказ, значение, конкретные Message, попытка и точка. Начальные проверки относятся к ответам Attacker и ещё не имеют попытки Target. |
 | `check_alignment(request, response, context, checkpoint_id)` | `LocalDecision`: согласованность и завершённый `Exchange` Attacker, содержащий фактическое суждение. |
-| `select_continuation(conversation, last_attempt)` | Адаптерный `_Continuation` с независимым от garak `decision: BranchDecision` и нативной попыткой для дальнейшего исполнения. |
+| `select_continuation(conversation, last_attempt)` | Адаптерный `Continuation[Attempt]` с независимым от garak `decision: BranchDecision` и нативной попыткой для дальнейшего исполнения. |
 
 `BranchDecision` содержит `continue` / `realign` / `restart` / `rephrase` /
 `exhausted`, исходную `ConversationPoint`, фактические `checks`, уровни до/после,
@@ -38,7 +43,7 @@
 Подготовленное продолжение может не отправляться при успехе оценщика или лимите
 раундов; факт выбора остаётся доступен обёртке.
 
-Нативное поле `_Continuation.attempt` используется только мостом к garak и
+Нативное поле `Continuation.attempt` используется только мостом к garak и
 передаётся им дальше без изменений. Обёртке достаточно `decision`; ей не нужно
 читать `notes`, анализировать историю нативной попытки или рассчитывать индекс
 лестницы. Библиотечные hooks возвращают ожидаемые garak boolean/Attempt, используя
@@ -52,23 +57,24 @@
 
 ## 2. Обмены и контрольные точки
 
-В `attacks.fitd.user._Execution`:
+В `attacks.fitd.execution.Execution` (операции обмена и оценки определены в
+`attacks.fitd.execution_operations.ExecutionOperations`):
 
 - `_send(role, message, cause) -> Exchange`: завершённый обмен,
   `call_id`, контекст и точные запрос/ответ. Отмена/ошибка остаётся исключением;
   незавершённый ответ не возвращается как `Exchange`.
-- `_exchange(context, call_id, message) -> Exchange`: уже допущенная
+- `exchange(context, call_id, message) -> Exchange`: уже допущенная
   часть `_send`, позволяющая обёртке записать начало до I/O без повторного допуска.
-  `_assess(result, context, checkpoint_id) -> EvaluationResult` аналогично выделяет
+  `assess(result, context, checkpoint_id) -> EvaluationResult` аналогично выделяет
   целиком допущенную оценку из `_evaluate`.
-- `_checkpoint(role, cause) -> Checkpoint`: создание непрозрачного снимка,
+- `checkpoint(role, cause) -> Checkpoint`: создание непрозрачного снимка,
   в том числе фиксация завершённого обмена после запроса остановки.
-- `_restore(role, checkpoint, cause) -> ConversationChange`: успешное восстановление.
-- `_reset(role, cause) -> ConversationChange`: новый разговор и идентификатор
+- `restore(role, checkpoint, cause) -> ConversationChange`: успешное восстановление.
+- `reset(role, cause) -> ConversationChange`: новый разговор и идентификатор
   предыдущего. Эти операции используются и для независимых запросов Attacker,
   и для подготовки участников при повторном запуске.
 
-В адаптере `attacks.fitd.garak_adapter._Target`:
+В адаптере `attacks.fitd.target.FITDTarget`:
 
 - `save(request, response, result, cause) -> ConversationPoint` связывает
   завершённый материал и предъявленный результат с новой контрольной точкой.
@@ -79,30 +85,32 @@
   (`unchanged` / `restored` / `reset`), точки `before` / `after` и `ResultChange`.
   Даже неизменившиеся разговор и результат описаны явно.
 
-Согласование выполняется сразу после выбора продолжения, включая последний
-допустимый раунд без следующего обращения к модели. Realignment может оставить
-завершённый ответ в материале разговора, сохранив прежний результат и его оценку.
+Согласование выбранного продолжения выполняется после выбора ветки и возможного
+принятия/оценки результата, включая последний допустимый раунд без следующего
+обращения к модели. При успехе оценщика интеграция завершается до согласования.
+Realignment может оставить завершённый ответ в материале разговора, сохранив
+прежний результат и его оценку.
 
 Согласно [ADR 0002](adr/0002-dialogue-owned-by-llm-chat.md), историей и валидностью
-токенов владеет **LLMChat**. Только `_Target` сопоставляет префиксы garak с
+токенов владеет **LLMChat**. Только `FITDTarget` сопоставляет префиксы garak с
 сохранёнными точками. Он не собирает историю провайдера и не проверяет токены вместо
 LLMChat; после reset старые токены остаются невалидными даже при сохранённом
 обёрткой объекте `Checkpoint`.
 
 ## 3. Предъявленный результат и оценка
 
-- `_Target.accept(cause) -> ResultChange` принимает завершённый ответ текущей точки
+- `FITDTarget.accept(cause) -> ResultChange` принимает завершённый ответ текущей точки
   при продвижении по лестнице.
-- `_Execution._publish(result, context, checkpoint_id) -> ResultChange` принимает,
+- `Execution.publish(result, context, checkpoint_id) -> ResultChange` принимает,
   заменяет, отзывает либо оставляет результат: `accepted` / `replaced` /
   `withdrawn` / `unchanged`. Возвращаются прежний/текущий Message и прежняя/текущая
   оценка. Переход на другой Message, в том числе на ранее принятый, инвалидирует
   оценку; одинаковый текст не делает два Message одним результатом. `None`
   означает отсутствие результата, пустой Message остаётся результатом.
-- `_Execution._evaluate(result, context, checkpoint_id) -> EvaluationResult`
+- `Execution._evaluate(result, context, checkpoint_id) -> EvaluationResult`
   оценивает явно переданный **точный предъявленный Message** и возвращает
   зафиксированное суждение. Ошибки оценщика не превращаются в `success=False`.
-- `_Execution._record_evaluation(result, success, context, checkpoint_id)`
+- `Execution.record_evaluation(result, success, context, checkpoint_id)`
   фиксирует `EvaluationResult` только если этот Message всё ещё предъявлен.
   Устаревшая фиксация и фиксация после закрытия выполнения отвергаются.
 
@@ -113,23 +121,23 @@ LLMChat; после reset старые токены остаются невал�
 
 ## 4. Рабочее выполнение и допуск
 
-- `_Execution.start() -> RunStarted` резервирует участников и запускает поток.
+- `Execution.start() -> RunStarted` резервирует участников и запускает поток.
   Возвращает только `run_id` допущенного запуска. Публичный `FITDUser.start()`
   по-прежнему возвращает `None`.
-- `_admit(RunStarted)` связывает контекст перед стартом потока; `_initialize(run_id)`
-  охватывает начальные сбросы. `_finalize(state, reason)` атомарно фиксирует исход
+- `admit(RunStarted)` связывает контекст перед стартом потока; `initialize(run_id)`
+  охватывает начальные сбросы. `finalize(state, reason)` атомарно фиксирует исход
   с учётом принятой остановки. Обёртка перед ним снимает итоговые настройки
   участников, пока они ещё принадлежат этому запуску.
-- `_Execution._run(run_id) -> WorkerOutcome` — синхронная операция, исполняемая
+- `Execution._run(run_id) -> WorkerOutcome` — синхронная операция, исполняемая
   внутри рабочего потока. Возвращает итоговый `UserStatus`, предъявленный Message,
   исходное исключение (если было) и `ResourcesReleased` после успешного освобождения.
-- `_Execution._release_resources(run_id) -> ResourcesReleased` возвращает UUID
+- `Execution._release_resources(run_id) -> ResourcesReleased` возвращает UUID
   выполнения и освобождённые роли. Если освобождение выбросило исключение,
   `WorkerOutcome.released` равен `None`, а исход работы — `FAILED`.
-- `_complete(WorkerOutcome)` вызывается рабочим потоком после освобождения участников.
+- `complete(WorkerOutcome)` вызывается рабочим потоком после освобождения участников.
   Его обёртка завершает журнал. Исключение этой границы тоже переводит User в `FAILED`.
 
-Обёртка `_run` получает исход **после** выхода из стратегии, фиксации состояния и
+Обёртка `complete` получает исход **после** выхода из стратегии, фиксации состояния и
 освобождения участников. Она вызывается независимо от наличия внешнего `wait()`;
 обёртка одного `start()` или `wait()` не заменяет наблюдение рабочего выполнения.
 Терминальный публичный статус может появиться перед освобождением участников;
@@ -150,9 +158,9 @@ LLMChat; после reset старые токены остаются невал�
 
 `_check_running()` допускает следующий шаг стратегии, `_send()` — самостоятельный
 модельный вызов, `_evaluate()` — оценивание целиком. Отказ в допуске выражается
-внутренним `_RunStopped`, отдельным от `ChatCancelled`; только первый означает
+внутренним `RunStopped`, отдельным от `ChatCancelled`; только первый означает
 остановку User. Ошибка текущей операции, включая явную отмену LLMChat, не маскируется.
-`_assess()` вызывает единый `evaluate(base, result)`, а `_record_evaluation()`
+`assess()` вызывает единый `evaluate(base, result)`, а `record_evaluation()`
 сохраняет его нормальный boolean-возврат независимо от запроса остановки.
 Оценщику при сборке передаётся обёрнутый чат; его внутренние сбросы/отправки — часть
 уже допущенного оценивания и не требуют нового допуска User. Подмены ввода-вывода

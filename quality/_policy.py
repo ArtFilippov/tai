@@ -69,6 +69,7 @@ IGNORED_FRAMEWORK_PARENTS = [
     "builtins.BaseException", "builtins.Exception", "builtins.RuntimeError",
     "builtins.OSError", "builtins.TimeoutError", "typing.Protocol",
     "typing_extensions.Protocol", "enum.Enum", "enum.StrEnum",
+    "garak.probes.base.Probe",
 ]
 LAYER_DIRS = {
     "domain": "Domain", "application": "UseCase", "use_cases": "UseCase",

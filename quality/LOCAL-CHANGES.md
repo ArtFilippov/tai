@@ -48,6 +48,21 @@ Infrastructure → UseCase для всех соответствующих фай
 Назначение структуры описано в корневом `README.md`. `architecture.ready.json`
 подтверждает принятие конфигурации, а не отсутствие нарушений в исходниках.
 
+## Согласованная политика наследования garak
+
+2026-09-22 пользователь принял текущую интеграцию: публичный `FITDProbe` реализует
+`ProbeOperations`, внутренний `_NativeFITD` наследует закреплённый garak FITD.
+В `ignored-parents` добавлен точный тип `garak.probes.base.Probe`. Pylint исключает
+его и `Configurable` из подсчёта R0901; `FITD`, `IterativeProbe` и собственные
+промежуточные классы учитываются. `max_parents = 3` сохранён. Это согласованная
+политика внешнего каркаса, а не исправление ошибки Pylint. Она отражена в
+`pyproject.toml` и `IGNORED_FRAMEWORK_PARENTS` генератора; тестовый профиль
+синхронизируется через `quality/apply.py`.
+
+W9201 продолжает проверять публичный фасад. Native checker уже пропускает
+приватные helper-классы, поэтому `_NativeFITD` не требует Domain-контракта,
+повторяющего служебный API garak.
+
 ## Совместимость с clean-architecture-linter-plugin 1.2.2
 
 `_architecture_compat.py` исправляет воспроизводимые ошибки семантики закреплённой
@@ -162,10 +177,20 @@ Infrastructure → UseCase для всех соответствующих фай
   подклассы встроенных типов не получают такого исключения.
 * **Pylint R0903 — объявления Protocol как интерфейсы.** В `design_analysis.py`
   native-комментарий явно исключает interface classes, но Astroid классифицирует
-  `typing.Protocol` как обычный class. `install_pylint_protocol_compat()` расширяет
-  только предикат `_is_exempt_from_public_methods` для настоящих Protocol declarations.
+  `typing.Protocol` как обычный class. Для этой проверки
+  `install_pylint_protocol_compat()` расширяет только предикат
+  `_is_exempt_from_public_methods` для настоящих Protocol declarations.
   Concrete subclasses Protocol и обычные классы с одним методом сохраняют R0903;
   R0901, R0904, max/min limits и список игнорируемых built-in ancestors не меняются.
+* **Pylint E1111 — возвращаемое значение объявления Protocol.** Pylint 4.0.8
+  рассматривает тело `...` у метода Protocol как concrete-функцию без `return`.
+  Это воспроизведено для generic `Journal.call[T](...) -> T` через поле dataclass,
+  а также для алиасов и квалифицированных/generic баз Protocol. В
+  `TypeChecker._is_ignored_function` добавлено распознавание единственного `...`
+  в теле метода настоящего объявления Protocol, аналогично native-обработке
+  абстрактных методов. Методы с default-реализацией, concrete overrides и классы,
+  только названные `*Protocol`, по-прежнему проверяются на E1111/E1128. Патч
+  ограничен версией 4.0.8 и устанавливается тем же `install_pylint_protocol_compat()`.
 
 `tests/test_architecture_compat.py` запускает настоящий Pylint в отдельных процессах
 на временных пакетах: сравнивает проблемные примеры с непатченным плагином и

@@ -849,6 +849,63 @@ class ArchitectureCompatTest(unittest.TestCase):
                          [(m["messageId"], m["obj"], m["message"]) for m in native])
         self.assertEqual({m["messageId"] for m in messages}, {"R0901", "R0904"})
 
+    def test_pylint_protocol_ellipsis_declares_a_return_contract(self):
+        files = {"sample.py": '''
+            import typing
+            from dataclasses import dataclass
+            from typing import Protocol as Port
+            class Lifecycle(Port):
+                def ready(self) -> bool: ...
+            class Journal(Lifecycle, Port):
+                def call[T](self, operation: str, invoke: typing.Callable[[], T]) -> T:
+                    """Return the callback result after observation."""
+                    ...
+            class Qualified(typing.Protocol):
+                def fetch(self) -> int: ...
+            T = typing.TypeVar("T")
+            class Generic(Port[T]):
+                def fetch(self) -> T: ...
+            @dataclass
+            class Client:
+                journal: Journal
+                def execute(self):
+                    _ = self.journal.call("exchange", lambda: 1)
+            aliased = Journal.call
+            first = aliased(object(), "exchange", lambda: 1)
+            second = Qualified.fetch(object())
+            third = Generic.fetch(object())
+        '''}
+        native = self.lint(files, {}, rules=["E1111", "E1128"], patched=False)
+        self.assertTrue(native)
+        self.assertTrue(all(m["messageId"] == "E1111" for m in native), native)
+        self.assertEqual(self.lint(files, {}, rules=["E1111", "E1128"]), [])
+
+    def test_protocol_return_fix_preserves_concrete_and_default_method_checks(self):
+        files = {"sample.py": '''
+            from typing import Protocol
+            class Port(Protocol):
+                def fetch(self) -> int: ...
+                def default(self) -> int:
+                    value = 1
+                def nothing(self): return None
+            class Implementation(Port):
+                def fetch(self) -> int: ...
+            class FakeProtocol:
+                def fetch(self) -> int: ...
+            def missing() -> int:
+                value = 1
+            first = Port.default(object())
+            second = Port.nothing(object())
+            third = Implementation.fetch(object())
+            fourth = FakeProtocol.fetch(object())
+            fifth = missing()
+        '''}
+        native = self.lint(files, {}, rules=["E1111", "E1128"], patched=False)
+        messages = self.lint(files, {}, rules=["E1111", "E1128"])
+        self.assertEqual([(m["line"], m["messageId"]) for m in messages],
+                         [(m["line"], m["messageId"]) for m in native])
+        self.assertEqual(sorted(m["messageId"] for m in messages), ["E1111"] * 4 + ["E1128"])
+
 
 if __name__ == "__main__":
     unittest.main()

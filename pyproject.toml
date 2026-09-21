@@ -95,7 +95,7 @@ ignore-signatures = true
 min-similarity-lines = 4
 
 [tool.pylint.design]
-ignored-parents = ["builtins.BaseException", "builtins.Exception", "builtins.RuntimeError", "builtins.OSError", "builtins.TimeoutError", "typing.Protocol", "typing_extensions.Protocol", "enum.Enum", "enum.StrEnum"]
+ignored-parents = ["builtins.BaseException", "builtins.Exception", "builtins.RuntimeError", "builtins.OSError", "builtins.TimeoutError", "typing.Protocol", "typing_extensions.Protocol", "enum.Enum", "enum.StrEnum", "garak.probes.base.Probe"]
 max-statements = 20
 max-complexity = 6
 max-branches = 4
@@ -185,7 +185,7 @@ auto-regenerate-baseline = false
 [tool.clean-arch]
 project_type = "generic"
 visibility_enforcement = true
-infrastructure_modules = ["alert", "alert.manifest", "alert.preparation", "alert.report", "app.runtime", "app.series_storage", "attacks.fitd.continuation", "attacks.fitd.garak_adapter", "attacks.fitd.native", "attacks.fitd.native_configuration", "attacks.fitd.target", "core.chats.http_worker", "core.chats.openai", "core.chats.openai_transport", "core.chats.qwen", "core.chats.qwen_executor", "core.chats.qwen_runtime", "core.evaluation.observation", "core.runs.artifact_io", "core.runs.journal", "core.runs.journal_lifecycle", "core.runs.journal_output", "core.runs.journal_state", "core.runs.storage"]
+infrastructure_modules = ["alert", "alert.manifest", "alert.preparation", "alert.report", "app.runtime", "app.series_storage", "attacks.fitd.continuation", "attacks.fitd.garak_adapter", "attacks.fitd.native", "attacks.fitd.native_configuration", "attacks.fitd.probe", "attacks.fitd.target", "core.chats.http_worker", "core.chats.openai", "core.chats.openai_transport", "core.chats.qwen", "core.chats.qwen_executor", "core.chats.qwen_runtime", "core.evaluation.observation", "core.runs.artifact_io", "core.runs.journal", "core.runs.journal_lifecycle", "core.runs.journal_output", "core.runs.journal_state", "core.runs.storage"]
 
 [tool.clean-arch.layer_map]
 Domain = ["domain"]
@@ -220,6 +220,10 @@ name = "Domain"
 
 [[tool.clean-arch.layers]]
 module = "core.evaluation.model_evaluator"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "core.runs.journal_configuration"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
@@ -272,6 +276,10 @@ name = "Domain"
 
 [[tool.clean-arch.layers]]
 module = "core.evaluation.evaluator"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "core.runs.journal_support"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
@@ -335,6 +343,10 @@ module = "core.runs.journal_calls"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
+module = "core.runs.journal_ports"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
 module = "core.runs.journal_state"
 name = "Infrastructure"
 
@@ -391,6 +403,10 @@ module = "core.runs.operations"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
+module = "app.failure_capture"
+name = "UseCase"
+
+[[tool.clean-arch.layers]]
 module = "attacks.fitd.native"
 name = "Infrastructure"
 
@@ -400,6 +416,10 @@ name = "Infrastructure"
 
 [[tool.clean-arch.layers]]
 module = "app.series_storage"
+name = "Infrastructure"
+
+[[tool.clean-arch.layers]]
+module = "attacks.fitd.probe"
 name = "Infrastructure"
 
 [[tool.clean-arch.layers]]

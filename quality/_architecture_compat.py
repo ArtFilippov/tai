@@ -652,7 +652,7 @@ def _patch_coupling(checker):
 
 
 def install_pylint_protocol_compat() -> None:
-    """Treat actual Protocol declarations as interfaces for Pylint's R0903 only."""
+    """Recognize Protocol interfaces and ellipsis return declarations in Pylint."""
     global _pylint_protocol_installed
     if _pylint_protocol_installed:
         return
@@ -660,6 +660,7 @@ def install_pylint_protocol_compat() -> None:
     if installed_version != "4.0.8":
         raise RuntimeError(f"Review Protocol compatibility for Pylint {installed_version}")
     from pylint.checkers import design_analysis
+    from pylint.checkers.typecheck import TypeChecker
 
     original = design_analysis._is_exempt_from_public_methods
 
@@ -667,7 +668,22 @@ def install_pylint_protocol_compat() -> None:
     def is_exempt_from_public_methods(node):
         return _is_protocol(node) or original(node)
 
+    original_ignored = TypeChecker._is_ignored_function
+
+    @wraps(original_ignored)
+    def is_ignored_function(function):
+        # A Protocol's ellipsis body declares a signature, not an implicit None
+        # return. Keep checking concrete overrides and default implementations.
+        owner = function.parent
+        body = function.body
+        if (isinstance(owner, nodes.ClassDef) and _is_protocol(owner)
+                and len(body) == 1 and isinstance(body[0], nodes.Expr)
+                and isinstance(body[0].value, nodes.Const) and body[0].value.value is Ellipsis):
+            return True
+        return original_ignored(function)
+
     design_analysis._is_exempt_from_public_methods = is_exempt_from_public_methods
+    TypeChecker._is_ignored_function = staticmethod(is_ignored_function)
     _pylint_protocol_installed = True
 
 
