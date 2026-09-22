@@ -58,7 +58,7 @@ def test_run_storage_failure_is_explicit_and_preserves_actual_completed_outcome(
     positive_responses(lib, monkeypatch)
     users: list[FITDExperiment] = []
     _install_storage_fault(monkeypatch, users, filename, interrupt)
-    result = run_alert_series(MANIFEST, profile, tmp_path / "runs", taxonomy_path=TAXONOMY)
+    result = run_alert_series(MANIFEST, profile, tmp_path / "runs", taxonomy_path=TAXONOMY, jobs=1)
     assert result.exit_code == (130 if interrupt else 1)
     index = json.loads((result.directory / "index.json").read_text())
     first = index["entries"][0]
@@ -90,14 +90,14 @@ def test_shared_series_write_failure_terminates_command_after_join(
         return user
 
     def persist(path: Path, value: object) -> None:
-        if users and path.name == filename:
+        if users and path.name == filename and users[-1].wait(0):
             assert users[-1].wait(0)
             raise OSError("shared series storage unavailable")
         write(path, value)
 
     monkeypatch.setattr(RoleProfile, "create_experiment", create)
     monkeypatch.setattr(series_storage, "write_json", persist)
-    assert main(["alert-series", "--manifest", str(MANIFEST), "--profile", str(profile),
+    assert main(["alert-series", "--jobs", "1", "--manifest", str(MANIFEST), "--profile", str(profile),
                  "--artifacts-dir", str(tmp_path / "runs"), "--taxonomy", str(TAXONOMY)]) == 2
     assert "shared series storage unavailable" in capsys.readouterr().err
     assert len(users) == (32 if filename == "final-settings.json" else 1)
@@ -186,7 +186,7 @@ def test_artifact_inspection_error_preserves_attempt_and_continues_real_fitd(
     users: list[FITDExperiment] = []
     failed_stats = _install_inspection_fault(monkeypatch, users, unavailable, interrupt)
     previous_handler = signal.getsignal(signal.SIGINT)
-    result = run_alert_series(MANIFEST, config, tmp_path / "runs", taxonomy_path=TAXONOMY)
+    result = run_alert_series(MANIFEST, config, tmp_path / "runs", taxonomy_path=TAXONOMY, jobs=1)
     assert signal.getsignal(signal.SIGINT) is previous_handler
     assert failed_stats == list(unavailable)
     assert result.exit_code == (130 if interrupt else 1)

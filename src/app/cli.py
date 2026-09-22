@@ -3,6 +3,7 @@
 import argparse
 import json
 import sys
+from contextlib import closing
 from pathlib import Path
 
 from alert.preparation import prepare_alert
@@ -17,7 +18,7 @@ from .terminal import run_profile
 
 
 def _series(args: argparse.Namespace) -> int:
-    result = run_alert_series(args.manifest, args.profile, args.artifacts_dir, taxonomy_path=args.taxonomy)
+    result = run_alert_series(args.manifest, args.profile, args.artifacts_dir, taxonomy_path=args.taxonomy, jobs=args.jobs)
     print(f"Серия: {result.directory}", file=sys.stderr)
     if result.exit_code == 1:
         print(f"Ошибки запуска или сохранения: {result.directory / 'index.json'}", file=sys.stderr)
@@ -37,7 +38,8 @@ def _prepare(args: argparse.Namespace) -> int:
 
 
 def _preflight(args: argparse.Namespace) -> int:
-    return run_preflight(load_profile(args.config), args.report)
+    with closing(load_profile(args.config, server_log=(args.report or Path("runs/preflight.json")).with_suffix(".vllm.log"))) as profile:
+        return run_preflight(profile, args.report)
 
 
 def _base_request(text: str | None, path: Path | None) -> Message:
@@ -49,8 +51,8 @@ def _base_request(text: str | None, path: Path | None) -> Message:
 
 def _fitd(args: argparse.Namespace) -> int:
     base = _base_request(args.text, args.text_file)
-    profile = load_profile(args.config)
-    return run_profile(profile, base, args.artifacts_dir)
+    with closing(load_profile(args.config, server_log=args.artifacts_dir / "vllm.log")) as profile:
+        return run_profile(profile, base, args.artifacts_dir)
 
 
 def main(argv: list[str] | None = None) -> int:

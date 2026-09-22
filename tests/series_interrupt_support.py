@@ -64,7 +64,7 @@ class InterruptRace:
         if path.name != "index.json":
             return
         index = object_value(value, "index")
-        count = len(array_value(index["entries"], "entries"))
+        count = sum(bool(object_value(entry, "entry").get("finished_at")) for entry in array_value(index["entries"], "entries"))
         boundaries = {"initial_save": not count, "first_save": count == 1,
                       "last_save": count == 32 and bool(index["finished_at"])}
         if boundaries.get(self.boundary, False):

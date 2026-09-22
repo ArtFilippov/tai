@@ -16,6 +16,7 @@ from core.evaluation.configuration import EvaluatorSetup, evaluator_setup
 from core.primitives.diagnostics import DiagnosticRedactor
 from core.primitives.messages import Message
 from core.runs.journal import RunJournal
+from core.runs.journal_ports import Journal
 
 from .bootstrap import execution_settings, validate_options
 from .execution import Execution
@@ -27,15 +28,15 @@ from .user import FITDUser
 class ExperimentOptions(TypedDict, total=False):
     journal_dir: str | Path | None
     max_calls_per_conv: int
-    journal_factory: Callable[..., RunJournal]
+    journal_factory: Callable[..., Journal]
 
 
 @dataclass
 class _Journals:
     setup: EvaluatorSetup
     directory: Path | None
-    factory: Callable[..., RunJournal]
-    runs: dict[Execution, RunJournal] = field(default_factory=dict[Execution, RunJournal])
+    factory: Callable[..., Journal]
+    runs: dict[Execution, Journal] = field(default_factory=dict[Execution, Journal])
 
 
 class FITDExperiment(FITDUser):
@@ -71,12 +72,12 @@ class FITDExperiment(FITDUser):
         ))
 
     @property
-    def journal(self) -> RunJournal:
+    def journal(self) -> Journal:
         with self._lock:
             return self._observation.runs[self._execution]
 
     @property
-    def journals(self) -> tuple[RunJournal, ...]:
+    def journals(self) -> tuple[Journal, ...]:
         with self._lock:
             return tuple(journal for journal in self._observation.runs.values() if journal.status().run_id is not None)
 
@@ -88,7 +89,7 @@ class FITDExperiment(FITDUser):
         self._observation.runs[execution] = journal
         return execution
 
-    def _new_journal(self) -> RunJournal:
+    def _new_journal(self) -> Journal:
         chats = self._settings.chats
         setup = self._observation.setup
         redactor = DiagnosticRedactor.combine(*(chat.redactor for chat in chats.values()))

@@ -86,10 +86,15 @@ depends_on = [
     "app.chat_factory",
     "app.configuration_values",
     "app.profiles",
+    "app.server_factory",
     "attacks.fitd",
+    "core.chats",
+    "core.chats.qwen_server",
     "core.evaluation.assembly",
     "core.evaluation.model_evaluator",
     "core.primitives.messages",
+    "core.runs.journal",
+    "core.runs.journal_ports",
 ]
 
 [[modules]]
@@ -115,11 +120,13 @@ depends_on = [
     "app.experiments",
     "app.runtime",
     "app.series_contracts",
+    "app.series_console",
     "app.series_execution",
     "app.series_storage",
     "attacks.fitd.garak_adapter",
     "attacks.fitd.profile",
     "core.primitives.messages",
+    "core.runs.console_journal",
 ]
 
 [[modules]]
@@ -152,6 +159,7 @@ depends_on = [
     "core.primitives.diagnostics",
     "core.primitives.messages",
     "core.runs.journal",
+    "core.runs.journal_ports",
 ]
 
 [[modules]]
@@ -362,7 +370,7 @@ depends_on = ["alert.records"]
 [[modules]]
 path = "app.chat_factory"
 layer = "Bootstrap"
-depends_on = ["app.configuration_values", "core.chats", "core.chats.openai", "core.chats.qwen"]
+depends_on = ["app.configuration_values", "core.chats", "core.chats.openai", "core.chats.qwen", "core.chats.qwen_server", "core.chats.server_chat"]
 
 [[modules]]
 path = "app.configuration_values"
@@ -435,7 +443,7 @@ depends_on = ["alert.accounting", "app.contracts", "core.primitives.messages", "
 [[modules]]
 path = "app.series_execution"
 layer = "UseCase"
-depends_on = ["alert.accounting", "alert.records", "app.contracts", "app.failure_capture", "app.lifecycle", "app.series_contracts", "core.primitives.messages", "core.runs"]
+depends_on = ["alert.accounting", "alert.records", "app.failure_capture", "app.lifecycle", "app.series_attempt", "app.series_contracts", "core.primitives.messages"]
 
 [[modules]]
 path = "app.series_storage"
@@ -514,7 +522,7 @@ depends_on = [
     "core.evaluation.observation",
     "core.primitives.messages",
     "core.runs",
-    "core.runs.journal",
+    "core.runs.journal_ports",
     "core.runs.operations",
 ]
 
@@ -661,6 +669,73 @@ depends_on = ["core.primitives.messages", "core.runs.operations"]
 path = "core.runs.records"
 layer = "Domain"
 depends_on = ["core.primitives.diagnostics", "core.primitives.diagnostics.json_values", "core.runs.status"]
+
+[[modules]]
+path = "app.server_factory"
+layer = "Bootstrap"
+depends_on = ["app.configuration_values", "core.chats.qwen_config", "core.chats.qwen_server", "core.chats.server_config"]
+
+[[modules]]
+path = "app.series_attempt"
+layer = "UseCase"
+depends_on = ["app.contracts", "app.failure_capture", "app.series_contracts", "core.primitives.messages", "core.runs"]
+
+[[modules]]
+path = "app.series_console"
+layer = "Interface"
+cannot_depend_on = ["core.runs.console_journal", "core.runs.journal", "core.chats.qwen_server", "core.chats.server_process"]
+depends_on = ["app.console_format", "core.runs.console_ports"]
+
+[[modules]]
+path = "app.console_format"
+layer = "Interface"
+cannot_depend_on = ["core.runs.console_journal", "core.runs.journal", "core.chats.qwen_server", "core.chats.server_process"]
+depends_on = ["core.runs.console_ports"]
+
+[[modules]]
+path = "core.chats.server_config"
+layer = "Domain"
+depends_on = ["core.chats.qwen_config"]
+
+[[modules]]
+path = "core.chats.server_ports"
+layer = "Domain"
+depends_on = ["core.chats.chat_state", "core.chats.server_config"]
+
+[[modules]]
+path = "core.chats.qwen_server"
+layer = "Infrastructure"
+cannot_depend_on = ["app.series_execution", "app.series_attempt", "attacks.fitd.execution", "attacks.fitd.user"]
+depends_on = ["core.chats.conversation", "core.chats.openai_transport", "core.chats.server_config", "core.chats.server_ports", "core.chats.server_process", "core.primitives.diagnostics"]
+
+[[modules]]
+path = "core.chats.server_process"
+layer = "Infrastructure"
+cannot_depend_on = ["app.series_execution", "app.series_attempt", "attacks.fitd.execution", "attacks.fitd.user"]
+depends_on = ["core.chats.server_config", "core.chats.server_ports"]
+
+[[modules]]
+path = "core.chats.server_chat"
+layer = "Infrastructure"
+cannot_depend_on = ["app.series_execution", "app.series_attempt", "attacks.fitd.execution", "attacks.fitd.user"]
+depends_on = ["core.chats.conversation", "core.chats.qwen_server", "core.chats.server_config", "core.primitives.diagnostics"]
+
+[[modules]]
+path = "core.runs.console_ports"
+layer = "Domain"
+depends_on = []
+
+[[modules]]
+path = "core.runs.console_journal"
+layer = "Infrastructure"
+cannot_depend_on = ["app.series_execution", "app.series_attempt", "attacks.fitd.execution", "attacks.fitd.user"]
+depends_on = ["core.runs.console_ports", "core.runs.journal", "core.runs.journal_calls", "core.runs.journal_configuration", "core.runs.journal_delegate", "core.runs.operations"]
+
+[[modules]]
+path = "core.runs.journal_delegate"
+layer = "Infrastructure"
+cannot_depend_on = ["app.series_execution", "app.series_attempt", "attacks.fitd.execution", "attacks.fitd.user"]
+depends_on = ["core.primitives.diagnostics", "core.primitives.diagnostics.json_values", "core.runs.journal_ports", "core.runs.status", "core.runs.records"]
 
 # The facade exposes exactly the documented src/tai.py API.
 [[interfaces]]

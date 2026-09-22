@@ -1,0 +1,34 @@
+"""Composition of an explicitly owned server without importing GPU libraries."""
+
+from pathlib import Path
+
+from core.chats.qwen_config import local_checkpoint
+from core.chats.qwen_server import QwenServer
+from core.chats.server_config import ServerConfig, ServerLimits, positive_integer, positive_number
+
+from .configuration_values import string, table
+
+
+def create_server(value: object, log_path: Path) -> QwenServer | None:
+    if value is None:
+        return None
+    data = table(value, "server", {
+        "python", "model", "revision", "cache_dir", "device", "dtype", "max_model_len",
+        "max_num_seqs", "gpu_memory_utilization", "startup_timeout", "shutdown_timeout",
+    })
+    checkpoint = local_checkpoint(
+        string(data.get("model"), "server.model"), string(data.get("revision"), "server.revision"),
+        Path(string(data.get("cache_dir"), "server.cache_dir")).expanduser().resolve(),
+        string(data.get("device"), "server.device"),
+    )
+    limits = ServerLimits(
+        positive_integer(data.get("max_model_len", 8192), "max_model_len"),
+        positive_integer(data.get("max_num_seqs", 32), "max_num_seqs"),
+        positive_number(data.get("gpu_memory_utilization", 0.3), "gpu_memory_utilization"),
+        positive_number(data.get("startup_timeout", 300.0), "startup_timeout"),
+        positive_number(data.get("shutdown_timeout", 10.0), "shutdown_timeout"),
+    )
+    return QwenServer(ServerConfig(
+        checkpoint, Path(string(data.get("python"), "server.python")).expanduser(), limits,
+        string(data.get("dtype", "float16"), "server.dtype"),
+    ), log_path)

@@ -64,7 +64,7 @@ def test_installed_cli_sigint_finishes_current_call_and_rebuilds_offline(
         endpoint.scripts["/v1/target/chat/completions"][0] = held
     else:
         endpoint.scripts["/v1/evaluator/chat/completions"] = deque([held])
-    command = [str(Path(sys.executable).with_name("tai")), "alert-series", "--manifest", str(MANIFEST.resolve()),
+    command = [str(Path(sys.executable).with_name("tai")), "alert-series", "--jobs", "1", "--manifest", str(MANIFEST.resolve()),
                "--profile", str(profile), "--artifacts-dir", str(tmp_path / "runs"), "--taxonomy", str(TAXONOMY.resolve())]
     with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True) as process:
         try:

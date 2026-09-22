@@ -53,7 +53,7 @@ def test_interrupt_races_preserve_actual_outcomes_and_attempted_prefix(
     race.install_lifecycle(monkeypatch)
     race.install_storage(monkeypatch)
     previous = signal.getsignal(signal.SIGINT)
-    result = run_alert_series(MANIFEST, profile, tmp_path / "runs", taxonomy_path=TAXONOMY)
+    result = run_alert_series(MANIFEST, profile, tmp_path / "runs", taxonomy_path=TAXONOMY, jobs=1)
     assert race.raised.is_set()
     assert signal.getsignal(signal.SIGINT) is previous
     _assert_saved_race(result, boundary, attempts)
@@ -68,7 +68,7 @@ def test_creation_or_post_admission_error_is_saved_and_next_run_waits(
     positive_responses(lib, monkeypatch)
     faults = AdmissionFaults(phase)
     faults.install(monkeypatch)
-    result = run_alert_series(MANIFEST, profile, tmp_path / "runs", taxonomy_path=TAXONOMY)
+    result = run_alert_series(MANIFEST, profile, tmp_path / "runs", taxonomy_path=TAXONOMY, jobs=1)
     index = json.loads((result.directory / "index.json").read_text())
     assert result.exit_code == 1 and result.report["complete"] is True
     assert len(index["entries"]) == faults.constructed == 32
@@ -94,7 +94,7 @@ def test_terminal_status_before_worker_cleanup_does_not_admit_next_run(
     controller = Thread(target=gate.control)
     controller.start()
     try:
-        result = run_alert_series(MANIFEST, profile, tmp_path / "runs", taxonomy_path=TAXONOMY)
+        result = run_alert_series(MANIFEST, profile, tmp_path / "runs", taxonomy_path=TAXONOMY, jobs=1)
     finally:
         gate.release.set()
         controller.join(10)

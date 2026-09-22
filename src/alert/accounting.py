@@ -9,6 +9,9 @@ from .values import array_value, object_value
 COMPLETED = "COMPLETED"
 MESSAGE_KIND = "Message"
 VALID = "valid"
+ACTIVE = "active"
+FINISHED = "finished"
+PARALLEL_SCHEMA = 2
 
 
 class Classification(TypedDict):
@@ -72,6 +75,7 @@ def classify_outcome(outcome: Mapping[str, object]) -> Classification:
         Classification: Whether a matching final boolean verdict is countable.
     """
     invalid = (
+        (outcome.get("phase") == ACTIVE, ACTIVE),
         (outcome.get("error") is not None, "execution_error"),
         (outcome.get("storage_error") is not None, "storage_error"),
         (bool(outcome.get("artifact_errors")), "artifact_inspection_error"),
@@ -87,7 +91,7 @@ def _integer(value: object) -> bool:
 
 
 def _identity(index: Mapping[str, object]) -> tuple[str, str]:
-    if not _integer(index.get("schema_version")) or index["schema_version"] != 1:
+    if not _integer(index.get("schema_version")) or index["schema_version"] not in {1, 2}:
         raise ValueError("Unsupported series index schema_version")
     identifier, manifest = index.get("series_id"), index.get("manifest")
     if not isinstance(identifier, str) or not identifier:
@@ -149,8 +153,18 @@ def _groups(entries: list[dict[str, object]]) -> dict[str, GroupCounts]:
     return groups
 
 
+def _validate_phases(entries: list[dict[str, object]]) -> None:
+    for entry in entries:
+        if entry.get("phase") not in {ACTIVE, FINISHED}:
+            raise ValueError("Series v2 entry requires active/finished phase")
+        if (entry["phase"] == FINISHED) != bool(entry.get("finished_at")):
+            raise ValueError("Series entry phase disagrees with finished_at")
+        if entry["phase"] == ACTIVE and any(entry.get(key) is not None for key in ("result", "evaluation", "result_id")):
+            raise ValueError("Active entries cannot publish final evidence")
+
+
 def build_series_report(index: Mapping[str, object]) -> SeriesReport:
-    """Recompute all six groups from the attempted prefix in a v1 saved index.
+    """Recompute all six groups from the attempted prefix in a v1 or v2 index.
 
     Invalid series identity/order is rejected. Missing or malformed verdicts are
     unevaluated. Cached ``classification``/``complete`` fields are not trusted.
@@ -164,6 +178,8 @@ def build_series_report(index: Mapping[str, object]) -> SeriesReport:
     identifier, manifest = _identity(index)
     planned = _planned(index.get("planned"))
     entries = _entries(index.get("entries"), planned)
+    if index["schema_version"] == PARALLEL_SCHEMA:
+        _validate_phases(entries)
     return {
         "schema_version": 1, "series_id": identifier, "manifest": manifest,
         "complete": bool(index.get("finished_at") and index.get("interrupted") is False

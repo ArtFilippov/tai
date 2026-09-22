@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Textual LLM robustness experiments"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
-dependencies = ["garak"]
+dependencies = ["garak", "rich==15.0.0"]
 
 [project.optional-dependencies]
 qwen = [
@@ -185,7 +185,7 @@ auto-regenerate-baseline = false
 [tool.clean-arch]
 project_type = "generic"
 visibility_enforcement = true
-infrastructure_modules = ["alert", "alert.manifest", "alert.preparation", "alert.report", "app.runtime", "app.series_storage", "attacks.fitd.continuation", "attacks.fitd.garak_adapter", "attacks.fitd.native", "attacks.fitd.native_configuration", "attacks.fitd.probe", "attacks.fitd.target", "core.chats.http_worker", "core.chats.openai", "core.chats.openai_transport", "core.chats.qwen", "core.chats.qwen_executor", "core.chats.qwen_runtime", "core.evaluation.observation", "core.runs.artifact_io", "core.runs.journal", "core.runs.journal_lifecycle", "core.runs.journal_output", "core.runs.journal_state", "core.runs.storage"]
+infrastructure_modules = ["alert", "alert.manifest", "alert.preparation", "alert.report", "app.runtime", "app.series_storage", "attacks.fitd.continuation", "attacks.fitd.garak_adapter", "attacks.fitd.native", "attacks.fitd.native_configuration", "attacks.fitd.probe", "attacks.fitd.target", "core.chats.http_worker", "core.chats.openai", "core.chats.openai_transport", "core.chats.qwen", "core.chats.qwen_executor", "core.chats.qwen_runtime", "core.chats.qwen_server", "core.chats.server_chat", "core.chats.server_process", "core.evaluation.observation", "core.runs.artifact_io", "core.runs.console_journal", "core.runs.journal", "core.runs.journal_delegate", "core.runs.journal_lifecycle", "core.runs.journal_output", "core.runs.journal_state", "core.runs.storage"]
 
 [tool.clean-arch.layer_map]
 Domain = ["domain"]
@@ -263,6 +263,10 @@ module = "attacks.fitd.garak_adapter"
 name = "Infrastructure"
 
 [[tool.clean-arch.layers]]
+module = "core.runs.journal_delegate"
+name = "Infrastructure"
+
+[[tool.clean-arch.layers]]
 module = "attacks.fitd.continuation"
 name = "Infrastructure"
 
@@ -275,8 +279,16 @@ module = "core.chats.qwen_contracts"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
+module = "core.chats.server_process"
+name = "Infrastructure"
+
+[[tool.clean-arch.layers]]
 module = "core.evaluation.evaluator"
 name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "core.runs.console_journal"
+name = "Infrastructure"
 
 [[tool.clean-arch.layers]]
 module = "core.runs.journal_support"
@@ -307,6 +319,10 @@ module = "core.chats.qwen_executor"
 name = "Infrastructure"
 
 [[tool.clean-arch.layers]]
+module = "core.chats.server_config"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
 module = "core.evaluation.assembly"
 name = "Bootstrap"
 
@@ -335,7 +351,15 @@ module = "core.chats.qwen_runtime"
 name = "Infrastructure"
 
 [[tool.clean-arch.layers]]
+module = "core.chats.server_ports"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
 module = "core.evaluation.verdict"
+name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "core.runs.console_ports"
 name = "Domain"
 
 [[tool.clean-arch.layers]]
@@ -369,6 +393,14 @@ name = "Infrastructure"
 [[tool.clean-arch.layers]]
 module = "core.chats.qwen_config"
 name = "Domain"
+
+[[tool.clean-arch.layers]]
+module = "core.chats.qwen_server"
+name = "Infrastructure"
+
+[[tool.clean-arch.layers]]
+module = "core.chats.server_chat"
+name = "Infrastructure"
 
 [[tool.clean-arch.layers]]
 module = "app.readiness_session"
@@ -415,8 +447,24 @@ module = "attacks.fitd.target"
 name = "Infrastructure"
 
 [[tool.clean-arch.layers]]
+module = "app.console_format"
+name = "Interface"
+
+[[tool.clean-arch.layers]]
+module = "app.series_attempt"
+name = "UseCase"
+
+[[tool.clean-arch.layers]]
+module = "app.series_console"
+name = "Interface"
+
+[[tool.clean-arch.layers]]
 module = "app.series_storage"
 name = "Infrastructure"
+
+[[tool.clean-arch.layers]]
+module = "app.server_factory"
+name = "Bootstrap"
 
 [[tool.clean-arch.layers]]
 module = "attacks.fitd.probe"

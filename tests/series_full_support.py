@@ -84,8 +84,9 @@ class MixedSeries:
 
 
 def assert_isolation(scenario: MixedSeries) -> None:
-    assert len(scenario.users) == 32 and all(profile is scenario.profiles[0] for profile in scenario.profiles)
-    assert len({id(user._settings.evaluator) for user in scenario.users}) == 1
+    assert len(scenario.users) == len({id(profile) for profile in scenario.profiles}) == 32
+    assert len({id(user._settings.evaluator) for user in scenario.users}) == 32
+    assert len({id(chat) for profile in scenario.profiles for chat in profile.chats().values()}) == 96
     assert len({user.base.id for user in scenario.users}) == 32
     assert len(scenario.lib.records.loads) == 2  # One tokenizer + one model for all roles and runs.
     profile = scenario.profiles[0]

@@ -1,4 +1,4 @@
-"""Values and ports for sequential, independently persisted attack runs."""
+"""Values and ports for bounded, independently persisted attack runs."""
 
 from abc import abstractmethod
 from collections.abc import Callable, Mapping
@@ -28,12 +28,23 @@ class SeriesStore(Protocol):
 
 
 @dataclass(frozen=True)
+class SeriesIdentity:
+    sequence: int
+    micro_category: str
+
+
+@dataclass(frozen=True)
 class SeriesDependencies:
-    create: Callable[[Message], RunHandle]
+    create: Callable[[SeriesIdentity, Message], RunHandle]
     store: SeriesStore
     stop: StopRequests
     clock: Clock
     redact: Callable[[str], str]
+    notify: Callable[[int, str], None] | None = None
+
+    def display(self, sequence: int, state: str) -> None:
+        if self.notify is not None:
+            self.notify(sequence, state)
 
 
 @dataclass(frozen=True)

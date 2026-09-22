@@ -8,7 +8,7 @@ from typing import cast, override
 from core.primitives.messages import Message
 from core.evaluation.observation import observe_evaluation
 from core.runs import UserState
-from core.runs.journal import RunJournal
+from core.runs.journal_ports import Journal
 from core.runs.operations import Context, EvaluationResult, Exchange, RunStarted, WorkerOutcome
 
 from .contracts import Continuation
@@ -22,7 +22,7 @@ def _project(value: object) -> object:
     return value.decision if isinstance(value, Continuation) else value
 
 
-def _wrap_method(base: type, name: str, journal: RunJournal) -> Callable[..., object]:
+def _wrap_method(base: type, name: str, journal: Journal) -> Callable[..., object]:
     original = cast(Callable[..., object], getattr(base, name))
 
     @wraps(original)
@@ -35,7 +35,7 @@ def _wrap_method(base: type, name: str, journal: RunJournal) -> Callable[..., ob
 
 
 def wrap_methods[T](
-    base: type[T], journal: RunJournal, names: tuple[str, ...],
+    base: type[T], journal: Journal, names: tuple[str, ...],
     overrides: dict[str, Callable[..., object]] | None = None,
 ) -> type[T]:
     methods = {name: _wrap_method(base, name, journal) for name in names}
@@ -43,7 +43,7 @@ def wrap_methods[T](
 
 
 class ObservedExecution(Execution):
-    def __init__(self, settings: ExecutionSettings, journal: RunJournal, directory: Path | None) -> None:
+    def __init__(self, settings: ExecutionSettings, journal: Journal, directory: Path | None) -> None:
         self._journal, self._directory = journal, directory
         super().__init__(settings)
 
@@ -99,12 +99,12 @@ class ObservedExecution(Execution):
         _ = self._journal.finish(outcome)
 
 
-def observed_execution(journal: RunJournal, directory: Path | None) -> Callable[[ExecutionSettings], Execution]:
+def observed_execution(journal: Journal, directory: Path | None) -> Callable[[ExecutionSettings], Execution]:
     observed_type = wrap_methods(ObservedExecution, journal, ("checkpoint", "restore", "reset", "publish"))
     return lambda settings: observed_type(settings, journal, directory)
 
 
-def observed_runtime(journal: RunJournal) -> GarakRuntime:
+def observed_runtime(journal: Journal) -> GarakRuntime:
     def check_probe(probe: FITDProbe) -> None:
         journal.check()
         FITDProbe.raise_if_interrupted(probe)

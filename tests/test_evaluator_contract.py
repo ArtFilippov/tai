@@ -194,7 +194,14 @@ def test_series_uses_the_assembled_one_operation_evaluator(
             pairs.append((base, result))
             return True
 
-    profile = RoleProfile(*participants(32), EvaluatorSetup(CustomEvaluator()), 20)
+    def factory() -> RoleProfile:
+        return RoleProfile(*participants(1), EvaluatorSetup(CustomEvaluator()), 20)
+
+    profile = factory()
+    def fresh(_profile: RoleProfile) -> RoleProfile:
+        return factory()
+
+    monkeypatch.setattr(RoleProfile, "fresh", fresh)
 
     def load_profile(*_args: object, **_kwargs: object) -> RoleProfile:
         return profile
@@ -211,7 +218,9 @@ def test_series_uses_the_assembled_one_operation_evaluator(
     assert len(pairs) == len(index["entries"]) == 32
     assert len({base.id for base, _ in pairs}) == 32
     assert len({result.id for _, result in pairs}) == 32
-    for (base, result), entry in zip(pairs, index["entries"], strict=True):
+    by_base = {base.id: (base, result) for base, result in pairs}
+    for entry in index["entries"]:
+        base, result = by_base[entry["base_id"]]
         assert entry["base_id"] == base.id
         assert entry["evaluation"] == {"result_id": result.id, "success": True}
 

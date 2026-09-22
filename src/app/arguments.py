@@ -48,6 +48,13 @@ def _series(parser: argparse.ArgumentParser) -> None:
     for name in ("manifest", "profile", "artifacts-dir"):
         _ = parser.add_argument(f"--{name}", type=Path, required=True)
     _ = parser.add_argument("--taxonomy", type=Path, default=Path("ALERT_taxonomy.md"))
+    _ = parser.add_argument("--jobs", type=_positive_jobs, default=4, help="Лимит активных запусков (по умолчанию 4)")
+
+
+def _positive_jobs(value: str) -> int:
+    if (jobs := int(value)) < 1:
+        raise argparse.ArgumentTypeError("jobs must be a positive integer")
+    return jobs
 
 
 def _report(parser: argparse.ArgumentParser) -> None:
@@ -63,6 +70,6 @@ def parse_arguments(argv: list[str] | None) -> argparse.Namespace:
                          + "HTTP-таймаут каждой роли по умолчанию 120 секунд.")
     commands.add_command("preflight", _preflight, help_text="Проверить текстовый ответ каждой роли без запуска FITD")
     commands.add_command("prepare-alert", _prepare, help_text="Подготовить локальный манифест 32 запросов ALERT")
-    commands.add_command("alert-series", _series, help_text="Последовательно выполнить 32 запуска FITD по ALERT")
+    commands.add_command("alert-series", _series, help_text="Параллельно выполнить 32 запуска FITD по ALERT")
     commands.add_command("alert-report", _report, help_text="Пересчитать JSON по сохранённому индексу без инференса")
     return commands.parse(argv)

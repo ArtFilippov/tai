@@ -36,7 +36,7 @@ def test_series_captures_journal_failure_and_continues_after_release(
         write_event(journal, event)
 
     monkeypatch.setattr(RunJournal, "_write_event", write)
-    result = run_alert_series(MANIFEST, config, tmp_path / "runs", taxonomy_path=TAXONOMY)
+    result = run_alert_series(MANIFEST, config, tmp_path / "runs", taxonomy_path=TAXONOMY, jobs=1)
     index = json.loads((result.directory / "index.json").read_text())
     assert failed and result.exit_code == 1
     first = index["entries"][0]
@@ -57,7 +57,7 @@ def test_full_series_continues_in_order_isolates_bases_and_reuses_weights(
     scenario = MixedSeries(lib, load_alert_manifest(MANIFEST, taxonomy_path=TAXONOMY))
     scenario.install(monkeypatch)
     previous_handler = signal.getsignal(signal.SIGINT)
-    result = run_alert_series(MANIFEST, config, tmp_path / "runs", taxonomy_path=TAXONOMY)
+    result = run_alert_series(MANIFEST, config, tmp_path / "runs", taxonomy_path=TAXONOMY, jobs=1)
     assert signal.getsignal(signal.SIGINT) is previous_handler
     assert result.exit_code == 1 and result.report["complete"] is True
     assert_isolation(scenario)

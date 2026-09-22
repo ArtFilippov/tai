@@ -33,6 +33,7 @@ from app.preflight import run_preflight
 from app.terminal import run_foreground
 from core.evaluation.model_evaluator import MODEL_RUBRIC_VERSION
 from core.runs.journal_lifecycle import JournalOptions
+from core.runs.journal_ports import Journal
 from attacks.fitd.native import GarakException
 
 
@@ -199,7 +200,7 @@ def assert_saved_failure(experiment: FITDExperiment, root: Path, target_calls: i
     assert metadata["progress"]["target_calls"] == target_calls
 
 
-def assert_cleanup_pending(experiment: FITDExperiment, journal: RunJournal) -> None:
+def assert_cleanup_pending(experiment: FITDExperiment, journal: Journal) -> None:
     assert experiment.status().state is UserState.COMPLETED
     assert not journal.finished and not journal.wait(0)
     assert not any(event.kind == "run_finished" for event in journal.events())

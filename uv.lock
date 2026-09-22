@@ -798,6 +798,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "garak" },
+    { name = "rich" },
 ]
 
 [package.optional-dependencies]
@@ -823,6 +824,7 @@ dev = [
 requires-dist = [
     { name = "garak", git = "https://github.com/NVIDIA/garak.git?rev=3f50ea5ff9cd7050099940647c15c39b07a93392" },
     { name = "huggingface-hub", extras = ["cli"], marker = "extra == 'qwen'", specifier = "==0.34.4" },
+    { name = "rich", specifier = "==15.0.0" },
     { name = "torch", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'qwen'", specifier = "==2.5.1+cu121", index = "https://download.pytorch.org/whl/cu121", conflict = { package = "tai", extra = "qwen" } },
     { name = "transformers", marker = "extra == 'qwen'", specifier = "==4.51.3" },
 ]

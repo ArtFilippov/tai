@@ -1,0 +1,29 @@
+[project]
+name = "tai-vllm-server"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "vllm==0.6.4.post1",
+    "torch==2.5.1+cu121",
+    "torchvision==0.20.1+cu121",
+    "xformers==0.0.28.post3",
+    "transformers==4.45.2",
+    "numpy==1.26.4",
+    "huggingface-hub[cli]==0.26.2",
+]
+
+[tool.uv]
+package = false
+exclude-newer = "2024-12-01T00:00:00Z"
+exclude-newer-package = { pyairports = "2026-09-22T00:00:00Z", torch = "2025-03-01T00:00:00Z", torchvision = "2025-03-01T00:00:00Z", xformers = "2025-03-01T00:00:00Z" }
+environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu121" }
+torchvision = { index = "pytorch-cu121" }
+xformers = { index = "pytorch-cu121" }
+
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
