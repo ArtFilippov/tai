@@ -36,6 +36,10 @@ dev = [
     "packaging==25.0",
 ]
 
+[tool.uv]
+# garak rejects resource symlinks that resolve outside its installed data directory.
+link-mode = "copy"
+
 [tool.uv.sources]
 garak = { git = "https://github.com/NVIDIA/garak.git", rev = "3f50ea5ff9cd7050099940647c15c39b07a93392" }
 torch = { index = "pytorch-cu121", extra = "qwen" }

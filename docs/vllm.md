@@ -29,6 +29,12 @@ environments/vllm/.venv/bin/huggingface-cli download Qwen/Qwen2.5-0.5B-Instruct 
 Все пути кеша расширяют `~`; snapshot должен быть подготовлен заранее.
 Веса: SHA-256 `fdf756fa7fcbe7404d5c60e26bff1a0c8b8aa1f72ced49e7dd0210fe288fb7fe`.
 
+Основное окружение tai использует `link-mode = "copy"` для совместимости с
+загрузчиком ресурсов garak. Если серия завершается за несколько секунд с
+`GarakException: The requested resource does not refer to a valid path`, нулевыми
+счётчиками вызовов и сервером `not_started`, переустановите garak по
+[инструкции восстановления окружения](../README.md#закрепление-garak).
+
 Совместимость проверена на TITAN RTX (compute capability 7.5), драйвере
 545.23.08, CUDA runtime 12.1. Используются FP16, XFORMERS и eager execution.
 vLLM 0.6.3.post1 был отклонён: его CLI привязывает сокет ко всем интерфейсам

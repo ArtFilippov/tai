@@ -247,6 +247,25 @@ uv run --locked --group dev python quality/check.py
 произвольные плагины и CLI garak могут требовать дополнительные зависимости.
 Для воспроизводимой установки используйте `uv sync --locked`, а не `pip install .`.
 
+В `pyproject.toml` закреплён `tool.uv.link-mode = "copy"`: загрузчик ресурсов garak
+отклоняет символические ссылки, ведущие из каталога пакета в кеш uv. Установка
+через `--link-mode symlink` приводит к `GarakException: The requested resource
+does not refer to a valid path` ещё при загрузке шаблонов FITD, до обращений к моделям.
+В таком окружении все записи серии могут быстро завершиться `FAILED` с
+`evaluated=0`; `complete=true` означает только обработку всех записей манифеста.
+
+Смена настройки сама по себе не переустанавливает уже установленные пакеты.
+Для исправления существующего окружения выполните из корня проекта:
+
+```bash
+uv sync --locked --group dev --link-mode copy --reinstall-package garak
+uv run --locked --group dev pytest tests/test_fitd.py
+```
+
+Если окружение подготовлено с extra Qwen, добавьте `--extra qwen` к обеим командам.
+Эти офлайн-тесты используют настоящие шаблоны и алгоритм FITD с управляемыми
+ответами моделей. Модельный `preflight` сам по себе загрузку шаблонов не проверяет.
+
 ## Воспроизводимая выборка ALERT
 
 [`examples/alert-manifest.json`](examples/alert-manifest.json) содержит 32 базовых
@@ -272,6 +291,46 @@ Preflight этого профиля проверяет также третью �
 Подготовка весов общая с Qwen ниже; меняется только `--config` на ALERT-профиль.
 Схема, команды, ограничения качества Qwen 0.5B и интерфейс для последовательного
 запуска: **[docs/model-evaluator.md](docs/model-evaluator.md)**.
+
+### ALERT через Transformers на выбранной GPU
+
+[`examples/fitd-alert-transformers.toml`](examples/fitd-alert-transformers.toml)
+переключает все три роли на существующий `QwenChat` через `backend = "qwen"`.
+Профиль сохраняет модель, ревизию, инструкции и рубрику vLLM-профиля, FP16,
+greedy, **200 раундов FITD**, 512 выходных токенов для Target/Attacker и 320
+для Evaluator. Лимит контекста берётся из модели (32 768), а не из настройки
+vLLM `max_model_len=8192`; ответы разных исполнителей могут различаться.
+Общий Transformers-исполнитель сериализует генерации, поэтому используйте `--jobs 1`.
+
+Подготовьте зависимости основного окружения:
+
+```bash
+uv sync --locked --group dev --extra qwen
+```
+
+Выберите GPU по UUID из `nvidia-smi -i <номер> --query-gpu=uuid --format=csv,noheader`.
+Пример ниже использует физическую GPU 2 на текущем сервере. Внутри маски
+`CUDA_VISIBLE_DEVICES` она становится `cuda:0`, как задано у всех трёх ролей.
+При запуске на другой машине замените UUID своим. Существующие веса используются
+из локального кеша; подготовка snapshot описана ниже в разделе Qwen.
+
+```bash
+CUDA_VISIBLE_DEVICES=GPU-8ce36c63-5438-3920-55bf-3a109d1878d5 \
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 \
+  uv run --locked --offline --extra qwen tai preflight \
+    --config examples/fitd-alert-transformers.toml
+
+CUDA_VISIBLE_DEVICES=GPU-8ce36c63-5438-3920-55bf-3a109d1878d5 \
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 \
+  uv run --locked --offline --extra qwen tai alert-series --jobs 1 \
+    --manifest examples/alert-manifest.json \
+    --profile examples/fitd-alert-transformers.toml \
+    --taxonomy ALERT_taxonomy.md \
+    --artifacts-dir runs/alert-transformers
+```
+
+Сохраняйте `--extra qwen` во всех командах uv, использующих это окружение.
+Индекс, JSON-отчёт и журналы имеют тот же формат, что у серии через vLLM.
 
 ## Параллельная серия ALERT, живые строки и JSON-отчёт
 
