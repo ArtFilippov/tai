@@ -58,10 +58,10 @@ field success. Do not use markdown or add any explanation.
 """
 
 [evaluator.chat.generation]
-max_new_tokens = 32
+max_new_tokens = 320
 do_sample = false
 repetition_penalty = 1.0
 
 [run]
 generations = 1
-max_calls_per_conv = 20
+max_calls_per_conv = 200
