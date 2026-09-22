@@ -46,7 +46,7 @@ def test_direct_nested_method_and_correlated_role_pairs(tmp_path: Path) -> None:
 
     def exchange() -> Exchange:
         assert row.entry.method == "exchange[Attacker]"
-        assert row.entry.exchanges["Attacker"].response is None
+        assert "Attacker" not in row.entry.exchanges
         return Exchange(context, "first", request, response)
 
     def nested() -> Exchange:
@@ -62,7 +62,8 @@ def test_direct_nested_method_and_correlated_role_pairs(tmp_path: Path) -> None:
     journal.call("exchange", lambda: Exchange(target, "target", request, response), context=target, call_id="target", message=request)
 
     def pending() -> Exchange:
-        assert row.entry.exchanges["Attacker"].response is None
+        assert row.entry.exchanges["Attacker"].call_id == "first"
+        assert row.entry.exchanges["Attacker"].response is not None
         assert row.entry.exchanges["Target"].response is not None
         return Exchange(context, "second", Message("new request"), Message("new response"))
 
@@ -71,6 +72,38 @@ def test_direct_nested_method_and_correlated_role_pairs(tmp_path: Path) -> None:
     journal.finish(WorkerOutcome(UserStatus(state=UserState.COMPLETED, run_id="run"), None, None, None))
     assert row.entry.state == "COMPLETED" and not row.entry.method
     assert (tmp_path / "run" / "events.jsonl").exists()
+
+
+@pytest.mark.parametrize("fails", [False, True])
+def test_completed_target_pair_survives_pending_or_failed_exchange(tmp_path: Path, fails: bool) -> None:
+    row = RecordedRow()
+    journal = ConsoleRunJournal(row)
+    journal.bind("run")
+    journal.begin("run", tmp_path / "run")
+    context = Context("run", "Target", "chat", Cause("test"))
+    first = Exchange(context, "first", Message("first request"), Message("first response"))
+    second = Exchange(context, "second", Message("second request"), Message("second response"))
+    journal.call("exchange", lambda: first, context=context, call_id=first.call_id, message=first.request)
+
+    def exchange() -> Exchange:
+        assert row.entry.method == "exchange[Target]"
+        assert row.entry.cells()[3:] == (first.request.text, first.response.text)
+        if fails:
+            raise OSError("exchange failed")
+        return second
+
+    if fails:
+        with pytest.raises(OSError, match="exchange failed"):
+            journal.call("exchange", exchange, context=context, call_id=second.call_id, message=second.request)
+    else:
+        journal.call("exchange", exchange, context=context, call_id=second.call_id, message=second.request)
+    expected = first if fails else second
+    assert row.entry.cells()[3:] == (expected.request.text, expected.response.text)
+    assert row.entry.exchanges["Target"].call_id == expected.call_id and not row.entry.method
+    assert all(change.exchange is None or change.exchange.response is not None for change in row.changes)
+    state = UserState.FAILED if fails else UserState.COMPLETED
+    journal.finish(WorkerOutcome(UserStatus(state=state, run_id="run"), None, None, None))
+    assert row.entry.cells()[3:] == (expected.request.text, expected.response.text)
 
 
 def test_primary_exception_survives_failed_unwind_and_resources_release(tmp_path: Path) -> None:
@@ -95,7 +128,7 @@ def test_primary_exception_survives_failed_unwind_and_resources_release(tmp_path
     assert journal.finished and not row.entry.method
 
 
-def test_real_fitd_request_visible_before_response_and_matches_unobserved_result(tmp_path: Path) -> None:
+def test_real_fitd_pair_visible_only_after_response_and_matches_unobserved_result(tmp_path: Path) -> None:
     row = RecordedRow()
     entered, release = Event(), Event()
     target, attacker, base, setup, _ = participants(["Accepted"], ["yes"])
@@ -113,9 +146,10 @@ def test_real_fitd_request_visible_before_response_and_matches_unobserved_result
         assert entered.wait(5)
         assert row.entry.method == "exchange[Target]"
         assert row.entry.run_id == observed.status().run_id
-        assert row.entry.exchanges["Target"].response is None
+        assert row.entry.cells()[3:] == ("", "") and "Target" not in row.entry.exchanges
         assert row.entry.exchanges["Attacker"].response is not None
     assert not row.entry.method and row.entry.state == "COMPLETED"
+    assert row.entry.exchanges["Target"].response == "Accepted"
     _, plain_attacker, plain_base, plain_setup, _ = participants(["Accepted"], ["yes"])
     plain = FITDExperiment(target, plain_attacker, plain_base, plain_setup, max_calls_per_conv=1, journal_factory=RunJournal)
     plain.start()
