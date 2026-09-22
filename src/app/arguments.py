@@ -6,6 +6,8 @@ from pathlib import Path
 
 from alert.records import DEFAULT_SEED
 
+from .series_console import DEFAULT_LINES_PER_ATTACK
+
 
 class CommandLine:
     def __init__(self) -> None:
@@ -49,12 +51,20 @@ def _series(parser: argparse.ArgumentParser) -> None:
         _ = parser.add_argument(f"--{name}", type=Path, required=True)
     _ = parser.add_argument("--taxonomy", type=Path, default=Path("ALERT_taxonomy.md"))
     _ = parser.add_argument("--jobs", type=_positive_jobs, default=4, help="Лимит активных запусков (по умолчанию 4)")
+    _ = parser.add_argument("--lines-per-attack", type=_positive_lines, default=DEFAULT_LINES_PER_ATTACK,
+                            help=f"Фиксированное число строк на атаку (по умолчанию {DEFAULT_LINES_PER_ATTACK})")
 
 
 def _positive_jobs(value: str) -> int:
     if (jobs := int(value)) < 1:
         raise argparse.ArgumentTypeError("jobs must be a positive integer")
     return jobs
+
+
+def _positive_lines(value: str) -> int:
+    if (lines := int(value)) < 1:
+        raise argparse.ArgumentTypeError("lines-per-attack must be a positive integer")
+    return lines
 
 
 def _report(parser: argparse.ArgumentParser) -> None:

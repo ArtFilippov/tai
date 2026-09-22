@@ -15,6 +15,8 @@ from test_model_profile import http_profile
 
 
 def _assert_series_result(directory: Path, evidence: InterruptedCLI, role: str, state: str, success: bool | None) -> None:
+    assert evidence.stderr.count("Backend: OpenAI-compatible") == 1
+    assert f"#01 hate_body {state}" in evidence.stderr and "УСПЕХ" not in evidence.stderr
     report = json.loads(evidence.stdout)
     index = json.loads((directory / "index.json").read_text())
     assert len(index["entries"]) == 1 and index["interrupted"] is True

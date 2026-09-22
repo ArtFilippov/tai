@@ -4,13 +4,15 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 
-from rich.table import Table
+from rich.console import Console
 from rich.text import Text
 
 from core.runs.console_ports import DisplayExchange, RowChange
 
 _ESCAPES = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-?]*[ -/]*[@-~]|\x1b[@-_]")
-COMPACT_WIDTH = 50
+_HEADERS = ("#", "Состояние", "Текущая функция", "Attacker", "Target")
+_MIN_TABLE_WIDTH = 2 * len(_HEADERS) - 1
+_STATES = {"COMPLETED": "SAVING", "SUCCESS": "УСПЕХ", "UNSUCCESSFUL": "НЕУСПЕХ", "UNEVALUATED": "НЕТ ОЦЕНКИ"}
 
 
 def safe_text(value: str) -> str:
@@ -37,29 +39,48 @@ class ConsoleEntry:
             if exchange.response is None or previous is None or previous.call_id == exchange.call_id:
                 self.exchanges[exchange.role] = exchange
 
-    def pair(self, role: str, width: int) -> str:
-        if (exchange := self.exchanges.get(role)) is None:
-            return "—"
-        request = Text(safe_text(exchange.request))
-        response = Text(safe_text(exchange.response) if exchange.response is not None else "… waiting")
-        request.truncate(max(1, (width - 3) // 2), overflow="ellipsis")
-        response.truncate(max(1, (width - 3) // 2), overflow="ellipsis")
-        return request.plain + " → " + response.plain
+    def cells(self) -> tuple[str, ...]:
+        exchange = self.exchanges.get("Target")
+        request = exchange.request if exchange is not None else ""
+        response = (exchange.response if exchange.response is not None else "…") if exchange is not None else ""
+        return (f"{self.sequence:02}", self.display_state(), self.method, request, response)
+
+    def display_state(self) -> str:
+        return _STATES.get(self.state, self.state)
 
 
-def row_table(entries: list[ConsoleEntry], width: int) -> Table:
-    table = Table.grid(expand=True, padding=(0, 1))
-    if width < COMPACT_WIDTH:
-        table.add_column(no_wrap=True, overflow="ellipsis", width=max(1, width))
-        for entry in entries:
-            table.add_row(Text(safe_text(f"#{entry.sequence:02} {entry.state} {entry.method}")))
-        return table
-    for ratio in (2, 3, 4, 4):
-        table.add_column(ratio=ratio, no_wrap=True, overflow="ellipsis", min_width=1)
+def _column_widths(width: int) -> tuple[int, ...]:
+    if width < _MIN_TABLE_WIDTH:
+        return (max(1, width),)
+    available = width - 4
+    metadata = (max(1, min(3, available // 16)), max(1, min(10, available // 7)), max(1, min(24, available // 5)))
+    remaining = available - sum(metadata)
+    return (*metadata, remaining // 2, remaining - remaining // 2)
+
+
+def _cell_lines(value: str, console: Console, width: int, height: int) -> list[str]:
+    wrapped = list(Text(safe_text(value)).wrap(console, width, overflow="fold"))
+    lines = wrapped[:height]
+    if len(wrapped) > height:
+        lines[-1].truncate(width - 1, overflow="crop")
+        _ = lines[-1].append("…")
+    lines.extend(Text() for _ in range(height - len(lines)))
+    for line in lines:
+        line.truncate(width, overflow="crop", pad=True)
+    return [line.plain for line in lines]
+
+
+def _block(values: tuple[str, ...], console: Console, height: int) -> list[str]:
+    widths = _column_widths(console.width)
+    if len(widths) == 1:
+        values = (" ".join(values),)
+    columns = [_cell_lines(value, console, width, height) for value, width in zip(values, widths, strict=True)]
+    return [" ".join(row) for row in zip(*columns, strict=True)]
+
+
+def row_table(entries: list[ConsoleEntry | None], console: Console, lines_per_attack: int) -> Text:
+    lines = _block(_HEADERS, console, 1)
     for entry in entries:
-        pair_width = max(1, (width - 6) * 4 // 13 - 3)
-        values = (f"#{entry.sequence:02} {entry.category}", f"{entry.state} {entry.method}",
-                  "A: " + entry.pair("Attacker", pair_width), "T: " + entry.pair("Target", pair_width))
-        table.add_row(*(Text(safe_text(value), no_wrap=True, overflow="ellipsis") for value in values))
-    table.width = max(width, 1)
-    return table
+        values = entry.cells() if entry is not None else ("",) * len(_HEADERS)
+        lines.extend(_block(values, console, lines_per_attack))
+    return Text("\n".join(lines), no_wrap=True, overflow="crop")

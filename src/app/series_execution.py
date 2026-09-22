@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from itertools import count
 from threading import Event
 
-from alert.accounting import COMPLETED, SeriesReport, build_series_report, classify_outcome
+from alert.accounting import COMPLETED, Classification, SeriesReport, build_series_report, classify_outcome
 from alert.records import AlertRecord
 from core.primitives.messages import Message
 
@@ -17,6 +17,14 @@ from .series_contracts import SeriesDependencies, SeriesIdentity, SeriesResult
 def validate_jobs(jobs: object) -> None:
     if isinstance(jobs, bool) or not isinstance(jobs, int) or jobs < 1:
         raise ValueError("jobs must be a positive integer")
+
+
+def _display_state(outcome: dict[str, object], classification: Classification) -> str:
+    if outcome["error"] or outcome["storage_error"] or outcome["artifact_errors"]:
+        return "ERROR"
+    if outcome["state"] == COMPLETED:
+        return {True: "SUCCESS", False: "UNSUCCESSFUL", None: "UNEVALUATED"}[classification["success"]]
+    return str(outcome["state"])
 
 
 @dataclass
@@ -81,10 +89,10 @@ class SeriesExecution:
     def _capture(self, sequence: int, attempt: Attempt) -> None:
         self.dependencies.display(sequence, "SAVING")
         outcome = attempt.capture(self.dependencies)
-        self.entries[sequence - 1].update(outcome, classification=classify_outcome(outcome))
+        classification = classify_outcome(outcome)
+        self.entries[sequence - 1].update(outcome, classification=classification)
         del self.active[sequence]
-        failed = bool(outcome["error"] or outcome["storage_error"] or outcome["artifact_errors"])
-        self.dependencies.display(sequence, "ERROR" if failed else str(outcome["state"]))
+        self.dependencies.display(sequence, _display_state(outcome, classification))
 
     def _run_records(self) -> None:
         for _ in count():

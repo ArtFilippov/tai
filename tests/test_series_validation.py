@@ -8,6 +8,7 @@ from qwen_fakes import LocalFixture
 from series_support import MANIFEST, TAXONOMY, qwen_profile
 
 from app.cli import main
+from app.series import run_alert_series
 from tai import FITDExperiment
 
 pytest_plugins = ("qwen_fakes",)
@@ -62,3 +63,18 @@ def test_all_inputs_are_validated_before_any_start(
     assert lib.records.requests == [] and lib.records.loads == []
     if problem != "artifacts":
         assert not artifacts.exists()
+
+
+@pytest.mark.parametrize("lines", [0, -1, True])
+def test_invalid_line_budget_precedes_input_loading(tmp_path: Path, lines: int) -> None:
+    with pytest.raises(ValueError, match="lines_per_attack"):
+        run_alert_series(MANIFEST, tmp_path / "absent.toml", tmp_path / "runs", taxonomy_path=TAXONOMY, lines_per_attack=lines)
+    assert not (tmp_path / "runs").exists()
+
+
+@pytest.mark.parametrize("lines", ["0", "-1", "text"])
+def test_cli_rejects_invalid_line_budget(tmp_path: Path, lines: str) -> None:
+    with pytest.raises(SystemExit) as caught:
+        main(["alert-series", "--manifest", str(MANIFEST), "--profile", str(tmp_path / "absent.toml"),
+              "--artifacts-dir", str(tmp_path / "runs"), "--lines-per-attack", lines])
+    assert caught.value.code == 2 and not (tmp_path / "runs").exists()

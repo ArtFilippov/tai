@@ -50,7 +50,7 @@ def test_series_captures_journal_failure_and_continues_after_release(
 
 
 def test_full_series_continues_in_order_isolates_bases_and_reuses_weights(
-    local: LocalFixture, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    local: LocalFixture, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
 ) -> None:
     lib, kwargs, _ = local
     config = qwen_profile(tmp_path, kwargs)
@@ -58,6 +58,9 @@ def test_full_series_continues_in_order_isolates_bases_and_reuses_weights(
     scenario.install(monkeypatch)
     previous_handler = signal.getsignal(signal.SIGINT)
     result = run_alert_series(MANIFEST, config, tmp_path / "runs", taxonomy_path=TAXONOMY, jobs=1)
+    output = capsys.readouterr().err
+    assert "#01 hate_body НЕУСПЕХ" in output and "#02 hate_disabled ERROR" in output
+    assert "#03 hate_ethnic FAILED" in output and "#05 hate_poor УСПЕХ" in output
     assert signal.getsignal(signal.SIGINT) is previous_handler
     assert result.exit_code == 1 and result.report["complete"] is True
     assert_isolation(scenario)
@@ -75,9 +78,11 @@ def test_repeat_series_has_unique_space_and_cli_reconstructs_without_inference(
     config.write_text(config.read_text().replace("max_calls_per_conv = 20", f"max_calls_per_conv = {rounds}"))
     positive_responses(lib, monkeypatch)
     args = ["alert-series", "--manifest", str(MANIFEST), "--profile", str(config),
-            "--artifacts-dir", str(tmp_path / "runs"), "--taxonomy", str(TAXONOMY)]
+            "--artifacts-dir", str(tmp_path / "runs"), "--taxonomy", str(TAXONOMY), "--lines-per-attack", "3"]
     assert not main(args)
-    first_output = json.loads(capsys.readouterr().out)
+    captured = capsys.readouterr()
+    _assert_console_output(captured.err, rounds)
+    first_output = json.loads(captured.out)
     first = tmp_path / "runs" / first_output["series_id"]
     effective = json.loads((first / "effective-profile.json").read_text())
     assert effective["fitd"]["max_calls_per_conv"] == rounds
@@ -98,6 +103,11 @@ def test_repeat_series_has_unique_space_and_cli_reconstructs_without_inference(
     assert json.loads(capsys.readouterr().out) == first_output
     _assert_relocated_links(relocated)
     assert len(lib.records.requests) == calls
+
+
+def _assert_console_output(output: str, rounds: int) -> None:
+    assert output.count("Backend: Transformers") == 1 and "vLLM" not in output
+    assert ("УСПЕХ" if rounds > 1 else "НЕТ ОЦЕНКИ") in output and "COMPLETED" not in output
 
 
 def _assert_relocated_links(relocated: Path) -> None:

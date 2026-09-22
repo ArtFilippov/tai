@@ -6,6 +6,7 @@ from functools import partial
 from importlib.metadata import version
 from pathlib import Path
 from time import monotonic
+from typing import TypedDict, Unpack
 from uuid import uuid4
 
 from alert.manifest import load_alert_manifest
@@ -22,9 +23,14 @@ from .runtime import Interrupts, utc_now
 from .series_contracts import SeriesDependencies, SeriesIdentity, SeriesResult
 from .series_execution import SeriesExecution, validate_jobs
 from .series_storage import SeriesFiles
-from .series_console import SeriesConsole
+from .series_console import DEFAULT_LINES_PER_ATTACK, SeriesConsole, validate_lines_per_attack
 
-__all__ = ["SeriesResult", "run_alert_series"]
+__all__ = ["SeriesOptions", "SeriesResult", "run_alert_series"]
+
+
+class SeriesOptions(TypedDict, total=False):
+    jobs: int
+    lines_per_attack: int
 
 
 def _settings(profile: RoleProfile) -> dict[str, object]:
@@ -47,9 +53,18 @@ def _bind(profile: RoleProfile, base: Message, directory: Path) -> RunHandle:
     return bind_experiment(user, directory)
 
 
-def _execute_series(manifest: AlertManifest, profile: RoleProfile, store: SeriesFiles, jobs: int) -> SeriesResult:
-    server = profile.assembly.settings if profile.assembly is not None else dict
-    with Interrupts() as stop, SeriesConsole(len(manifest.records), server=server) as console:
+def _backend(profile: RoleProfile) -> str:
+    labels = {"qwen": "Transformers", "vllm": "vLLM", "openai": "OpenAI-compatible"}
+    backends = {role: settings.get("backend") if isinstance(settings := chat.settings(), dict) else None
+                for role, chat in profile.chats().items()}
+    roles = {role: labels.get(str(backend), "unknown") for role, backend in backends.items()}
+    if len(set(roles.values())) == 1:
+        return next(iter(roles.values()))
+    return " · ".join(f"{role}: {backend}" for role, backend in roles.items())
+
+
+def _execute_series(manifest: AlertManifest, profile: RoleProfile, store: SeriesFiles, jobs: int, *, lines_per_attack: int) -> SeriesResult:
+    with Interrupts() as stop, SeriesConsole(len(manifest.records), backend=_backend(profile), lines_per_attack=lines_per_attack) as console:
         create = partial(_create, profile, store.directory / "runs", console=console)
         dependencies = SeriesDependencies(create, store, stop, Clock(utc_now, monotonic), store.redact, console.notify)
         try:
@@ -66,8 +81,30 @@ def _series_files(
     )
 
 
+def _prepare_series(
+    manifest_path: Path, profile_path: Path, artifacts_dir: Path, taxonomy_path: Path,
+) -> tuple[AlertManifest, RoleProfile, SeriesFiles]:
+    directory = artifacts_dir / str(uuid4())
+    paths = {"manifest": manifest_path, "profile": profile_path, "taxonomy": taxonomy_path}
+    inputs = {name: path.read_bytes() for name, path in paths.items()}
+    manifest = load_alert_manifest(manifest_path, taxonomy_path=taxonomy_path)
+    profile = load_profile(profile_path, alert_series=True, server_log=directory / "vllm.log")
+    if any(path.read_bytes() != inputs[name] for name, path in paths.items()):
+        raise ValueError("Series input files changed during validation")
+    return manifest, profile, _series_files(profile, paths, inputs, directory)
+
+
+def _limits(options: SeriesOptions) -> tuple[int, int]:
+    if unknown := options.keys() - {"jobs", "lines_per_attack"}:
+        raise TypeError(f"Unexpected series options: {', '.join(sorted(unknown))}")
+    jobs, lines = options.get("jobs", 4), options.get("lines_per_attack", DEFAULT_LINES_PER_ATTACK)
+    validate_jobs(jobs)
+    validate_lines_per_attack(lines)
+    return jobs, lines
+
+
 def run_alert_series(
-    manifest_path: Path, profile_path: Path, artifacts_dir: Path, *, taxonomy_path: Path, jobs: int = 4,
+    manifest_path: Path, profile_path: Path, artifacts_dir: Path, *, taxonomy_path: Path, **options: Unpack[SeriesOptions],
 ) -> SeriesResult:
     """Validate all inputs, then admit independent FITD workers in manifest order.
 
@@ -80,20 +117,12 @@ def run_alert_series(
         profile_path (Path): Pinned participant TOML configuration.
         artifacts_dir (Path): Parent of the new unique series directory.
         taxonomy_path (Path): Pinned local taxonomy document.
-        jobs (int, default=4): Positive bound on workers including cleanup and saving.
+        **options (Unpack[SeriesOptions]): Positive jobs (default 4) and lines_per_attack (default 5).
 
     Returns:
         SeriesResult: Saved directory, accounting report, and command exit code.
 
-    Raises:
-        ValueError: An input file changed during validation.
     """
-    validate_jobs(jobs)
-    directory = artifacts_dir / str(uuid4())
-    paths = {"manifest": manifest_path, "profile": profile_path, "taxonomy": taxonomy_path}
-    inputs = {name: path.read_bytes() for name, path in paths.items()}
-    manifest = load_alert_manifest(manifest_path, taxonomy_path=taxonomy_path)
-    profile = load_profile(profile_path, alert_series=True, server_log=directory / "vllm.log")
-    if any(path.read_bytes() != inputs[name] for name, path in paths.items()):
-        raise ValueError("Series input files changed during validation")
-    return _execute_series(manifest, profile, _series_files(profile, paths, inputs, directory), jobs)
+    jobs, lines = _limits(options)
+    manifest, profile, store = _prepare_series(manifest_path, profile_path, artifacts_dir, taxonomy_path)
+    return _execute_series(manifest, profile, store, jobs, lines_per_attack=lines)

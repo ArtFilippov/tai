@@ -66,9 +66,10 @@ def test_missing_dependencies_and_cuda_do_not_fall_back(
 def test_import_and_observation_do_not_import_optional_libraries() -> None:
     completed = subprocess.run(
         [sys.executable, "-c", "; ".join((
-            "from app.configuration import load_profile", "from pathlib import Path",
+            "from app.configuration import load_profile", "from app import series", "from pathlib import Path",
             "import sys", "p = load_profile(Path('examples/fitd-alert-qwen.toml'))",
             "p.evaluator.settings()", "p.target.settings()",
+            "assert series._backend(p) == 'Transformers'",
             "assert not {'torch', 'transformers', 'huggingface_hub'} & sys.modules.keys()",
         ))], capture_output=True, text=True, timeout=10, check=False,
     )

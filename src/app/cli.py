@@ -18,7 +18,8 @@ from .terminal import run_profile
 
 
 def _series(args: argparse.Namespace) -> int:
-    result = run_alert_series(args.manifest, args.profile, args.artifacts_dir, taxonomy_path=args.taxonomy, jobs=args.jobs)
+    result = run_alert_series(args.manifest, args.profile, args.artifacts_dir, taxonomy_path=args.taxonomy,
+                              jobs=args.jobs, lines_per_attack=args.lines_per_attack)
     print(f"Серия: {result.directory}", file=sys.stderr)
     if result.exit_code == 1:
         print(f"Ошибки запуска или сохранения: {result.directory / 'index.json'}", file=sys.stderr)

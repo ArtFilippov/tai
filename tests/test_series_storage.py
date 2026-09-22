@@ -52,6 +52,7 @@ def _install_storage_fault(
 ])
 def test_run_storage_failure_is_explicit_and_preserves_actual_completed_outcome(
     local: LocalFixture, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, filename: str, interrupt: bool,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     lib, kwargs, _ = local
     profile = qwen_profile(tmp_path, kwargs)
@@ -59,6 +60,8 @@ def test_run_storage_failure_is_explicit_and_preserves_actual_completed_outcome(
     users: list[FITDExperiment] = []
     _install_storage_fault(monkeypatch, users, filename, interrupt)
     result = run_alert_series(MANIFEST, profile, tmp_path / "runs", taxonomy_path=TAXONOMY, jobs=1)
+    output = capsys.readouterr().err
+    assert "#01 hate_body ERROR" in output and "#01 hate_body УСПЕХ" not in output
     assert result.exit_code == (130 if interrupt else 1)
     index = json.loads((result.directory / "index.json").read_text())
     first = index["entries"][0]
