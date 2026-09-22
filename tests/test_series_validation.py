@@ -25,7 +25,7 @@ def _corrupt_profile(profile: Path, problem: str) -> None:
     else:
         old, new = {
             "profile": ('system = "Evaluator"', "unknown = true"),
-            "rounds": ("max_calls_per_conv = 20", "max_calls_per_conv = 19"),
+            "rounds": ("max_calls_per_conv = 20", "max_calls_per_conv = 0"),
         }[problem]
         profile.write_text(profile.read_text().replace(old, new))
 

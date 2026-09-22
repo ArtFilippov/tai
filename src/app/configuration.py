@@ -101,7 +101,7 @@ def load_profile(config: Path, *, alert_series: bool = False, server_log: Path =
 
     Args:
         config (Path): Complete TOML experiment configuration.
-        alert_series (bool, default=False): Require the pinned ALERT evaluator and round limit.
+        alert_series (bool, default=False): Require the pinned ALERT model evaluator.
         server_log (Path, default=DEFAULT_SERVER_LOG): Separate server process output.
 
     Returns:
@@ -112,5 +112,5 @@ def load_profile(config: Path, *, alert_series: bool = False, server_log: Path =
     return ProfileAssembly(
         chat_factory(data.get("target"), "target", server), chat_factory(data.get("attacker"), "attacker", server),
         _evaluator(data.get("evaluator"), server, alert_series=alert_series),
-        round_limit(data.get("run", {}), alert_series=alert_series), server,
+        round_limit(data.get("run", {})), server,
     ).create()

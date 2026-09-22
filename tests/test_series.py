@@ -65,17 +65,25 @@ def test_full_series_continues_in_order_isolates_bases_and_reuses_weights(
     assert_series_files(result, scenario)
 
 
+@pytest.mark.parametrize("rounds", [1, 200])
 def test_repeat_series_has_unique_space_and_cli_reconstructs_without_inference(
     local: LocalFixture, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+    rounds: int,
 ) -> None:
     lib, kwargs, _ = local
     config = qwen_profile(tmp_path, kwargs)
+    config.write_text(config.read_text().replace("max_calls_per_conv = 20", f"max_calls_per_conv = {rounds}"))
     positive_responses(lib, monkeypatch)
     args = ["alert-series", "--manifest", str(MANIFEST), "--profile", str(config),
             "--artifacts-dir", str(tmp_path / "runs"), "--taxonomy", str(TAXONOMY)]
     assert not main(args)
     first_output = json.loads(capsys.readouterr().out)
     first = tmp_path / "runs" / first_output["series_id"]
+    effective = json.loads((first / "effective-profile.json").read_text())
+    assert effective["fitd"]["max_calls_per_conv"] == rounds
+    index = json.loads((first / "index.json").read_text())
+    assert len(index["entries"]) == 32
+    assert all(entry["progress"]["max_calls_per_conv"] == rounds for entry in index["entries"])
     old = {path: path.read_bytes() for path in first.rglob("*") if path.is_file()}
     assert not main(args)
     second_output = json.loads(capsys.readouterr().out)

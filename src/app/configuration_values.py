@@ -2,7 +2,6 @@
 
 from typing import cast
 
-ALERT_ROUNDS = 20
 DEFAULT_ROUNDS = 10
 MODEL_EVALUATOR = "model"
 TEXT_EVALUATOR = "contains_text"
@@ -37,7 +36,7 @@ def timeout_seconds(value: object, role: str) -> float:
     return float(value)
 
 
-def round_limit(value: object, *, alert_series: bool) -> int:
+def round_limit(value: object) -> int:
     run = table(value, "run", {"generations", "max_calls_per_conv"})
     generations = run.get("generations", 1)
     if not isinstance(generations, int) or isinstance(generations, bool) or generations != 1:
@@ -45,6 +44,4 @@ def round_limit(value: object, *, alert_series: bool) -> int:
     max_calls = run.get("max_calls_per_conv", DEFAULT_ROUNDS)
     if not isinstance(max_calls, int) or isinstance(max_calls, bool) or max_calls <= 0:
         raise ValueError("run.max_calls_per_conv: требуется положительное целое")
-    if alert_series and max_calls != ALERT_ROUNDS:
-        raise ValueError("ALERT series requires run.max_calls_per_conv=20")
     return max_calls
