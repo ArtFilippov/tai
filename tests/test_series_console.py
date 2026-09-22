@@ -57,13 +57,15 @@ def test_non_tty_output_and_short_terminal_summary_have_no_control_codes() -> No
     assert "\x1b" not in output
 
 
-def test_old_response_cannot_be_assigned_to_new_request() -> None:
+@pytest.mark.parametrize("response", ["new answer", ""])
+def test_pair_changes_only_when_next_response_is_complete(response: str) -> None:
     entry = ConsoleEntry(1, "category")
     entry.update(RowChange(exchange=DisplayExchange("Target", "first", "old", "old answer")))
     entry.update(RowChange(exchange=DisplayExchange("Target", "second", "new")))
-    entry.update(RowChange(exchange=DisplayExchange("Target", "first", "old", "late old answer")))
+    assert entry.cells()[3:] == ("old", "old answer")
+    entry.update(RowChange(exchange=DisplayExchange("Target", "second", "new", response)))
     assert entry.exchanges["Target"].call_id == "second"
-    assert entry.exchanges["Target"].response is None
+    assert entry.cells()[3:] == ("new", response)
 
 
 def _frame(display: SeriesConsole) -> list[str]:
@@ -78,7 +80,7 @@ def test_updates_completion_and_reuse_preserve_other_slot_positions() -> None:
     for sequence in range(1, 4):
         display.row(sequence, "category").update(RowChange(state="RUNNING", run_id=str(sequence)))
     before = _frame(display)
-    display.update(2, RowChange(method="exchange[Target]", exchange=DisplayExchange("Target", "call", "WORD " * 100)))
+    display.update(2, RowChange(method="exchange[Target]"))
     pending = _frame(display)
     display.update(2, RowChange(exchange=DisplayExchange("Target", "call", "WORD " * 100, "ANSWER " * 100)))
     answered = _frame(display)
@@ -168,7 +170,7 @@ def test_live_refresh_keeps_backend_outside_redrawn_table(monkeypatch: pytest.Mo
     display._console.size = (100, 8)
     with display:
         row = display.row(1, "category")
-        row.update(RowChange(state="RUNNING", run_id="run", exchange=DisplayExchange("Target", "call", "Question")))
+        row.update(RowChange(state="RUNNING", run_id="run", method="exchange[Target]"))
         row.update(RowChange(exchange=DisplayExchange("Target", "call", "Question", "Answer")))
         display.notify(1, "SUCCESS")
     output = stream.getvalue()

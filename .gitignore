@@ -8,6 +8,11 @@ dist/
 /runs/
 OPENCODE_ZEN_KEY.json
 
-# Local quality reports and native cache
-.quality/
-.tach/
+# Historical reports from before the Eryx migration
+/.quality/
+
+# Local Eryx reports, logs and native cache
+/.eryx/reports/
+/.eryx/logs/
+/.eryx/cache/
+/.tach/

@@ -182,7 +182,7 @@ for record in manifest.records:
 ```bash
 uv run --locked --offline pytest tests/test_alert.py
 uv run --locked --offline pytest
-uv run --locked --offline --group dev python quality/check.py
+uv run --locked --offline --group dev python eryx/check.py
 ```
 
 Тесты используют общий запрет внешней сети. Управляемый набор проверяет golden

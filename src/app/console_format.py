@@ -35,8 +35,7 @@ class ConsoleEntry:
             if (value := getattr(change, name)) is not None:
                 setattr(self, name, value)
         if (exchange := change.exchange) is not None and exchange.role in {"Attacker", "Target"}:
-            previous = self.exchanges.get(exchange.role)
-            if exchange.response is None or previous is None or previous.call_id == exchange.call_id:
+            if exchange.response is not None:
                 self.exchanges[exchange.role] = exchange
 
     def cells(self) -> tuple[str, ...]:

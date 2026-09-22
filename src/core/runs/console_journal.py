@@ -44,13 +44,11 @@ class ConsoleRunJournal(JournalDelegate):
         self._journal.configure()
 
     def _enter(self, operation: str, inputs: CallInputs) -> None:
-        context, message = inputs.get("context"), inputs.get("message")
-        exchange = None
-        if operation == EXCHANGE and context is not None and message is not None:
+        context = inputs.get("context")
+        if operation == EXCHANGE and context is not None:
             operation += f"[{context.role}]"
-            exchange = DisplayExchange(context.role, inputs.get("call_id") or "", self.redactor.text(message.text))
         self._methods.append(operation)
-        self._update(RowChange(method=operation, exchange=exchange))
+        self._update(RowChange(method=operation))
 
     def _leave(self) -> None:
         _ = self._methods.pop()
