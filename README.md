@@ -90,8 +90,9 @@ Target и Attacker владеют своими разговорами через
 `.python-version`; системный Python менять не требуется.
 
 ```bash
+git submodule update --init --recursive
 uv sync --locked --group dev
-uv run --locked --group dev python quality/check.py
+uv run --locked --group dev python eryx/check.py
 uv run --locked --group dev pytest
 uv run --locked python examples/offline_fitd.py
 ```
@@ -102,20 +103,22 @@ uv run --locked python examples/offline_fitd.py
 и на HTTP-подпроцессы. Программируются ответы моделей, а построение лестницы,
 переходы FITD и решение о продолжении выполняет настоящая библиотека.
 
-### Статические проверки Python Quality
+### Статические проверки Eryx
 
-**Python Quality Bundle 1.0.0** — единственный набор статических проверок проекта.
-На свежем клоне достаточно
-`uv sync --locked --group dev`: инструменты закреплены в `pyproject.toml` и `uv.lock`,
-runner и профили находятся в [`quality/`](quality/README.md). Архитектура уже
-инициализирована; её состояние хранится в `quality/architecture.ready.json`.
+**[Eryx](https://github.com/ArtFilippov/eryx)** — единственный набор статических
+проверок проекта. Код закреплён gitlink в [`eryx/`](eryx/README.md), версии
+анализаторов — в `pyproject.toml` и `uv.lock`. На свежем клоне выполните
+`git submodule update --init --recursive`, затем `uv sync --locked --group dev`.
+Можно сразу клонировать `tai` с `--recurse-submodules`; нужен доступ к приватному Eryx.
+Настройки проекта находятся в `.eryx/`. Архитектура уже принята: 109 модулей,
+состояние — `.eryx/architecture.ready.json`, границы — `tach.toml`.
 
 Единая команда проверяет `src/` и `tests/`:
 
 ```bash
-uv run --locked --group dev python quality/check.py
+uv run --locked --group dev python eryx/check.py
 # Полный машиночитаемый вывод:
-uv run --locked --group dev python quality/check.py --json
+uv run --locked --group dev python eryx/check.py --json
 ```
 
 | Инструмент | Проверки |
@@ -130,34 +133,56 @@ uv run --locked --group dev python quality/check.py --json
 или исполнения инструмента. Успешная установка и принятие архитектурной конфигурации
 сами по себе не означают, что код прошёл строгий профиль.
 
-Полный отчёт всегда сохраняется в `.quality/reports/latest.json`, история — в
-`.quality/reports/<run-id>/report.json`, сырые логи — в соседнем `raw/`.
+Полный отчёт всегда сохраняется в `.eryx/reports/latest.json`, история — в
+`.eryx/reports/<run-id>/report.json`, сырые логи — в соседнем `raw/`.
 Для короткого вывода можно добавить `--max-diagnostics 20`; JSON остаётся полным.
-Каталог `.quality/` исключён из Git. Проверки не создают baseline и не исправляют код.
+Отчёт содержит SHA запущенного Eryx и признак локальных изменений. Из Git исключены
+только `.eryx/reports/`, `.eryx/logs/` и `.eryx/cache/`; настройки `.eryx/` версионируются.
+Проверки не создают baseline и не исправляют код.
 
-Настройки читаемости меняются в [`quality/readability.toml`](quality/readability.toml),
-общая область исключений — в [`quality/scope.toml`](quality/scope.toml). После изменения:
+Настройки читаемости меняются в [`.eryx/readability.toml`](.eryx/readability.toml),
+общая область исключений — в [`.eryx/scope.toml`](.eryx/scope.toml). После изменения:
 
 ```bash
-uv run --locked --group dev python quality/apply.py --json
+uv run --locked --group dev python eryx/apply.py --json
 ```
 
 Настройки типов находятся в `pyrightconfig.json`, архитектуры — в `tach.toml`.
 Runtime-тесты pytest и офлайн-пример запускаются отдельными командами выше.
-Локальные исправления runner проверяются отдельно:
+Регрессии runner и автономная установка проверяются отдельно (установочным
+тестам нужен uv и сеть либо подготовленный cache):
 
 ```bash
-uv run --locked --group dev python -m unittest discover -s quality/tests
+uv run --locked --group dev python -B -m unittest discover -s eryx/tests
 ```
 
 При работе с окружением Qwen добавляйте `--extra qwen` к командам uv.
-Подробности профиля и ограничения: [`quality/README.md`](quality/README.md);
-инструкции для агентов: [`AGENTS.md`](AGENTS.md) и [`quality/AGENTS.md`](quality/AGENTS.md).
-Локальные исправления поставки: [`quality/LOCAL-CHANGES.md`](quality/LOCAL-CHANGES.md).
+Подробности профиля и ограничения: [`eryx/PROFILE.md`](eryx/PROFILE.md);
+инструкции для агентов: [`AGENTS.md`](AGENTS.md) и [`eryx/AGENTS.md`](eryx/AGENTS.md).
+Исправления совместимости: [`eryx/COMPATIBILITY.md`](eryx/COMPATIBILITY.md).
 
-### Архитектурные настройки Python Quality (Tach)
+При обновлении gitlink при необходимости выполните установку повторно:
 
-[Tach](https://docs.gauge.sh/) входит в Python Quality и устанавливается
+```bash
+bash eryx/install.sh --project . --extra qwen --dry-run --json
+bash eryx/install.sh --project . --extra qwen
+```
+
+Для окружения без Qwen при первой установке опустите `--extra qwen`; повторная
+установка сохраняет выбор extras из `.eryx/installation.json`. Установщик сохраняет
+лимиты, принятую архитектуру, native `ignored-parents` для garak, `stubPath` и
+uv source/index/metadata. При сбое управляемые файлы откатываются.
+
+Исправление инструмента: создайте ветку **внутри `eryx/`** (HEAD обычно detached),
+воспроизведите проблему на `tai`, добавьте автономную регрессию и откройте
+**PR в Eryx**. После CI, ревью и слияния закрепите точный merged SHA в
+**отдельном PR tai**, со ссылкой на PR инструмента. Полный цикл описан в
+[`eryx/README.md`](eryx/README.md). Для отдельного клона инструмента используйте
+`uv run --locked --group dev --extra qwen python /path/to/eryx/check.py --project .`.
+
+### Архитектурные настройки Eryx (Tach)
+
+[Tach](https://docs.gauge.sh/) входит в Eryx и устанавливается
 вместе с dev-зависимостями.
 
 Пакеты группируют связанные обязанности; общие механизмы располагаются глубже
@@ -221,7 +246,7 @@ Interface → Infrastructure и Infrastructure → UseCase, которые ра�
 лишь линейный порядок слоёв. Текущие импорты остаются видимыми для диагностики:
 принятие конфигурации не подавляет нарушения границ или слоёв.
 
-Проверки модульных и внешних зависимостей выполняются через `quality/check.py`.
+Проверки модульных и внешних зависимостей выполняются через `eryx/check.py`.
 
 При добавлении модуля задайте в `tach.toml` его слой, зависимости и публичный интерфейс.
 После намеренного изменения зависимостей можно выполнить
@@ -230,8 +255,8 @@ sync записывает фактические импорты, в том чи�
 sync не нужен. После изменения слоёв синхронизируйте clean-architecture-плагин:
 
 ```bash
-uv run --locked --group dev python quality/init_architecture.py --accept --json
-uv run --locked --group dev python quality/check.py
+uv run --locked --group dev python eryx/init_architecture.py --accept --json
+uv run --locked --group dev python eryx/check.py
 ```
 
 ### Закрепление garak

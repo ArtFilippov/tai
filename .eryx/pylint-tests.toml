@@ -1,4 +1,4 @@
-# Test-only profile. Regenerate with quality/apply.py.
+# Test-only profile. Regenerate with eryx/apply.py.
 [tool.pylint.main]
 load-plugins = ["pylint.extensions.bad_builtin", "pylint.extensions.broad_try_clause", "pylint.extensions.check_elif", "pylint.extensions.code_style", "pylint.extensions.comparison_placement", "pylint.extensions.confusing_elif", "pylint.extensions.consider_refactoring_into_while_condition", "pylint.extensions.consider_ternary_expression", "pylint.extensions.dict_init_mutate", "pylint.extensions.docstyle", "pylint.extensions.dunder", "pylint.extensions.empty_comment", "pylint.extensions.eq_without_hash", "pylint.extensions.for_any_all", "pylint.extensions.magic_value", "pylint.extensions.mccabe", "pylint.extensions.no_self_use", "pylint.extensions.overlapping_exceptions", "pylint.extensions.private_import", "pylint.extensions.redefined_loop_name", "pylint.extensions.redefined_variable_type", "pylint.extensions.set_membership", "pylint.extensions.typing", "pylint.extensions.while_used", "clean_architecture_linter"]
 jobs = 1
@@ -7,7 +7,7 @@ fail-under = 0
 fail-on = ["I"]
 recursive = true
 py-version = "3.12"
-ignore-paths = ["(?:^|[/\\\\])(?:\\.git|\\.venv|venv|__pycache__|\\.mypy_cache|\\.pytest_cache|\\.ruff_cache|\\.tox|\\.nox|\\.quality|node_modules|build|dist|vendor|vendored|_vendor|generated|_generated|migrations)(?:[/\\\\]|$)"]
+ignore-paths = ["(?:^|[/\\\\])(?:\\.git|\\.venv|venv|__pycache__|\\.mypy_cache|\\.pytest_cache|\\.ruff_cache|\\.tox|\\.nox|\\.eryx|node_modules|build|dist|vendor|vendored|_vendor|generated|_generated|migrations)(?:[/\\\\]|$)"]
 
 [tool.pylint.messages_control]
 enable = ["all"]

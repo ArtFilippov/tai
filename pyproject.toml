@@ -34,6 +34,7 @@ dev = [
     "pydoclint==0.9.1",
     "tomlkit==0.13.3",
     "packaging==25.0",
+    "jsonschema==4.26.0",
 ]
 
 [tool.uv]
@@ -72,7 +73,7 @@ fail-under = 0
 fail-on = ["I"]
 recursive = true
 py-version = "3.12"
-ignore-paths = ["(?:^|[/\\\\])(?:\\.git|\\.venv|venv|__pycache__|\\.mypy_cache|\\.pytest_cache|\\.ruff_cache|\\.tox|\\.nox|\\.quality|node_modules|build|dist|vendor|vendored|_vendor|generated|_generated|migrations)(?:[/\\\\]|$)"]
+ignore-paths = ["(?:^|[/\\\\])(?:\\.git|\\.venv|venv|__pycache__|\\.mypy_cache|\\.pytest_cache|\\.ruff_cache|\\.tox|\\.nox|\\.eryx|node_modules|build|dist|vendor|vendored|_vendor|generated|_generated|migrations)(?:[/\\\\]|$)"]
 
 [tool.pylint.messages_control]
 enable = ["all"]
@@ -122,8 +123,8 @@ max-try-statements = 1
 [tool.pyright]
 stubPath = "src/attacks/fitd/stubs"
 include = ["src", "tests"]
-exclude = [".git/**", "**/.git/**", ".venv/**", "**/.venv/**", "venv/**", "**/venv/**", "__pycache__/**", "**/__pycache__/**", ".mypy_cache/**", "**/.mypy_cache/**", ".pytest_cache/**", "**/.pytest_cache/**", ".ruff_cache/**", "**/.ruff_cache/**", ".tox/**", "**/.tox/**", ".nox/**", "**/.nox/**", ".quality/**", "**/.quality/**", "node_modules/**", "**/node_modules/**", "build/**", "**/build/**", "dist/**", "**/dist/**", "vendor/**", "**/vendor/**", "vendored/**", "**/vendored/**", "_vendor/**", "**/_vendor/**", "generated/**", "**/generated/**", "_generated/**", "**/_generated/**", "migrations/**", "**/migrations/**"]
-ignore = [".git/**", "**/.git/**", ".venv/**", "**/.venv/**", "venv/**", "**/venv/**", "__pycache__/**", "**/__pycache__/**", ".mypy_cache/**", "**/.mypy_cache/**", ".pytest_cache/**", "**/.pytest_cache/**", ".ruff_cache/**", "**/.ruff_cache/**", ".tox/**", "**/.tox/**", ".nox/**", "**/.nox/**", ".quality/**", "**/.quality/**", "node_modules/**", "**/node_modules/**", "build/**", "**/build/**", "dist/**", "**/dist/**", "vendor/**", "**/vendor/**", "vendored/**", "**/vendored/**", "_vendor/**", "**/_vendor/**", "generated/**", "**/generated/**", "_generated/**", "**/_generated/**", "migrations/**", "**/migrations/**"]
+exclude = [".git/**", "**/.git/**", ".venv/**", "**/.venv/**", "venv/**", "**/venv/**", "__pycache__/**", "**/__pycache__/**", ".mypy_cache/**", "**/.mypy_cache/**", ".pytest_cache/**", "**/.pytest_cache/**", ".ruff_cache/**", "**/.ruff_cache/**", ".tox/**", "**/.tox/**", ".nox/**", "**/.nox/**", ".eryx/**", "**/.eryx/**", "node_modules/**", "**/node_modules/**", "build/**", "**/build/**", "dist/**", "**/dist/**", "vendor/**", "**/vendor/**", "vendored/**", "**/vendored/**", "_vendor/**", "**/_vendor/**", "generated/**", "**/generated/**", "_generated/**", "**/_generated/**", "migrations/**", "**/migrations/**"]
+ignore = [".git/**", "**/.git/**", ".venv/**", "**/.venv/**", "venv/**", "**/venv/**", "__pycache__/**", "**/__pycache__/**", ".mypy_cache/**", "**/.mypy_cache/**", ".pytest_cache/**", "**/.pytest_cache/**", ".ruff_cache/**", "**/.ruff_cache/**", ".tox/**", "**/.tox/**", ".nox/**", "**/.nox/**", ".eryx/**", "**/.eryx/**", "node_modules/**", "**/node_modules/**", "build/**", "**/build/**", "dist/**", "**/dist/**", "vendor/**", "**/vendor/**", "vendored/**", "**/vendored/**", "_vendor/**", "**/_vendor/**", "generated/**", "**/generated/**", "_generated/**", "**/_generated/**", "migrations/**", "**/migrations/**"]
 typeCheckingMode = "strict"
 pythonPlatform = "Linux"
 extraPaths = ["src"]
@@ -164,7 +165,7 @@ extraPaths = ["src"]
 [tool.pydoclint]
 style = "google"
 quiet = true
-exclude = "(?:^|[/\\\\])(?:\\.git|\\.venv|venv|__pycache__|\\.mypy_cache|\\.pytest_cache|\\.ruff_cache|\\.tox|\\.nox|\\.quality|node_modules|build|dist|vendor|vendored|_vendor|generated|_generated|migrations)(?:[/\\\\]|$)"
+exclude = "(?:^|[/\\\\])(?:\\.git|\\.venv|venv|__pycache__|\\.mypy_cache|\\.pytest_cache|\\.ruff_cache|\\.tox|\\.nox|\\.eryx|node_modules|build|dist|vendor|vendored|_vendor|generated|_generated|migrations)(?:[/\\\\]|$)"
 skip-checking-short-docstrings = false
 skip-checking-private-functions = false
 skip-checking-raises = false

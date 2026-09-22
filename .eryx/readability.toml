@@ -1,4 +1,4 @@
-# Edit these limits, then run: uv run --locked python quality/apply.py
+# Edit these limits, then run: uv run --locked python eryx/apply.py
 # Length means Pylint's own metrics, NOT an AST-independent line count.
 [production]
 max_line_length = 160
