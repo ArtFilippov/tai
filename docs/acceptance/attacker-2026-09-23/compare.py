@@ -138,8 +138,8 @@ def main():
         "recorded_evidence": recorded_evidence(args.events, inputs), "variants": [],
     }
     systems = {"original": ORIGINAL_SYSTEM, "minimal": MINIMAL_SYSTEM}
-    if profile["attacker"]["system"] not in systems.values():
-        systems["profile"] = profile["attacker"]["system"]
+    if profile["attacker"].get("system", "") not in systems.values():
+        systems["profile"] = profile["attacker"].get("system", "")
     if replay is not None:
         systems = {variant["name"]: variant["system"] for variant in replay["variants"]}
     chats = {name: QwenChat(**config, system=system) for name, system in systems.items()}
@@ -152,7 +152,7 @@ def main():
         evolution = []
         for case in variant_inputs:
             chat.reset()
-            assert len(chat.history()) == 1
+            assert len(chat.history()) == bool(systems[name])
             start = time.monotonic()
             response = chat.send(Message(case["input"])).to_string()
             result = {"case": case["name"], "conversation_id": chat.conversation_id,

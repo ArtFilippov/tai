@@ -100,11 +100,13 @@ def _assert_stale(chat: LLMChat, points: tuple[object, ...]) -> None:
         chat.restore(foreign)
 
 
-def test_checkpoints_restore_immutable_branches_and_reset_preserves_system() -> None:
+@pytest.mark.parametrize("system", ["", "Puzzle rules"])
+def test_checkpoints_restore_immutable_branches_and_reset_preserves_system(system: str) -> None:
     requests: list[tuple[ChatTurn, ...]] = []
     chat = LLMChat(
-        lambda turns: requests.append(turns) or "Puzzle answer", system="Puzzle rules"
+        lambda turns: requests.append(turns) or "Puzzle answer", system=system
     )
+    initial_history = chat.history()
     initial = chat.checkpoint()
     chat.send(Message("First clue"))
     first_history = chat.history()
@@ -119,23 +121,21 @@ def test_checkpoints_restore_immutable_branches_and_reset_preserves_system() -> 
     assert chat.restore(discarded) is None
     assert chat.history() == discarded_history
     assert chat.restore(initial) is None
-    assert chat.history() == first_history[:1]
+    assert chat.history() == initial_history
     # Branching and reading do not mutate snapshots or execute the model again.
     assert len(requests) == 3
     assert chat.restore(first) is None
     assert chat.history() == first_history
 
     assert chat.reset() is None
-    assert chat.history() == first_history[:1]
+    assert chat.history() == initial_history
     _assert_stale(chat, (initial, first, discarded))
     current = chat.checkpoint()
     chat.send(Message("New puzzle"))
-    assert [(t.role, t.message.to_string()) for t in requests[-1]] == [
-        ("system", "Puzzle rules"),
-        ("user", "New puzzle"),
-    ]
+    expected = [("system", system)] if system else []
+    assert [(t.role, t.message.to_string()) for t in requests[-1]] == expected + [("user", "New puzzle")]
     assert chat.restore(current) is None
-    assert chat.history() == first_history[:1]
+    assert chat.history() == initial_history
 
 
 @pytest.mark.parametrize("finish", ["complete", "cancel", "fail"])

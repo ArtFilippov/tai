@@ -47,11 +47,44 @@ def test_alert_profile_pins_three_independent_roles_and_reusable_evaluator() -> 
         assert generation["max_new_tokens"] == max_tokens
         assert generation["do_sample"] is False
         assert generation["repetition_penalty"] == 1.0
-        assert len(array_value(settings["initial_history"], "history")) == 1
+        assert array_value(settings["initial_history"], "history") == []
         assert "puzzle" not in json.dumps(settings)
         assert "SILVER-KEY" not in json.dumps(settings)
     text_profile = load_profile(Path("examples/fitd-qwen.toml"))
     assert isinstance(text_profile.evaluator.evaluator, ContainsTextEvaluator)
+
+
+@pytest.mark.parametrize("name", ["qwen", "transformers", "vllm"])
+@pytest.mark.parametrize("custom_system", [False, True])
+def test_alert_profiles_reset_and_recreate_only_explicit_system_instructions(
+    tmp_path: Path, name: str, custom_system: bool,
+) -> None:
+    path = Path(f"examples/fitd-alert-{name}.toml")
+    if custom_system:
+        source = path.read_text(encoding="utf-8")
+        for role in ("target", "attacker", "evaluator.chat"):
+            source = source.replace(f"[{role}]", f'[{role}]\nsystem = "Custom {role}"')
+        path = tmp_path / "custom.toml"
+        path.write_text(source, encoding="utf-8")
+    profile = load_profile(path)
+    fresh = profile.fresh()
+    chats = (profile.target, profile.attacker, profile.evaluator.chat,
+             fresh.target, fresh.attacker, fresh.evaluator.chat)
+    assert len({id(chat) for chat in chats}) == 6
+    assert profile.evaluator.evaluator is not fresh.evaluator.evaluator
+    conversations: set[str] = set()
+    for chat, role in zip(chats, ("target", "attacker", "evaluator.chat") * 2, strict=True):
+        assert chat is not None
+        expected = [("system", f"Custom {role}")] if custom_system else []
+        assert [(turn.role, turn.text()) for turn in chat.history()] == expected
+        conversations.add(chat.conversation_id)
+        chat.reset()
+        assert [(turn.role, turn.text()) for turn in chat.history()] == expected
+        conversations.add(chat.conversation_id)
+        settings = object_value(chat.settings(), "settings")
+        assert len(array_value(settings["initial_history"], "history")) == len(expected)
+    assert len(conversations) == 12
+    profile.close()
 
 
 @pytest.mark.parametrize(

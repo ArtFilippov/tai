@@ -23,10 +23,11 @@ class InvalidQwenInput(Protocol):
     def __call__(self, **options: object) -> QwenChat: ...
 
 
-def config_for(local: LocalFixture, tmp_path: Path, *, alert: bool = False) -> Path:
+def config_for(
+    local: LocalFixture, tmp_path: Path, *, template: str = "fitd-qwen",
+) -> Path:
     _, kwargs, _ = local
-    template = "examples/fitd-alert-qwen.toml" if alert else "examples/fitd-qwen.toml"
-    text = Path(template).read_text(encoding="utf-8")
+    text = Path(f"examples/{template}.toml").read_text(encoding="utf-8")
     text = text.replace("Qwen/Qwen2.5-0.5B-Instruct", kwargs["model"])
     text = text.replace("7ae557604adf67be50417f59c2c2f167def9a775", kwargs["revision"])
     text = text.replace("~/.cache/tai/huggingface", str(kwargs["cache_dir"]))
@@ -63,14 +64,21 @@ def test_missing_dependencies_and_cuda_do_not_fall_back(
     assert not lib.records.loads and not chat.history()
 
 
-def test_import_and_observation_do_not_import_optional_libraries() -> None:
+@pytest.mark.parametrize("name", ["qwen", "transformers", "vllm"])
+def test_import_and_observation_do_not_import_optional_libraries(name: str) -> None:
     completed = subprocess.run(
         [sys.executable, "-c", "; ".join((
             "from app.configuration import load_profile", "from app import series", "from pathlib import Path",
-            "import sys", "p = load_profile(Path('examples/fitd-alert-qwen.toml'))",
-            "p.evaluator.settings()", "p.target.settings()",
-            "assert series._backend(p) == 'Transformers'",
-            "assert not {'torch', 'transformers', 'huggingface_hub'} & sys.modules.keys()",
+            "import sys", f"p = load_profile(Path('examples/fitd-alert-{name}.toml'))",
+            "p = p.fresh()", "p.evaluator.settings()", "p.target.settings()",
+            "assert p.evaluator.chat is not None",
+            "chats = (p.target, p.attacker, p.evaluator.chat)",
+            "assert all(chat.history() == () for chat in chats)",
+            "[chat.reset() for chat in chats]",
+            "assert all(chat.history() == () for chat in chats)",
+            f"assert series._backend(p) == {'vLLM' if name == 'vllm' else 'Transformers'!r}",
+            "assert not {'torch', 'transformers', 'huggingface_hub', 'vllm'} & sys.modules.keys()",
+            "p.close()",
         ))], capture_output=True, text=True, timeout=10, check=False,
     )
     assert not completed.returncode, completed.stderr
@@ -171,37 +179,45 @@ criterion="key"
     assert not lib.records.imports
 
 
-def test_three_role_preflight_and_real_fitd_reuse_one_load_across_base_requests(
-    local: LocalFixture, tmp_path: Path,
-) -> None:
-    lib, _, snapshot = local
-    profile = load_profile(config_for(local, tmp_path, alert=True))
-    lib.responses.extend(["READY", "READY", '{"success": false}'])
-    report = tmp_path / "preflight.json"
-    assert not run_preflight(profile, report)
+def assert_model_preflight(report: Path) -> None:
     data = json.loads(report.read_text(encoding="utf-8"))
     assert [r["role"] for r in data["roles"]] == ["Target", "Attacker", "Evaluator"]
     assert all(r["final_settings"]["actual_dtype"] == "float16" for r in data["roles"][:2])
     assert data["roles"][2]["final_settings"]["chat"]["actual_dtype"] == "float16"
     assert len({r["conversation_id"] for r in data["roles"]}) == 3
-    for base in (Message("First base"), Message("Second base")):
+
+
+@pytest.mark.parametrize("template", ["fitd-alert-qwen", "fitd-alert-transformers"])
+def test_three_role_preflight_and_real_fitd_reuse_one_load_across_base_requests(
+    local: LocalFixture, tmp_path: Path, template: str,
+) -> None:
+    lib, _, snapshot = local
+    profile = load_profile(config_for(local, tmp_path, template=template))
+    lib.responses.extend(["READY", "READY", '{"success": false}'])
+    report = tmp_path / "preflight.json"
+    assert not run_preflight(profile, report)
+    assert_model_preflight(report)
+    first = profile.create_experiment(Message("First base"), tmp_path / "runs")
+    fresh = profile.fresh()
+    second = fresh.create_experiment(Message("Second base"), tmp_path / "runs")
+    for user in (first, first, second):
         lib.responses.extend(["Initial", "L1", "L2", "L3"])
         for response in ("One", "Two", "Three", "Four", "Presented"):
             lib.responses.extend([response, "yes"])
         lib.responses.append('{"success": true}')
-        user = profile.create_experiment(base, tmp_path / "runs")
         user.start()
         assert user.wait(10)
         status = user.status()
         assert status.state is UserState.COMPLETED, status.reason
         assert status.evaluation is not None and status.evaluation.success is True
         assert status.progress.evaluator_calls == 1
-        assert status.progress.max_calls_per_conv == 20
-        assert len(lib.records.requests[-1]) == 2
+        assert status.progress.max_calls_per_conv == profile.max_calls_per_conv
+        assert len(lib.records.requests[-1]) == 1
         sent = json.loads(lib.records.requests[-1][-1]["content"].split("INPUT_JSON:\n")[1])
-        assert sent == {"base_request": base.to_string(), "result": "Presented"}
+        assert sent == {"base_request": user.base.to_string(), "result": "Presented"}
     assert lib.records.loads == [("tokenizer", str(snapshot)), ("model", str(snapshot))]
-    assert len(lib.records.generations) == 33
+    assert len(lib.records.generations) == 48
+    assert all(turn["role"] != "system" for request in lib.records.requests for turn in request)
     assert not lib.responses
 
 
