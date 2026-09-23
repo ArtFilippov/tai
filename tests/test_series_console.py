@@ -35,7 +35,7 @@ def test_fixed_height_blocks_at_terminal_width(width: int, height: int) -> None:
     assert "\x1b" not in stream.getvalue()
     assert "BOILERPLATE" not in stream.getvalue() and "NOT_SENT" not in stream.getvalue()
     if width >= 80:
-        assert "Attacker" in lines[0] and "Target" in lines[0]
+        assert "Запрос к Target" in lines[0] and "Ответ Target" in lines[0]
         assert all("TARGET" in lines[index] and "ANSWER" in lines[index] for index in (1, 1 + height))
         assert "…" in lines[height] and "…" in lines[-1]
 

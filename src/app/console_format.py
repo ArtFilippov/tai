@@ -10,7 +10,7 @@ from rich.text import Text
 from core.runs.console_ports import DisplayExchange, RowChange
 
 _ESCAPES = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-?]*[ -/]*[@-~]|\x1b[@-_]")
-_HEADERS = ("#", "Состояние", "Текущая функция", "Attacker", "Target")
+_HEADERS = ("#", "Состояние", "Текущая функция", "Запрос к Target", "Ответ Target")
 _MIN_TABLE_WIDTH = 2 * len(_HEADERS) - 1
 _STATES = {"COMPLETED": "SAVING", "SUCCESS": "УСПЕХ", "UNSUCCESSFUL": "НЕУСПЕХ", "UNEVALUATED": "НЕТ ОЦЕНКИ"}
 
