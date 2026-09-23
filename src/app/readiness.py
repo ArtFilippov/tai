@@ -20,6 +20,7 @@ from .profiles import ParticipantProfile
 PROMPT = "Reply with exactly READY."
 CALL_STARTED = "call_started"
 CALL_COMPLETED = "call_completed"
+EVALUATOR_ROLE = "Evaluator"
 
 
 def _context(run_id: str, role: ModelRole, chat: LLMChat) -> Context:
@@ -112,11 +113,8 @@ def _check_evaluator(services: ReadinessServices, run_id: str, setup: EvaluatorS
 
 
 def check_roles(profile: ParticipantProfile, services: ReadinessServices, run_id: str) -> dict[str, object]:
-    results = [
-        _check_chat(services, run_id, "Target", profile.target),
-        _check_chat(services, run_id, "Attacker", profile.attacker),
-        _check_evaluator(services, run_id, profile.evaluator),
-    ]
+    results = [_check_chat(services, run_id, role, chat) for role, chat in profile.chats().items() if role != EVALUATOR_ROLE]
+    results.append(_check_evaluator(services, run_id, profile.evaluator))
     return {
         "check": "role_readiness", "tai_version": services.version,
         "completed_at": services.clock.now(), "prompt": PROMPT,

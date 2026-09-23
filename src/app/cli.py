@@ -8,6 +8,7 @@ from pathlib import Path
 
 from alert.preparation import prepare_alert
 from alert.report import reconstruct_report
+from attacks.shared.contracts import FITD
 from core.primitives.messages import Message
 
 from .arguments import parse_arguments
@@ -50,15 +51,17 @@ def _base_request(text: str | None, path: Path | None) -> Message:
     return Message(text)
 
 
-def _fitd(args: argparse.Namespace) -> int:
+def _attack(args: argparse.Namespace) -> int:
     base = _base_request(args.text, args.text_file)
     with closing(load_profile(args.config, server_log=args.artifacts_dir / "vllm.log")) as profile:
+        if args.command == FITD and profile.attack_type != FITD:
+            raise ValueError("tai fitd требует attack.type=fitd; используйте tai attack")
         return run_profile(profile, base, args.artifacts_dir)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_arguments(argv)
-    commands = {"fitd": _fitd, "preflight": _preflight, "prepare-alert": _prepare, "alert-series": _series, "alert-report": _report}
+    commands = {"attack": _attack, "fitd": _attack, "preflight": _preflight, "prepare-alert": _prepare, "alert-series": _series, "alert-report": _report}
     try:
         return commands[args.command](args)
     except UnicodeError:

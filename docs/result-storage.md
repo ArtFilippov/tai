@@ -5,6 +5,9 @@
 результат. Наблюдение во время атаки обеспечивает [независимый журнал](run-journal.md).
 CLI и серия используют общий внешний модуль `core.runs.storage`.
 
+Те же правила действуют для `AdaptiveAttacksUser` и `AdaptiveAttacksExperiment`:
+общий снимок и writer сохраняют фактический финальный Message и только его оценку.
+
 ```python
 from tai import FITDExperiment, capture_run, save_run
 

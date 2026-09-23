@@ -9,6 +9,9 @@ from functools import partial
 from pathlib import Path
 
 from attacks.fitd import FITDExperiment
+from attacks.adaptive_attacks import AdaptiveAttacksExperiment
+from attacks.shared.contracts import ADAPTIVE_ATTACKS, FITD, StrategyConfiguration
+from attacks.shared.experiment import Experiment
 from core.evaluation.assembly import EvaluatorSetup
 from core.evaluation.model_evaluator import MODEL_RUBRIC_VERSION
 from core.chats import LLMChat
@@ -18,7 +21,8 @@ from core.runs.journal import RunJournal
 from core.runs.journal_ports import Journal
 
 from .chat_factory import chat_factory
-from .configuration_values import MODEL_EVALUATOR, TEXT_EVALUATOR, round_limit, string, table
+from .attack_configuration import attack_configuration, strategy_configuration
+from .configuration_values import MODEL_EVALUATOR, TEXT_EVALUATOR, string, table
 from .profiles import ParticipantProfile
 from .server_factory import create_server
 
@@ -30,12 +34,18 @@ class RoleProfile(ParticipantProfile):
     assembly: ProfileAssembly | None = None
     journal_factory: Callable[..., Journal] = RunJournal
 
-    def create_experiment(self, base: Message, journal_dir: Path | None = None) -> FITDExperiment:
+    def create_experiment(self, base: Message, journal_dir: Path | None = None) -> Experiment:
+        if self.attack_type == ADAPTIVE_ATTACKS:
+            return AdaptiveAttacksExperiment(self.target, base, self.evaluator, journal_dir=journal_dir, journal_factory=self.journal_factory)
+        assert self.attacker is not None and self.max_calls_per_conv is not None
         return FITDExperiment(
             self.target, self.attacker, base, self.evaluator,
             journal_dir=journal_dir, max_calls_per_conv=self.max_calls_per_conv,
             journal_factory=self.journal_factory,
         )
+
+    def strategy(self) -> StrategyConfiguration:
+        return strategy_configuration(self.attack_type, self.max_calls_per_conv)
 
     def fresh(self) -> RoleProfile:
         if self.assembly is None:
@@ -50,13 +60,16 @@ class RoleProfile(ParticipantProfile):
 @dataclass(frozen=True)
 class ProfileAssembly:
     target: Callable[[], LLMChat]
-    attacker: Callable[[], LLMChat]
+    attacker: Callable[[], LLMChat] | None
     evaluator: Callable[[], EvaluatorSetup]
-    rounds: int
+    strategy: StrategyConfiguration
     server: QwenServer | None
 
     def create(self) -> RoleProfile:
-        return RoleProfile(self.target(), self.attacker(), self.evaluator(), self.rounds, self)
+        return RoleProfile(
+            self.target(), self.attacker() if self.attacker is not None else None, self.evaluator(),
+            self.strategy.max_calls_per_conv, self, attack_type=self.strategy.attack_type,
+        )
 
     def settings(self) -> dict[str, object]:
         return self.server.settings() if self.server is not None else {}
@@ -107,10 +120,12 @@ def load_profile(config: Path, *, alert_series: bool = False, server_log: Path =
     Returns:
         RoleProfile: Independent chats and a reusable evaluator, without inference.
     """
-    data = table(_read_config(config), "config", {"target", "attacker", "evaluator", "run", "server"})
+    data = table(_read_config(config), "config", {"attack", "target", "attacker", "evaluator", "run", "server"})
+    strategy = attack_configuration(data)
     server = create_server(data.get("server"), server_log)
     return ProfileAssembly(
-        chat_factory(data.get("target"), "target", server), chat_factory(data.get("attacker"), "attacker", server),
+        chat_factory(data.get("target"), "target", server),
+        chat_factory(data.get("attacker"), "attacker", server) if strategy.attack_type == FITD else None,
         _evaluator(data.get("evaluator"), server, alert_series=alert_series),
-        round_limit(data.get("run", {})), server,
+        strategy, server,
     ).create()

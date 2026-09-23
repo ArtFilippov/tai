@@ -1,8 +1,8 @@
 """The initial FITD profile shared by execution, observation, and artifacts."""
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
-GARAK_REVISION = "3f50ea5ff9cd7050099940647c15c39b07a93392"
+from attacks.shared.contracts import StrategyConfiguration
 
 
 @dataclass(frozen=True, slots=True)
@@ -10,6 +10,9 @@ class FITDProfile:
     generations: int = 1
     max_calls_per_conv: int = 10
     num_level_queries: int = 3
+
+    def configuration(self) -> StrategyConfiguration:
+        return StrategyConfiguration("fitd", asdict(self), self.max_calls_per_conv)
 
 
 FITD_PROFILE = FITDProfile()

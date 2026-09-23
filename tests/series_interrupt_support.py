@@ -11,8 +11,8 @@ import pytest
 from alert.values import array_value, object_value
 from app import experiments, series_storage
 from app.configuration import RoleProfile
-from attacks.fitd import execution
-from attacks.fitd.execution import Execution
+from attacks.shared import execution
+from attacks.shared.execution import Execution
 from core.chats import LLMChat
 from tai import FITDExperiment, Message, RunRecord, UserState
 
@@ -34,6 +34,7 @@ class InterruptRace:
 
         def create(profile: RoleProfile, base: Message, directory: Path) -> FITDExperiment:
             user = factory(profile, base, directory)
+            assert isinstance(user, FITDExperiment)
             if self.boundary == "construction":
                 self.interrupt()
             return user
@@ -103,6 +104,7 @@ class AdmissionFaults:
             if self.phase == "construction" and self.constructed == 2:
                 raise RuntimeError("factory unavailable")
             user = factory(profile, base, directory)
+            assert isinstance(user, FITDExperiment)
             self.users.append(user)
             return user
 
@@ -127,6 +129,7 @@ class ReleaseGate:
 
         def create(profile: RoleProfile, base: Message, directory: Path) -> FITDExperiment:
             user = factory(profile, base, directory)
+            assert isinstance(user, FITDExperiment)
             if self.users:
                 assert self.checked.is_set() and self.users[-1].wait(0)
             self.users.append(user)

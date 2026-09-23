@@ -1,48 +1,16 @@
 """Strategy ports: native library objects never cross the execution boundary."""
 
 from abc import abstractmethod
-from collections.abc import Callable
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
-from typing import Literal, Protocol
+from typing import Protocol
 
-from core.chats import ModelRole
+from attacks.shared.contracts import CompletionReason
 from core.primitives.messages import Message
 from core.runs.operations import (
-    BranchDecision, Cause, Checkpoint, Context, ConversationChange, ConversationPoint,
-    EvaluationResult, Exchange, LocalDecision, ResultChange, Synchronization, TargetExchange,
+    BranchDecision, Cause, Context, ConversationPoint,
+    LocalDecision, ResultChange, Synchronization, TargetExchange,
 )
-
-from .profile import FITDProfile
-
-type CompletionReason = Literal["evaluator_success", "round_limit", "strategy_exhausted"]
-
-
-@dataclass(frozen=True)
-class ConversationPorts:
-    checkpoint: Callable[[ModelRole, Cause], Checkpoint]
-    restore: Callable[[ModelRole, Checkpoint, Cause], ConversationChange]
-    reset: Callable[[ModelRole, Cause], ConversationChange]
-    conversation_id: Callable[[ModelRole], str]
-
-
-@dataclass(frozen=True)
-class StrategyPorts:
-    send: Callable[[ModelRole, Message, Cause], Exchange]
-    publish: Callable[[Message | None, Context, str], ResultChange]
-    evaluate: Callable[[Message, Context, str], EvaluationResult]
-    check_running: Callable[[], None]
-    conversation: ConversationPorts
-
-
-class StrategyRuntime(Protocol):
-    @property
-    @abstractmethod
-    def revision(self) -> str: ...
-
-    @abstractmethod
-    def __call__(self, base: Message, ports: StrategyPorts, profile: FITDProfile) -> CompletionReason: ...
-
 
 @dataclass(frozen=True)
 class Continuation[Attempt]:

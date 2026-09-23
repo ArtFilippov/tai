@@ -66,8 +66,8 @@
 
 ## 2. Обмены и контрольные точки
 
-В `attacks.fitd.execution.Execution` (операции обмена и оценки определены в
-`attacks.fitd.execution_operations.ExecutionOperations`):
+В общем `attacks.shared.execution.Execution` (операции обмена и оценки определены в
+`attacks.shared.execution_operations.ExecutionOperations`):
 
 - `_send(role, message, cause) -> Exchange`: завершённый обмен,
   `call_id`, контекст и точные запрос/ответ. Отмена/ошибка остаётся исключением;

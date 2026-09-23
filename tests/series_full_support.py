@@ -13,10 +13,11 @@ from alert.records import AlertManifest
 from alert.report import reconstruct_report
 from app.configuration import RoleProfile
 from app.series import SeriesResult
+from attacks.shared.experiment import Experiment
 from core.chats.qwen_contracts import StoppingCriterion, Tensor
 from tai import FITDExperiment, Message, ModelEvaluator, QwenChat
 
-type ExperimentFactory = Callable[[RoleProfile, Message, Path | None], FITDExperiment]
+type ExperimentFactory = Callable[[RoleProfile, Message, Path | None], Experiment]
 
 
 @dataclass
@@ -38,6 +39,7 @@ class MixedSeries:
         self.target_calls = 0
         assert base.text == self.manifest.records[len(self.users)].base_request
         user = factory(profile, base, directory)
+        assert isinstance(user, FITDExperiment)
         assert isinstance(user._settings.evaluator, ModelEvaluator)
         assert user._settings.evaluator is profile.evaluator.evaluator
         assert user.base is base

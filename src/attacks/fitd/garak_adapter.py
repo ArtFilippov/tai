@@ -5,9 +5,9 @@ from typing import override
 
 from core.primitives.messages import Message
 
-from .contracts import CompletionReason, StrategyPorts, StrategyRuntime
+from attacks.shared.contracts import GARAK_REVISION, CompletionReason, StrategyPorts, StrategyRuntime
 from .probe import FITDProbe
-from .profile import GARAK_REVISION, FITDProfile
+from .profile import FITD_PROFILE, FITDProfile
 from .target import FITDTarget
 
 __all__ = ["FITDProbe", "GarakRuntime", "GARAK_REVISION"]
@@ -17,6 +17,7 @@ __all__ = ["FITDProbe", "GarakRuntime", "GARAK_REVISION"]
 class GarakRuntime(StrategyRuntime):
     target_type: type[FITDTarget] = FITDTarget
     probe_type: type[FITDProbe] = FITDProbe
+    profile: FITDProfile = FITD_PROFILE
 
     @property
     @override
@@ -24,7 +25,7 @@ class GarakRuntime(StrategyRuntime):
         return GARAK_REVISION
 
     @override
-    def __call__(self, base: Message, ports: StrategyPorts, profile: FITDProfile) -> CompletionReason:
+    def __call__(self, base: Message, ports: StrategyPorts) -> CompletionReason:
         target = self.target_type(ports)
-        probe = self.probe_type(base, ports, target, profile=profile)
+        probe = self.probe_type(base, ports, target, profile=self.profile)
         return probe()

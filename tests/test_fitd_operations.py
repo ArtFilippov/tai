@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from fitd_observation import Observations, OperationValues, install_observers, puzzle
 
-from attacks.fitd.execution import Execution
+from attacks.shared.execution import Execution
 from core.runs.operations import BranchDecision, Cause, Context, EvaluationResult, ResultChange, TargetExchange, WorkerOutcome
 from tai import FITDExperiment as FITDUser, LLMChat, Message, UserState
 

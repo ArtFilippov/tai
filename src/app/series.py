@@ -1,7 +1,7 @@
 """Compose parallel ALERT experiments, direct observation, and owned resources."""
 
 import platform
-from dataclasses import asdict, replace
+from dataclasses import replace
 from functools import partial
 from importlib.metadata import version
 from pathlib import Path
@@ -11,8 +11,7 @@ from uuid import uuid4
 
 from alert.manifest import load_alert_manifest
 from alert.records import AlertManifest
-from attacks.fitd.garak_adapter import GARAK_REVISION
-from attacks.fitd.profile import FITD_PROFILE
+from attacks.shared.contracts import GARAK_REVISION
 from core.primitives.messages import Message
 from core.runs.console_journal import ConsoleRunJournal
 
@@ -34,10 +33,11 @@ class SeriesOptions(TypedDict, total=False):
 
 
 def _settings(profile: RoleProfile) -> dict[str, object]:
+    strategy = profile.strategy()
     return {
         "tai_version": version("tai"), "python": platform.python_version(), "platform": platform.platform(),
         "garak_revision": GARAK_REVISION,
-        "fitd": asdict(replace(FITD_PROFILE, max_calls_per_conv=profile.max_calls_per_conv)),
+        "attack": {"type": strategy.attack_type}, strategy.attack_type: dict(strategy.parameters),
         **profile.settings(),
     }
 
@@ -106,7 +106,7 @@ def _limits(options: SeriesOptions) -> tuple[int, int]:
 def run_alert_series(
     manifest_path: Path, profile_path: Path, artifacts_dir: Path, *, taxonomy_path: Path, **options: Unpack[SeriesOptions],
 ) -> SeriesResult:
-    """Validate all inputs, then admit independent FITD workers in manifest order.
+    """Validate all inputs, then admit independent strategy workers in manifest order.
 
     Main thread only (owns SIGINT temporarily). One loaded profile holds shared
     model resources. Configuration/series I/O errors raise; run-local errors are

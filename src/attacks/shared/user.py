@@ -1,4 +1,4 @@
-"""A background User running an injected FITD strategy runtime."""
+"""A background User running an injected strategy runtime."""
 
 from collections.abc import Callable
 from threading import Lock
@@ -11,13 +11,8 @@ from .execution import Execution
 from .execution_state import ExecutionSettings
 
 
-class FITDUser(User):
-    """Independent FITD executions, without diagnostic observation.
-
-    The presented text is the most recent Target response accepted for ladder
-    progression in the retained conversation. Context kept for realignment is
-    not a result. Use FITDExperiment to assemble this User with a run journal.
-    """
+class ExecutionUser(User):
+    """Independent strategy executions, without diagnostic observation."""
 
     def __init__(self, settings: ExecutionSettings) -> None:
         """Prepare an idle User with explicit execution dependencies.

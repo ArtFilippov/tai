@@ -19,7 +19,7 @@ class ExecutionOperations:
     def __init__(self, settings: ExecutionSettings) -> None:
         super().__init__()
         self._settings = settings
-        self._state = ExecutionState(UserStatus(progress=Progress(max_calls_per_conv=settings.profile.max_calls_per_conv)))
+        self._state = ExecutionState(UserStatus(progress=Progress(max_calls_per_conv=settings.configuration.max_calls_per_conv)))
         self._lock = Lock()
 
     @property
@@ -109,7 +109,7 @@ class ExecutionOperations:
         with self._lock:
             self._ensure_running()
             if self._state.result is not result:
-                raise RuntimeError("FITD requested evaluation of an unpresented Message")
+                raise RuntimeError("Strategy requested evaluation of an unpresented Message")
             self._state.status = replace(
                 self._state.status, evaluation=None,
                 progress=replace(self._state.status.progress, evaluator_calls=self._state.status.progress.evaluator_calls + 1),

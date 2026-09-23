@@ -10,7 +10,8 @@ from core.runs.operations import (
     Cause, ConversationChange, ConversationPoint, ResultChange, Synchronization, TargetExchange,
 )
 
-from .contracts import StrategyPorts, TargetOperations
+from attacks.shared.contracts import StrategyPorts
+from .contracts import TargetOperations
 from .native import Conversation, GarakMessage, message_text
 
 type History = tuple[tuple[str, str], ...]

@@ -78,6 +78,7 @@ def make_case(
     profile = load_profile(config)
     root = config.parent / "runs"
     user = profile.create_experiment(base, root)
+    assert isinstance(user, FITDExperiment)
     expected = {"base_request": "Explicit base [REDACTED]; [REDACTED]; [REDACTED]",
                 "result": "Presented [REDACTED]; [REDACTED]; [REDACTED]\nFull answer π\n"}
     return RedactionCase(root, profile, user, base, final, secrets, expected), held

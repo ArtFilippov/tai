@@ -1,7 +1,8 @@
 """Validated participants shared by readiness and experiment composition."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
+from attacks.shared.contracts import AttackType
 from core.chats import LLMChat, ModelRole
 from core.evaluation.configuration import EvaluatorSetup
 from core.primitives.diagnostics import DiagnosticRedactor
@@ -10,9 +11,10 @@ from core.primitives.diagnostics import DiagnosticRedactor
 @dataclass(frozen=True)
 class ParticipantProfile:
     target: LLMChat
-    attacker: LLMChat
+    attacker: LLMChat | None
     evaluator: EvaluatorSetup
-    max_calls_per_conv: int
+    max_calls_per_conv: int | None
+    attack_type: AttackType = field(default="fitd", kw_only=True)
 
     def __post_init__(self) -> None:
         chats = tuple(self.chats().values())
@@ -20,7 +22,9 @@ class ParticipantProfile:
             raise ValueError("Participants must use independent LLMChat instances")
 
     def chats(self) -> dict[ModelRole, LLMChat]:
-        chats: dict[ModelRole, LLMChat] = {"Target": self.target, "Attacker": self.attacker}
+        chats: dict[ModelRole, LLMChat] = {"Target": self.target}
+        if self.attacker is not None:
+            chats["Attacker"] = self.attacker
         if self.evaluator.chat is not None:
             chats["Evaluator"] = self.evaluator.chat
         return chats

@@ -17,6 +17,7 @@ path = "tai"
 layer = "Bootstrap"
 depends_on = [
     "alert",
+    "attacks.adaptive_attacks",
     "attacks.fitd",
     "core.chats",
     "core.chats.openai",
@@ -34,25 +35,25 @@ depends_on = [
 [[modules]]
 path = "alert"
 layer = "Infrastructure"
-cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = ["alert.manifest"]
 
 [[modules]]
 path = "alert.manifest"
 layer = "Infrastructure"
-cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = ["alert.records", "alert.taxonomy", "alert.validation", "alert.values"]
 
 [[modules]]
 path = "alert.preparation"
 layer = "Infrastructure"
-cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = ["alert.manifest", "alert.records", "alert.values"]
 
 [[modules]]
 path = "alert.report"
 layer = "Infrastructure"
-cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = ["alert.accounting", "alert.values", "core.runs.storage"]
 
 [[modules]]
@@ -76,6 +77,7 @@ depends_on = [
     "app.preflight",
     "app.series",
     "app.terminal",
+    "attacks.shared.contracts",
     "core.primitives.messages",
 ]
 
@@ -83,11 +85,15 @@ depends_on = [
 path = "app.configuration"
 layer = "Bootstrap"
 depends_on = [
+    "app.attack_configuration",
     "app.chat_factory",
     "app.configuration_values",
     "app.profiles",
     "app.server_factory",
     "attacks.fitd",
+    "attacks.adaptive_attacks",
+    "attacks.shared.contracts",
+    "attacks.shared.experiment",
     "core.chats",
     "core.chats.qwen_server",
     "core.evaluation.assembly",
@@ -123,8 +129,7 @@ depends_on = [
     "app.series_console",
     "app.series_execution",
     "app.series_storage",
-    "attacks.fitd.garak_adapter",
-    "attacks.fitd.profile",
+    "attacks.shared.contracts",
     "core.primitives.messages",
     "core.runs.console_journal",
 ]
@@ -132,7 +137,7 @@ depends_on = [
 [[modules]]
 path = "app.terminal"
 layer = "Bootstrap"
-depends_on = ["app.configuration", "app.experiments", "app.runtime", "app.terminal_control", "attacks.fitd", "core.primitives.messages"]
+depends_on = ["app.configuration", "app.experiments", "app.runtime", "app.terminal_control", "attacks.shared.experiment", "core.primitives.messages"]
 
 [[modules]]
 path = "attacks"
@@ -149,14 +154,13 @@ path = "attacks.fitd.experiment"
 layer = "Bootstrap"
 depends_on = [
     "attacks.fitd.bootstrap",
-    "attacks.fitd.execution",
-    "attacks.fitd.execution_state",
     "attacks.fitd.observation",
-    "attacks.fitd.user",
+    "attacks.fitd.profile",
+    "attacks.shared.assembly",
+    "attacks.shared.experiment",
     "core.chats",
     "core.evaluation",
     "core.evaluation.configuration",
-    "core.primitives.diagnostics",
     "core.primitives.messages",
     "core.runs.journal",
     "core.runs.journal_ports",
@@ -165,9 +169,9 @@ depends_on = [
 [[modules]]
 path = "attacks.fitd.garak_adapter"
 layer = "Infrastructure"
-cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = [
-    "attacks.fitd.contracts",
+    "attacks.shared.contracts",
     "attacks.fitd.probe",
     "attacks.fitd.profile",
     "attacks.fitd.target",
@@ -177,14 +181,14 @@ depends_on = [
 [[modules]]
 path = "attacks.fitd.profile"
 layer = "Domain"
-depends_on = []
+depends_on = ["attacks.shared.contracts"]
 
 [[modules]]
-path = "attacks.fitd.user"
+path = "attacks.shared.user"
 layer = "UseCase"
 depends_on = [
-    "attacks.fitd.execution",
-    "attacks.fitd.execution_state",
+    "attacks.shared.execution",
+    "attacks.shared.execution_state",
     "core.primitives.messages",
     "core.runs",
 ]
@@ -208,19 +212,19 @@ depends_on = ["core.chats.chat_contract", "core.chats.chat_state", "core.primiti
 [[modules]]
 path = "core.chats.http_worker"
 layer = "Infrastructure"
-cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = []
 
 [[modules]]
 path = "core.chats.openai"
 layer = "Infrastructure"
-cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = ["core.chats.conversation", "core.chats.openai_config", "core.chats.openai_errors", "core.chats.openai_transport", "core.primitives.diagnostics"]
 
 [[modules]]
 path = "core.chats.qwen"
 layer = "Infrastructure"
-cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = ["core.chats.conversation", "core.chats.qwen_config", "core.chats.qwen_executor", "core.primitives.diagnostics"]
 
 [[modules]]
@@ -253,7 +257,7 @@ depends_on = ["core.chats", "core.evaluation.evaluator", "core.evaluation.verdic
 [[modules]]
 path = "core.evaluation.observation"
 layer = "Infrastructure"
-cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = [
     "core.chats",
     "core.evaluation.evaluator",
@@ -300,7 +304,7 @@ depends_on = ["core.runs.status", "core.runs.user"]
 [[modules]]
 path = "core.runs.journal"
 layer = "Infrastructure"
-cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = [
     "core.runs.journal_calls",
     "core.runs.journal_formatting",
@@ -326,7 +330,7 @@ depends_on = ["core.primitives.messages"]
 [[modules]]
 path = "core.runs.storage"
 layer = "Infrastructure"
-cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = [
     "core.primitives.diagnostics",
     "core.runs.artifact_io",
@@ -364,7 +368,7 @@ depends_on = []
 [[modules]]
 path = "app.arguments"
 layer = "Interface"
-cannot_depend_on = ["alert", "alert.manifest", "alert.preparation", "alert.report", "app.runtime", "app.series_storage", "attacks.fitd.continuation", "attacks.fitd.garak_adapter", "attacks.fitd.native", "attacks.fitd.native_configuration", "attacks.fitd.probe", "attacks.fitd.target", "core.chats.http_worker", "core.chats.openai", "core.chats.openai_transport", "core.chats.qwen", "core.chats.qwen_executor", "core.chats.qwen_runtime", "core.evaluation.observation", "core.runs.artifact_io", "core.runs.journal", "core.runs.journal_lifecycle", "core.runs.journal_output", "core.runs.journal_state", "core.runs.storage"]
+cannot_depend_on = ["alert", "alert.manifest", "alert.preparation", "alert.report", "app.runtime", "app.series_storage", "attacks.adaptive_attacks.garak_adapter", "attacks.fitd.continuation", "attacks.fitd.garak_adapter", "attacks.fitd.native", "attacks.fitd.native_configuration", "attacks.fitd.probe", "attacks.fitd.target", "core.chats.http_worker", "core.chats.openai", "core.chats.openai_transport", "core.chats.qwen", "core.chats.qwen_executor", "core.chats.qwen_runtime", "core.evaluation.observation", "core.runs.artifact_io", "core.runs.journal", "core.runs.journal_lifecycle", "core.runs.journal_output", "core.runs.journal_state", "core.runs.storage"]
 depends_on = ["alert.records", "app.series_console"]
 
 [[modules]]
@@ -385,7 +389,7 @@ depends_on = ["core.primitives.diagnostics", "core.primitives.messages", "core.r
 [[modules]]
 path = "app.experiments"
 layer = "Bootstrap"
-depends_on = ["app.contracts", "attacks.fitd", "core.runs.storage"]
+depends_on = ["app.contracts", "attacks.shared.experiment", "core.runs.storage"]
 
 [[modules]]
 path = "app.failure_capture"
@@ -405,7 +409,7 @@ depends_on = ["app.contracts"]
 [[modules]]
 path = "app.profiles"
 layer = "Domain"
-depends_on = ["core.chats", "core.evaluation.configuration", "core.primitives.diagnostics"]
+depends_on = ["attacks.shared.contracts", "core.chats", "core.evaluation.configuration", "core.primitives.diagnostics"]
 
 [[modules]]
 path = "app.readiness"
@@ -432,7 +436,7 @@ depends_on = ["app.contracts", "app.failure_capture", "app.profiles", "app.readi
 [[modules]]
 path = "app.runtime"
 layer = "Infrastructure"
-cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = ["app.contracts"]
 
 [[modules]]
@@ -448,24 +452,25 @@ depends_on = ["alert.accounting", "alert.records", "app.failure_capture", "app.l
 [[modules]]
 path = "app.series_storage"
 layer = "Infrastructure"
-cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = ["alert.accounting", "app.series_contracts", "core.runs", "core.runs.storage"]
 
 [[modules]]
 path = "app.terminal_control"
 layer = "Interface"
-cannot_depend_on = ["alert", "alert.manifest", "alert.preparation", "alert.report", "app.runtime", "app.series_storage", "attacks.fitd.continuation", "attacks.fitd.garak_adapter", "attacks.fitd.native", "attacks.fitd.native_configuration", "attacks.fitd.probe", "attacks.fitd.target", "core.chats.http_worker", "core.chats.openai", "core.chats.openai_transport", "core.chats.qwen", "core.chats.qwen_executor", "core.chats.qwen_runtime", "core.evaluation.observation", "core.runs.artifact_io", "core.runs.journal", "core.runs.journal_lifecycle", "core.runs.journal_output", "core.runs.journal_state", "core.runs.storage"]
+cannot_depend_on = ["alert", "alert.manifest", "alert.preparation", "alert.report", "app.runtime", "app.series_storage", "attacks.adaptive_attacks.garak_adapter", "attacks.fitd.continuation", "attacks.fitd.garak_adapter", "attacks.fitd.native", "attacks.fitd.native_configuration", "attacks.fitd.probe", "attacks.fitd.target", "core.chats.http_worker", "core.chats.openai", "core.chats.openai_transport", "core.chats.qwen", "core.chats.qwen_executor", "core.chats.qwen_runtime", "core.evaluation.observation", "core.runs.artifact_io", "core.runs.journal", "core.runs.journal_lifecycle", "core.runs.journal_output", "core.runs.journal_state", "core.runs.storage"]
 depends_on = ["app.contracts", "app.failure_capture", "app.lifecycle", "core.runs"]
 
 [[modules]]
 path = "attacks.fitd.bootstrap"
 layer = "Bootstrap"
 depends_on = [
-    "attacks.fitd.contracts",
-    "attacks.fitd.execution_state",
+    "attacks.shared.assembly",
+    "attacks.shared.contracts",
+    "attacks.shared.execution_state",
     "attacks.fitd.garak_adapter",
     "attacks.fitd.profile",
-    "attacks.fitd.user",
+    "attacks.shared.user",
     "core.chats",
     "core.evaluation",
     "core.evaluation.configuration",
@@ -475,39 +480,39 @@ depends_on = [
 [[modules]]
 path = "attacks.fitd.continuation"
 layer = "Infrastructure"
-cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = ["attacks.fitd.contracts", "attacks.fitd.native", "attacks.fitd.target", "core.primitives.messages", "core.runs.operations"]
 
 [[modules]]
 path = "attacks.fitd.contracts"
 layer = "Domain"
-depends_on = ["attacks.fitd.profile", "core.chats", "core.primitives.messages", "core.runs.operations"]
+depends_on = ["attacks.shared.contracts", "core.primitives.messages", "core.runs.operations"]
 
 [[modules]]
-path = "attacks.fitd.execution"
+path = "attacks.shared.execution"
 layer = "UseCase"
-depends_on = ["attacks.fitd.contracts", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "core.chats.conversation", "core.primitives.messages", "core.runs", "core.runs.operations"]
+depends_on = ["attacks.shared.contracts", "attacks.shared.execution_operations", "attacks.shared.execution_state", "core.chats.conversation", "core.primitives.messages", "core.runs", "core.runs.operations"]
 
 [[modules]]
-path = "attacks.fitd.execution_operations"
+path = "attacks.shared.execution_operations"
 layer = "UseCase"
-depends_on = ["attacks.fitd.execution_state", "core.chats", "core.evaluation", "core.primitives.messages", "core.runs", "core.runs.operations"]
+depends_on = ["attacks.shared.execution_state", "core.chats", "core.evaluation", "core.primitives.messages", "core.runs", "core.runs.operations"]
 
 [[modules]]
-path = "attacks.fitd.execution_state"
+path = "attacks.shared.execution_state"
 layer = "UseCase"
-depends_on = ["attacks.fitd.contracts", "attacks.fitd.profile", "core.chats", "core.evaluation", "core.primitives.messages", "core.runs"]
+depends_on = ["attacks.shared.contracts", "core.chats", "core.evaluation", "core.primitives.messages", "core.runs"]
 
 [[modules]]
 path = "attacks.fitd.native"
 layer = "Infrastructure"
-cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = []
 
 [[modules]]
 path = "attacks.fitd.native_configuration"
 layer = "Infrastructure"
-cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = ["attacks.fitd.native", "attacks.fitd.profile"]
 
 [[modules]]
@@ -515,28 +520,24 @@ path = "attacks.fitd.observation"
 layer = "Bootstrap"
 depends_on = [
     "attacks.fitd.contracts",
-    "attacks.fitd.execution",
-    "attacks.fitd.execution_state",
     "attacks.fitd.garak_adapter",
+    "attacks.fitd.profile",
     "attacks.fitd.target",
-    "core.evaluation.observation",
-    "core.primitives.messages",
-    "core.runs",
+    "attacks.shared.observation",
     "core.runs.journal_ports",
-    "core.runs.operations",
 ]
 
 [[modules]]
 path = "attacks.fitd.probe"
 layer = "Infrastructure"
-cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
-depends_on = ["attacks.fitd.continuation", "attacks.fitd.contracts", "attacks.fitd.native", "attacks.fitd.native_configuration", "attacks.fitd.profile", "attacks.fitd.target", "core.primitives.messages", "core.runs.operations"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
+depends_on = ["attacks.fitd.continuation", "attacks.fitd.contracts", "attacks.fitd.native", "attacks.fitd.native_configuration", "attacks.fitd.profile", "attacks.fitd.target", "attacks.shared.contracts", "core.primitives.messages", "core.runs.operations"]
 
 [[modules]]
 path = "attacks.fitd.target"
 layer = "Infrastructure"
-cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
-depends_on = ["attacks.fitd.contracts", "attacks.fitd.native", "core.primitives.messages", "core.runs.operations"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
+depends_on = ["attacks.fitd.contracts", "attacks.fitd.native", "attacks.shared.contracts", "core.primitives.messages", "core.runs.operations"]
 
 [[modules]]
 path = "core.chats.chat_contract"
@@ -566,7 +567,7 @@ depends_on = []
 [[modules]]
 path = "core.chats.openai_transport"
 layer = "Infrastructure"
-cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = ["core.chats.conversation", "core.chats.http_contracts", "core.chats.openai_errors", "core.primitives.diagnostics"]
 
 [[modules]]
@@ -582,13 +583,13 @@ depends_on = ["core.chats.chat_state", "core.chats.qwen_config"]
 [[modules]]
 path = "core.chats.qwen_executor"
 layer = "Infrastructure"
-cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = ["core.chats.conversation", "core.chats.qwen_config", "core.chats.qwen_contracts", "core.chats.qwen_runtime"]
 
 [[modules]]
 path = "core.chats.qwen_runtime"
 layer = "Infrastructure"
-cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = ["core.chats.conversation", "core.chats.qwen_config", "core.chats.qwen_contracts"]
 
 [[modules]]
@@ -614,7 +615,7 @@ depends_on = []
 [[modules]]
 path = "core.runs.artifact_io"
 layer = "Infrastructure"
-cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = []
 
 [[modules]]
@@ -635,13 +636,13 @@ depends_on = ["core.runs.journal_values", "core.runs.operations"]
 [[modules]]
 path = "core.runs.journal_lifecycle"
 layer = "Infrastructure"
-cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = ["core.primitives.diagnostics", "core.primitives.diagnostics.json_values", "core.runs.journal_configuration", "core.runs.journal_output", "core.runs.journal_ports", "core.runs.journal_state", "core.runs.journal_support", "core.runs.journal_values", "core.runs.status"]
 
 [[modules]]
 path = "core.runs.journal_output"
 layer = "Infrastructure"
-cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = ["core.primitives.diagnostics", "core.runs.journal_support", "core.runs.journal_values", "core.runs.records"]
 
 [[modules]]
@@ -652,7 +653,7 @@ depends_on = ["core.primitives.diagnostics", "core.primitives.diagnostics.json_v
 [[modules]]
 path = "core.runs.journal_state"
 layer = "Infrastructure"
-cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "attacks.fitd.execution", "attacks.fitd.execution_operations", "attacks.fitd.execution_state", "attacks.fitd.user"]
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = ["core.primitives.diagnostics", "core.runs.journal_support", "core.runs.operations", "core.runs.status"]
 
 [[modules]]
@@ -683,13 +684,13 @@ depends_on = ["app.contracts", "app.failure_capture", "app.series_contracts", "c
 [[modules]]
 path = "app.series_console"
 layer = "Interface"
-cannot_depend_on = ["core.runs.console_journal", "core.runs.journal", "core.chats.qwen_server", "core.chats.server_process"]
+cannot_depend_on = ["attacks.adaptive_attacks.garak_adapter", "core.runs.console_journal", "core.runs.journal", "core.chats.qwen_server", "core.chats.server_process"]
 depends_on = ["app.console_format", "core.runs.console_ports"]
 
 [[modules]]
 path = "app.console_format"
 layer = "Interface"
-cannot_depend_on = ["core.runs.console_journal", "core.runs.journal", "core.chats.qwen_server", "core.chats.server_process"]
+cannot_depend_on = ["attacks.adaptive_attacks.garak_adapter", "core.runs.console_journal", "core.runs.journal", "core.chats.qwen_server", "core.chats.server_process"]
 depends_on = ["core.runs.console_ports"]
 
 [[modules]]
@@ -705,19 +706,19 @@ depends_on = ["core.chats.chat_state", "core.chats.server_config"]
 [[modules]]
 path = "core.chats.qwen_server"
 layer = "Infrastructure"
-cannot_depend_on = ["app.series_execution", "app.series_attempt", "attacks.fitd.execution", "attacks.fitd.user"]
+cannot_depend_on = ["app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = ["core.chats.conversation", "core.chats.openai_transport", "core.chats.server_config", "core.chats.server_ports", "core.chats.server_process", "core.primitives.diagnostics"]
 
 [[modules]]
 path = "core.chats.server_process"
 layer = "Infrastructure"
-cannot_depend_on = ["app.series_execution", "app.series_attempt", "attacks.fitd.execution", "attacks.fitd.user"]
+cannot_depend_on = ["app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = ["core.chats.server_config", "core.chats.server_ports"]
 
 [[modules]]
 path = "core.chats.server_chat"
 layer = "Infrastructure"
-cannot_depend_on = ["app.series_execution", "app.series_attempt", "attacks.fitd.execution", "attacks.fitd.user"]
+cannot_depend_on = ["app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = ["core.chats.conversation", "core.chats.qwen_server", "core.chats.server_config", "core.primitives.diagnostics"]
 
 [[modules]]
@@ -728,19 +729,77 @@ depends_on = []
 [[modules]]
 path = "core.runs.console_journal"
 layer = "Infrastructure"
-cannot_depend_on = ["app.series_execution", "app.series_attempt", "attacks.fitd.execution", "attacks.fitd.user"]
+cannot_depend_on = ["app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = ["core.runs.console_ports", "core.runs.journal", "core.runs.journal_calls", "core.runs.journal_configuration", "core.runs.journal_delegate", "core.runs.operations"]
 
 [[modules]]
 path = "core.runs.journal_delegate"
 layer = "Infrastructure"
-cannot_depend_on = ["app.series_execution", "app.series_attempt", "attacks.fitd.execution", "attacks.fitd.user"]
+cannot_depend_on = ["app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
 depends_on = ["core.primitives.diagnostics", "core.primitives.diagnostics.json_values", "core.runs.journal_ports", "core.runs.status", "core.runs.records"]
+
+[[modules]]
+path = "attacks.shared"
+layer = "Bootstrap"
+depends_on = []
+
+[[modules]]
+path = "attacks.shared.contracts"
+layer = "Domain"
+depends_on = ["core.chats", "core.primitives.messages", "core.runs.operations"]
+
+[[modules]]
+path = "attacks.shared.assembly"
+layer = "Bootstrap"
+depends_on = ["core.chats", "core.evaluation.configuration"]
+
+[[modules]]
+path = "attacks.shared.experiment"
+layer = "Bootstrap"
+depends_on = ["attacks.shared.assembly", "attacks.shared.contracts", "attacks.shared.execution", "attacks.shared.execution_state", "attacks.shared.observation", "attacks.shared.user", "core.evaluation.configuration", "core.primitives.diagnostics", "core.runs.journal", "core.runs.journal_ports"]
+
+[[modules]]
+path = "attacks.shared.observation"
+layer = "Bootstrap"
+depends_on = ["attacks.shared.execution", "attacks.shared.execution_state", "core.evaluation.observation", "core.primitives.messages", "core.runs", "core.runs.journal_ports", "core.runs.operations"]
+
+[[modules]]
+path = "attacks.adaptive_attacks"
+layer = "Bootstrap"
+depends_on = ["attacks.adaptive_attacks.bootstrap", "attacks.adaptive_attacks.experiment"]
+
+[[modules]]
+path = "attacks.adaptive_attacks.profile"
+layer = "Domain"
+depends_on = ["attacks.shared.contracts"]
+
+[[modules]]
+path = "attacks.adaptive_attacks.garak_adapter"
+layer = "Infrastructure"
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
+depends_on = ["attacks.adaptive_attacks.profile", "attacks.shared.contracts", "core.primitives.messages", "core.runs.operations"]
+
+[[modules]]
+path = "attacks.adaptive_attacks.bootstrap"
+layer = "Bootstrap"
+depends_on = ["attacks.adaptive_attacks.garak_adapter", "attacks.adaptive_attacks.profile", "attacks.shared.assembly", "attacks.shared.execution_state", "attacks.shared.user", "core.chats", "core.evaluation", "core.evaluation.configuration", "core.primitives.messages"]
+
+[[modules]]
+path = "attacks.adaptive_attacks.experiment"
+layer = "Bootstrap"
+depends_on = ["attacks.adaptive_attacks.bootstrap", "attacks.shared.assembly", "attacks.shared.experiment", "core.chats", "core.evaluation", "core.evaluation.configuration", "core.primitives.messages", "core.runs.journal_ports"]
+
+[[modules]]
+path = "app.attack_configuration"
+layer = "Bootstrap"
+depends_on = ["app.configuration_values", "attacks.adaptive_attacks.profile", "attacks.fitd.profile", "attacks.shared.contracts"]
 
 # The facade exposes exactly the documented src/tai.py API.
 [[interfaces]]
 from = ['^tai$']
 expose = [
+    '^AdaptiveAttacksExperiment$',
+    '^AdaptiveAttacksUser$',
     '^AlertManifest$',
     '^AlertRecord$',
     '^ChatCancelled$',
@@ -794,6 +853,10 @@ from = ['^attacks\.fitd$']
 expose = ['^FITDExperiment$', '^FITDUser$']
 
 [[interfaces]]
+from = ['^attacks\.adaptive_attacks$']
+expose = ['^AdaptiveAttacksExperiment$', '^AdaptiveAttacksUser$']
+
+[[interfaces]]
 from = ['^core\.chats$']
 expose = ['^ChatCancelled$', '^ChatTurn$', '^LLMChat$', '^ModelRole$']
 
@@ -815,7 +878,7 @@ expose = ['^DiagnosticObject$', '^DiagnosticRedactor$']
 
 # Namespace containers have no symbol facade of their own.
 [[interfaces]]
-from = ['^app$', '^attacks$', '^core$', '^core\.primitives$']
+from = ['^app$', '^attacks$', '^attacks\.shared$', '^core$', '^core\.primitives$']
 expose = []
 
 # Descriptive leaf modules retain the public-symbol rule at every used depth.
@@ -824,6 +887,7 @@ from = [
     '^app\.[^.]+$',
     '^alert\.[^.]+$',
     '^attacks\.fitd\.[^.]+$',
+    '^attacks\.(shared|adaptive_attacks)\.[^.]+$',
     '^core\.(chats|evaluation|runs)\.[^.]+$',
     '^core\.primitives\.(messages|diagnostics)\.[^.]+$',
 ]

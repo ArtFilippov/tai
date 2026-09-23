@@ -7,7 +7,7 @@ import pytest
 from fitd_observation import Observations, install_observers, puzzle
 from fitd_support import ScriptedModel, Turns
 
-import attacks.fitd.execution as implementation
+import attacks.shared.execution as implementation
 from attacks.fitd.native import FITD, GarakException
 from tai import ContainsTextEvaluator, FITDExperiment as FITDUser, LLMChat, Message, RunEvent, RunJournal, UserState
 

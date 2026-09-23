@@ -14,7 +14,7 @@ from journal_scenarios import (
     count_native_checks, keyed_events, participants,
 )
 
-import attacks.fitd.execution as implementation
+import attacks.shared.execution as implementation
 
 from tai import (
     EvaluatorSetup,

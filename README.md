@@ -84,6 +84,28 @@ Target и Attacker владеют своими разговорами через
 происхождение сообщений, адаптация с откатами и независимые повторные запуски.
 Термины и архитектурные решения: [CONTEXT.md](CONTEXT.md), [docs/adr](docs/adr).
 
+### Выбор стратегии: FITD или Adaptive Attacks
+
+`tai attack` выполняет стратегию из `[attack].type`. Значения — `fitd` и
+`adaptive_attacks`; без `[attack]` используется FITD. Команда `tai fitd` принимает
+только FITD-профили.
+
+[Simple Adaptive Attacks](docs/adaptive-attacks.md) использует шаблон и пять
+cached-суффиксов установленного garak, подставляя ваш базовый Message.
+Каждый вариант начинает независимый разговор Target; после оценки `true`
+выполнение завершается. Эта ранняя остановка — политика tai, online search нет.
+Нужны только Target и оценщик. Python API: `AdaptiveAttacksUser` и
+`AdaptiveAttacksExperiment`.
+
+```bash
+uv run --locked --extra qwen tai attack \
+  --config examples/adaptive-attacks-qwen.toml \
+  --text 'Ваш базовый запрос' --artifacts-dir runs/adaptive
+```
+
+Тот же готовый профиль подходит для `tai preflight` и `tai alert-series --profile …`.
+Подготовка весов — выше; [полные примеры Python, CLI и ALERT](docs/adaptive-attacks.md).
+
 ## Установка и офлайн-проверки
 
 Нужны Git и [uv](https://docs.astral.sh/uv/). uv выбирает Python 3.12 по
@@ -110,7 +132,7 @@ uv run --locked python examples/offline_fitd.py
 анализаторов — в `pyproject.toml` и `uv.lock`. На свежем клоне выполните
 `git submodule update --init --recursive`, затем `uv sync --locked --group dev`.
 Можно сразу клонировать `tai` с `--recurse-submodules`; нужен доступ к приватному Eryx.
-Настройки проекта находятся в `.eryx/`. Архитектура уже принята: 109 модулей,
+Настройки проекта находятся в `.eryx/`. Архитектура уже принята: 120 модулей,
 состояние — `.eryx/architecture.ready.json`, границы — `tach.toml`.
 
 Единая команда проверяет `src/` и `tests/`:
@@ -193,6 +215,8 @@ src/
   tai.py                      # пользовательский API
   app/                        # CLI, конфигурация, preflight, одиночный запуск и серия
   attacks/fitd/                # FITD User, garak-адаптер, профиль и сборка эксперимента
+  attacks/adaptive_attacks/    # статическая композиция garak, Target-only User и эксперимент
+  attacks/shared/             # общие порты, выполнение, управление участниками и наблюдение
   alert/                      # манифест, таксономия, подготовка и отчёт ALERT
   core/
     chats/                    # разговор и адаптеры OpenAI/Qwen

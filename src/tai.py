@@ -7,6 +7,7 @@ from alert import (
     select_alert_records,
 )
 from attacks.fitd import FITDExperiment, FITDUser
+from attacks.adaptive_attacks import AdaptiveAttacksExperiment, AdaptiveAttacksUser
 from core.chats import ChatCancelled, ChatTurn, LLMChat, ModelRole
 from core.chats.openai import (
     OpenAIAuthenticationError,
@@ -35,6 +36,8 @@ from core.runs.journal import RunEvent, RunJournal
 from core.runs.storage import RunRecord, capture_run, save_run
 
 __all__ = [
+    "AdaptiveAttacksExperiment",
+    "AdaptiveAttacksUser",
     "AlertManifest",
     "AlertRecord",
     "ChatCancelled",

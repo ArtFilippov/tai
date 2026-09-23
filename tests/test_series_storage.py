@@ -31,6 +31,7 @@ def _install_storage_fault(
             assert index["entries"][0]["storage_error"]["phase"] == "save"
             assert users[-1].wait(0)
         user = factory(profile, base, directory)
+        assert isinstance(user, FITDExperiment)
         users.append(user)
         return user
 
@@ -89,6 +90,7 @@ def test_shared_series_write_failure_terminates_command_after_join(
 
     def create(profile: RoleProfile, base: Message, directory: Path) -> FITDExperiment:
         user = factory(profile, base, directory)
+        assert isinstance(user, FITDExperiment)
         users.append(user)
         return user
 
@@ -122,6 +124,7 @@ def _install_inspection_fault(
             assert len(saved["entries"]) == len(users)
             assert saved["entries"][0]["run_id"] == users[0].status().run_id
         user = factory(profile, base, directory)
+        assert isinstance(user, FITDExperiment)
         users.append(user)
         return user
 

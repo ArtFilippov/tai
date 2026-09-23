@@ -1,4 +1,4 @@
-"""Lifecycle and resource ownership of an independent FITD execution."""
+"""Lifecycle and resource ownership of an independent strategy execution."""
 
 from dataclasses import replace
 from threading import Thread
@@ -50,7 +50,7 @@ class Execution(ExecutionOperations):
         run_id = str(uuid4())
         self._state.status = replace(self._state.status, state=UserState.RUNNING, run_id=run_id)
         self.admit(RunStarted(run_id))
-        self._state.start_worker(Thread(target=self._run, args=(run_id,), name=f"fitd-{run_id}"))
+        self._state.start_worker(Thread(target=self._run, args=(run_id,), name=f"attack-{run_id}"))
         return RunStarted(run_id)
 
     def admit(self, started: RunStarted) -> None:
@@ -118,7 +118,7 @@ class Execution(ExecutionOperations):
             self._send, self.publish, self._evaluate, self._check_running,
             ConversationPorts(self.checkpoint, self.restore, self.reset, self._conversation_id),
         )
-        return self._settings.runtime(self.base, ports, self._settings.profile)
+        return self._settings.runtime(self.base, ports)
 
     def _execute(self, run_id: str) -> tuple[UserState, str]:
         self.initialize(run_id)

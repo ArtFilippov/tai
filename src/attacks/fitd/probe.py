@@ -18,7 +18,8 @@ from uuid import uuid4
 from core.primitives.messages import Message
 from core.runs.operations import Cause, Context, Exchange, LocalDecision
 
-from .contracts import CompletionReason, Continuation, ProbeOperations, Selection, StrategyPorts
+from attacks.shared.contracts import CompletionReason, StrategyPorts
+from .contracts import Continuation, ProbeOperations, Selection
 from .continuation import CONTINUE, SELECT_CONTINUATION, branch_kind, describe_selection
 from .native import Attempt, Conversation, FITD, attempt_prompt, levels_completed
 from .native_configuration import configure, prepare_goal, prepare_ladder

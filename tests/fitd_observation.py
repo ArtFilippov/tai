@@ -11,7 +11,7 @@ import pytest
 from fitd_support import ScriptedModel
 
 from attacks.fitd.contracts import Continuation
-from attacks.fitd.execution import Execution
+from attacks.shared.execution import Execution
 from attacks.fitd.garak_adapter import FITDProbe
 from attacks.fitd.native import Attempt, FITD
 from attacks.fitd.target import FITDTarget

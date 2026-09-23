@@ -5,6 +5,12 @@
 и диагностические снимки настроек. `result.txt` и `metadata.json` записывает
 [внешний модуль сохранения](result-storage.md) после ожидания User.
 
+`AdaptiveAttacksUser` / `AdaptiveAttacksExperiment` используют тот же механизм:
+`attacks.shared.experiment` собирает общий `Execution` и наблюдение его операций.
+Сборка FITD дополнительно оборачивает нативные решения в `attacks.fitd.observation`.
+Для Adaptive Attacks журнал получает сбросы, обмены, публикации и оценки напрямую
+из общего выполнения. Политика стратегии — [adaptive-attacks.md](adaptive-attacks.md).
+
 ## Python interface
 
 ```python

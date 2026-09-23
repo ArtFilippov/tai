@@ -11,7 +11,7 @@ import pytest
 from evaluation_fakes import ScriptedModel, script_success
 from journal_assertions import at, mapping, released_worker, run_directory
 
-import attacks.fitd.execution as implementation
+import attacks.shared.execution as implementation
 
 from tai import (
     ContainsTextEvaluator,

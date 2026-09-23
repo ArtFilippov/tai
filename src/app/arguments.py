@@ -25,7 +25,7 @@ class CommandLine:
         return self._parser.parse_args(argv)
 
 
-def _fitd(parser: argparse.ArgumentParser) -> None:
+def _attack(parser: argparse.ArgumentParser) -> None:
     _ = parser.add_argument("--config", type=Path, required=True, help="TOML-конфигурация")
     _ = parser.add_argument("--artifacts-dir", type=Path, required=True, help="Каталог артефактов запусков")
     source = parser.add_mutually_exclusive_group(required=True)
@@ -74,12 +74,13 @@ def _report(parser: argparse.ArgumentParser) -> None:
 
 def parse_arguments(argv: list[str] | None) -> argparse.Namespace:
     commands = CommandLine()
-    commands.add_command("fitd", _fitd, help_text="Запустить FITD через локальный Qwen или OpenAI-совместимый API",
+    commands.add_command("attack", _attack, help_text="Запустить выбранную в TOML стратегию атаки")
+    commands.add_command("fitd", _attack, help_text="Запустить FITD через локальный Qwen или OpenAI-совместимый API",
                          description="Один базовый запрос, generations=1. max_calls_per_conv (по умолчанию 10) "
                          + "— библиотечный лимит раундов FITD, а не общий бюджет обращений. "
                          + "HTTP-таймаут каждой роли по умолчанию 120 секунд.")
-    commands.add_command("preflight", _preflight, help_text="Проверить текстовый ответ каждой роли без запуска FITD")
+    commands.add_command("preflight", _preflight, help_text="Проверить настроенные роли без запуска атаки")
     commands.add_command("prepare-alert", _prepare, help_text="Подготовить локальный манифест 32 запросов ALERT")
-    commands.add_command("alert-series", _series, help_text="Параллельно выполнить 32 запуска FITD по ALERT")
+    commands.add_command("alert-series", _series, help_text="Параллельно выполнить выбранную стратегию по ALERT")
     commands.add_command("alert-report", _report, help_text="Пересчитать JSON по сохранённому индексу без инференса")
     return commands.parse(argv)

@@ -8,8 +8,7 @@ from core.evaluation import Evaluator
 from core.primitives.messages import Message
 from core.runs import UserStatus
 
-from .contracts import StrategyRuntime
-from .profile import FITDProfile
+from .contracts import StrategyConfiguration, StrategyRuntime
 
 
 @dataclass(frozen=True)
@@ -17,7 +16,7 @@ class ExecutionSettings:
     chats: dict[ModelRole, LLMChat]
     base: Message
     evaluator: Evaluator
-    profile: FITDProfile
+    configuration: StrategyConfiguration
     runtime: StrategyRuntime
 
 
