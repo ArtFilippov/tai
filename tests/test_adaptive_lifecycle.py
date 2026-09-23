@@ -12,18 +12,23 @@ from test_fitd_stop_boundaries import hold_boundary
 import attacks.adaptive_attacks.garak_adapter as adapter
 from attacks.shared import execution
 from tai import (
-    AdaptiveAttacksExperiment, ContainsTextEvaluator, EvaluatorSetup, LLMChat,
+    AdaptiveAttacksExperiment, BadCharactersDeletionExperiment, ContainsTextEvaluator, EvaluatorSetup, LLMChat,
     Message, RunEvent, RunJournal, UserState, capture_run, save_run,
 )
+
+type CandidateExperiment = type[AdaptiveAttacksExperiment] | type[BadCharactersDeletionExperiment]
 
 
 @pytest.mark.parametrize("role", ["Target", "Evaluator"])
 @pytest.mark.parametrize("success", [False, True])
-def test_stop_finishes_admitted_calls_without_publishing_an_unaccepted_exchange(role: str, success: bool, tmp_path: Path) -> None:
+@pytest.mark.parametrize("experiment_type", [AdaptiveAttacksExperiment, BadCharactersDeletionExperiment])
+def test_stop_finishes_admitted_calls_without_publishing_an_unaccepted_exchange(
+    role: str, success: bool, tmp_path: Path, experiment_type: CandidateExperiment,
+) -> None:
     held = HeldResponse('{"success": ' + str(success).lower() + '}')
     target = LLMChat.cancellable(ScriptedModel([held if role == "Target" else "Presented"]))
     evaluator_model = ScriptedModel([held])
-    user = AdaptiveAttacksExperiment(target, Message("Base"), EvaluatorSetup.model(LLMChat.cancellable(evaluator_model)), journal_dir=tmp_path)
+    user = experiment_type(target, Message("Base"), EvaluatorSetup.model(LLMChat.cancellable(evaluator_model)), journal_dir=tmp_path)
     user.start()
     with releasing(user, held.release):
         assert held.entered.wait(5)
@@ -49,12 +54,17 @@ def test_stop_finishes_admitted_calls_without_publishing_an_unaccepted_exchange(
     assert any(event.kind == "resources_released" for event in user.journal.events())
 
 
-@pytest.mark.parametrize("failure", ["target", "evaluator", "resource", "resource_import", "journal", "cleanup"])
-def test_failures_are_worker_errors_and_participants_are_released(failure: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+@pytest.mark.parametrize(("experiment_type", "failure"), [
+    (kind, failure) for kind in (AdaptiveAttacksExperiment, BadCharactersDeletionExperiment)
+    for failure in ("target", "evaluator", "journal", "cleanup")
+] + [(AdaptiveAttacksExperiment, "resource"), (AdaptiveAttacksExperiment, "resource_import")])
+def test_failures_are_worker_errors_and_participants_are_released(
+    failure: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, experiment_type: CandidateExperiment,
+) -> None:
     model = ScriptedModel([RuntimeError("target failed") if failure == "target" else "Presented"])
     target = LLMChat(model)
     evaluator = EvaluatorSetup.model(LLMChat(ScriptedModel([RuntimeError("evaluator failed") if failure == "evaluator" else '{"success": true}'])))
-    user = AdaptiveAttacksExperiment(target, Message("Base"), evaluator, journal_dir=tmp_path)
+    user = experiment_type(target, Message("Base"), evaluator, journal_dir=tmp_path)
     with monkeypatch.context() as patch:
         _inject_failure(patch, failure, tmp_path)
         user.start()
@@ -65,7 +75,7 @@ def test_failures_are_worker_errors_and_participants_are_released(failure: str, 
     assert record.snapshot.status.state is UserState.FAILED
     assert save_run(record, tmp_path).is_dir()
     model.responses.append("yes")
-    following = AdaptiveAttacksExperiment(target, Message("New base"), ContainsTextEvaluator("yes"))
+    following = experiment_type(target, Message("New base"), ContainsTextEvaluator("yes"))
     following.start()
     assert following.wait(10)
     assert following.status().reason == "evaluator_success"
@@ -105,8 +115,9 @@ def _fail_cleanup(patch: pytest.MonkeyPatch) -> None:
     patch.setattr(execution, "release_chats", fail_release)
 
 
-def test_external_storage_failure_preserves_worker_outcome(tmp_path: Path) -> None:
-    user = AdaptiveAttacksExperiment(LLMChat(ScriptedModel(["yes"])), Message("Base"), ContainsTextEvaluator("yes"))
+@pytest.mark.parametrize("experiment_type", [AdaptiveAttacksExperiment, BadCharactersDeletionExperiment])
+def test_external_storage_failure_preserves_worker_outcome(tmp_path: Path, experiment_type: CandidateExperiment) -> None:
+    user = experiment_type(LLMChat(ScriptedModel(["yes"])), Message("Base"), ContainsTextEvaluator("yes"))
     user.start()
     assert user.wait(10)
     record = capture_run(user, journal=user.journal)
@@ -119,10 +130,13 @@ def test_external_storage_failure_preserves_worker_outcome(tmp_path: Path) -> No
     assert save_run(record, tmp_path / "retry").is_dir()
 
 
-def test_stop_between_exchange_and_publication_retains_previous_evaluated_result(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("experiment_type", [AdaptiveAttacksExperiment, BadCharactersDeletionExperiment])
+def test_stop_between_exchange_and_publication_retains_previous_evaluated_result(
+    monkeypatch: pytest.MonkeyPatch, experiment_type: CandidateExperiment,
+) -> None:
     entered, release = hold_boundary(monkeypatch, "call_completed", "Target", 2)
     target = LLMChat(ScriptedModel(["First", "Not accepted"]))
-    user = AdaptiveAttacksExperiment(target, Message("Base"), ContainsTextEvaluator("success"))
+    user = experiment_type(target, Message("Base"), ContainsTextEvaluator("success"))
     user.start()
     with releasing(user, release):
         assert entered.wait(5)

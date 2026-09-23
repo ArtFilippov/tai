@@ -2,9 +2,10 @@
 
 from importlib import import_module
 from os import PathLike
-from typing import cast, override
+from collections.abc import Iterator
+from typing import cast
 
-from attacks.shared.contracts import GARAK_REVISION, CompletionReason, StrategyPorts, StrategyRuntime
+from attacks.shared.contracts import Candidate
 from core.primitives.messages import Message
 from core.runs.operations import Cause
 
@@ -25,21 +26,6 @@ def variants(base: Message) -> tuple[Message, ...]:
     return tuple(base.spawn(template.format(goal=base.to_string(), suffix=suffix)) for suffix in suffixes)
 
 
-class AdaptiveRuntime(StrategyRuntime):
-    @property
-    @override
-    def revision(self) -> str:
-        return GARAK_REVISION
-
-    @override
-    def __call__(self, base: Message, ports: StrategyPorts) -> CompletionReason:
-        for request in variants(base):
-            cause = Cause("adaptive_variant", request.id)
-            _ = ports.conversation.reset("Target", cause)
-            exchange = ports.send("Target", request, cause)
-            checkpoint = ports.conversation.checkpoint("Target", cause)
-            _ = ports.publish(exchange.response, exchange.context, checkpoint.id)
-            assessment = ports.evaluate(exchange.response, exchange.context, checkpoint.id)
-            if assessment.evaluation.success:
-                return "evaluator_success"
-        return "strategy_exhausted"
+def candidates(base: Message) -> Iterator[Candidate]:
+    for request in variants(base):
+        yield Candidate(request, Cause("adaptive_variant", request.id))

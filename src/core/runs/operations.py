@@ -18,6 +18,7 @@ class Cause:
     reason: str
     attempt_id: str | None = None
     id: str | None = None
+    metadata: dict[str, object] | None = None
 
 
 @dataclass(frozen=True, slots=True)

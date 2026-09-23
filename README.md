@@ -84,10 +84,10 @@ Target и Attacker владеют своими разговорами через
 происхождение сообщений, адаптация с откатами и независимые повторные запуски.
 Термины и архитектурные решения: [CONTEXT.md](CONTEXT.md), [docs/adr](docs/adr).
 
-### Выбор стратегии: FITD или Adaptive Attacks
+### Выбор стратегии: FITD, Adaptive Attacks или Bad Characters
 
-`tai attack` выполняет стратегию из `[attack].type`. Значения — `fitd` и
-`adaptive_attacks`; без `[attack]` используется FITD. Команда `tai fitd` принимает
+`tai attack` выполняет стратегию из `[attack].type`. Значения — `fitd`,
+`adaptive_attacks` и `badchars_deletion`; без `[attack]` используется FITD. Команда `tai fitd` принимает
 только FITD-профили.
 
 [Simple Adaptive Attacks](docs/adaptive-attacks.md) использует шаблон и пять
@@ -105,6 +105,19 @@ uv run --locked --extra qwen tai attack \
 
 Тот же готовый профиль подходит для `tai preflight` и `tai alert-series --profile …`.
 Подготовка весов — выше; [полные примеры Python, CLI и ALERT](docs/adaptive-attacks.md).
+
+[Bad Characters/deletion](docs/badchars-deletion.md) использует нативный генератор
+garak для вставок ASCII-символа и настоящего U+0008 в ваш base. Стартовые параметры
+`perturbation_budget=1`, `max_position_candidates=8`, `max_ascii_variants=4` дают
+до 32 вариантов. Python API: `BadCharactersDeletionUser` и
+`BadCharactersDeletionExperiment`; общий путь выполнения, оценки и сохранения
+тот же, что у Adaptive Attacks.
+
+```bash
+uv run --locked --extra qwen tai attack \
+  --config examples/badchars-deletion-qwen.toml \
+  --text 'Ваш базовый запрос' --artifacts-dir runs/badchars
+```
 
 ## Установка и офлайн-проверки
 
@@ -132,7 +145,7 @@ uv run --locked python examples/offline_fitd.py
 анализаторов — в `pyproject.toml` и `uv.lock`. На свежем клоне выполните
 `git submodule update --init --recursive`, затем `uv sync --locked --group dev`.
 Можно сразу клонировать `tai` с `--recurse-submodules`; нужен доступ к приватному Eryx.
-Настройки проекта находятся в `.eryx/`. Архитектура уже принята: 120 модулей,
+Настройки проекта находятся в `.eryx/`. Архитектура уже принята: 126 модулей,
 состояние — `.eryx/architecture.ready.json`, границы — `tach.toml`.
 
 Единая команда проверяет `src/` и `tests/`:

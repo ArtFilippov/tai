@@ -9,7 +9,7 @@ from evaluation_fakes import HeldResponse, ScriptedModel
 from garak.probes import adaptive_attacks as native
 from attacks.adaptive_attacks.garak_adapter import variants
 from tai import (
-    AdaptiveAttacksExperiment, AdaptiveAttacksUser, ContainsTextEvaluator, EvaluatorSetup,
+    AdaptiveAttacksExperiment, AdaptiveAttacksUser, BadCharactersDeletionExperiment, ContainsTextEvaluator, EvaluatorSetup,
     LLMChat, Message, UserState, capture_run, save_run,
 )
 
@@ -86,11 +86,14 @@ def test_bare_user_and_observed_runs_use_the_same_execution() -> None:
         assert user.result() is not None
 
 
-def test_repeated_and_overlapping_users_keep_bases_participants_and_journals_independent() -> None:
+@pytest.mark.parametrize("experiment_type", [AdaptiveAttacksExperiment, BadCharactersDeletionExperiment])
+def test_repeated_and_overlapping_users_keep_bases_participants_and_journals_independent(
+    experiment_type: type[AdaptiveAttacksExperiment] | type[BadCharactersDeletionExperiment],
+) -> None:
     held = [HeldResponse("yes one"), HeldResponse("yes two")]
     models = [ScriptedModel([response, "yes again"]) for response in held]
     evaluators = [PairEvaluator(1), PairEvaluator(1)]
-    users = [AdaptiveAttacksExperiment(LLMChat.cancellable(model), Message(f"Base {{{index}}}"), evaluator)
+    users = [experiment_type(LLMChat.cancellable(model), Message(f"Base {{{index}}}"), evaluator)
              for index, (model, evaluator) in enumerate(zip(models, evaluators, strict=True))]
     for user in users:
         user.start()

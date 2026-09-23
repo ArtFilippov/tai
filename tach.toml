@@ -18,6 +18,7 @@ layer = "Bootstrap"
 depends_on = [
     "alert",
     "attacks.adaptive_attacks",
+    "attacks.badchars",
     "attacks.fitd",
     "core.chats",
     "core.chats.openai",
@@ -92,6 +93,8 @@ depends_on = [
     "app.server_factory",
     "attacks.fitd",
     "attacks.adaptive_attacks",
+    "attacks.badchars",
+    "attacks.badchars.profile",
     "attacks.shared.contracts",
     "attacks.shared.experiment",
     "core.chats",
@@ -782,7 +785,7 @@ depends_on = ["attacks.adaptive_attacks.profile", "attacks.shared.contracts", "c
 [[modules]]
 path = "attacks.adaptive_attacks.bootstrap"
 layer = "Bootstrap"
-depends_on = ["attacks.adaptive_attacks.garak_adapter", "attacks.adaptive_attacks.profile", "attacks.shared.assembly", "attacks.shared.execution_state", "attacks.shared.user", "core.chats", "core.evaluation", "core.evaluation.configuration", "core.primitives.messages"]
+depends_on = ["attacks.adaptive_attacks.garak_adapter", "attacks.adaptive_attacks.profile", "attacks.shared.assembly", "attacks.shared.candidates", "attacks.shared.execution_state", "attacks.shared.user", "core.chats", "core.evaluation", "core.evaluation.configuration", "core.primitives.messages"]
 
 [[modules]]
 path = "attacks.adaptive_attacks.experiment"
@@ -792,7 +795,38 @@ depends_on = ["attacks.adaptive_attacks.bootstrap", "attacks.shared.assembly", "
 [[modules]]
 path = "app.attack_configuration"
 layer = "Bootstrap"
-depends_on = ["app.configuration_values", "attacks.adaptive_attacks.profile", "attacks.fitd.profile", "attacks.shared.contracts"]
+depends_on = ["app.configuration_values", "attacks.adaptive_attacks.profile", "attacks.badchars.profile", "attacks.fitd.profile", "attacks.shared.contracts"]
+
+[[modules]]
+path = "attacks.shared.candidates"
+layer = "UseCase"
+depends_on = ["attacks.shared.contracts", "core.primitives.messages"]
+
+[[modules]]
+path = "attacks.badchars"
+layer = "Bootstrap"
+depends_on = ["attacks.badchars.bootstrap", "attacks.badchars.experiment"]
+
+[[modules]]
+path = "attacks.badchars.profile"
+layer = "Domain"
+depends_on = ["attacks.shared.contracts"]
+
+[[modules]]
+path = "attacks.badchars.garak_adapter"
+layer = "Infrastructure"
+cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.candidates", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
+depends_on = ["attacks.badchars.profile", "attacks.shared.contracts", "core.primitives.messages", "core.runs.operations"]
+
+[[modules]]
+path = "attacks.badchars.bootstrap"
+layer = "Bootstrap"
+depends_on = ["attacks.badchars.garak_adapter", "attacks.badchars.profile", "attacks.shared.assembly", "attacks.shared.candidates", "attacks.shared.execution_state", "attacks.shared.user", "core.chats", "core.evaluation", "core.evaluation.configuration", "core.primitives.messages"]
+
+[[modules]]
+path = "attacks.badchars.experiment"
+layer = "Bootstrap"
+depends_on = ["attacks.badchars.bootstrap", "attacks.badchars.profile", "attacks.shared.assembly", "attacks.shared.experiment", "core.chats", "core.evaluation", "core.evaluation.configuration", "core.primitives.messages", "core.runs.journal", "core.runs.journal_ports"]
 
 # The facade exposes exactly the documented src/tai.py API.
 [[interfaces]]
@@ -802,6 +836,8 @@ expose = [
     '^AdaptiveAttacksUser$',
     '^AlertManifest$',
     '^AlertRecord$',
+    '^BadCharactersDeletionExperiment$',
+    '^BadCharactersDeletionUser$',
     '^ChatCancelled$',
     '^ChatTurn$',
     '^ContainsTextEvaluator$',
@@ -857,6 +893,10 @@ from = ['^attacks\.adaptive_attacks$']
 expose = ['^AdaptiveAttacksExperiment$', '^AdaptiveAttacksUser$']
 
 [[interfaces]]
+from = ['^attacks\.badchars$']
+expose = ['^BadCharactersDeletionExperiment$', '^BadCharactersDeletionUser$']
+
+[[interfaces]]
 from = ['^core\.chats$']
 expose = ['^ChatCancelled$', '^ChatTurn$', '^LLMChat$', '^ModelRole$']
 
@@ -887,7 +927,7 @@ from = [
     '^app\.[^.]+$',
     '^alert\.[^.]+$',
     '^attacks\.fitd\.[^.]+$',
-    '^attacks\.(shared|adaptive_attacks)\.[^.]+$',
+    '^attacks\.(shared|adaptive_attacks|badchars)\.[^.]+$',
     '^core\.(chats|evaluation|runs)\.[^.]+$',
     '^core\.primitives\.(messages|diagnostics)\.[^.]+$',
 ]

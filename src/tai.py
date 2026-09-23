@@ -8,6 +8,7 @@ from alert import (
 )
 from attacks.fitd import FITDExperiment, FITDUser
 from attacks.adaptive_attacks import AdaptiveAttacksExperiment, AdaptiveAttacksUser
+from attacks.badchars import BadCharactersDeletionExperiment, BadCharactersDeletionUser
 from core.chats import ChatCancelled, ChatTurn, LLMChat, ModelRole
 from core.chats.openai import (
     OpenAIAuthenticationError,
@@ -40,6 +41,8 @@ __all__ = [
     "AdaptiveAttacksUser",
     "AlertManifest",
     "AlertRecord",
+    "BadCharactersDeletionExperiment",
+    "BadCharactersDeletionUser",
     "ChatCancelled",
     "ChatTurn",
     "ContainsTextEvaluator",

@@ -11,9 +11,16 @@ from core.runs.operations import Cause, Checkpoint, Context, ConversationChange,
 
 GARAK_REVISION = "3f50ea5ff9cd7050099940647c15c39b07a93392"
 type CompletionReason = Literal["evaluator_success", "round_limit", "strategy_exhausted"]
-type AttackType = Literal["fitd", "adaptive_attacks"]
+type AttackType = Literal["fitd", "adaptive_attacks", "badchars_deletion"]
 FITD: Final[AttackType] = "fitd"
 ADAPTIVE_ATTACKS: Final[AttackType] = "adaptive_attacks"
+BADCHARS_DELETION: Final[AttackType] = "badchars_deletion"
+
+
+@dataclass(frozen=True)
+class Candidate:
+    request: Message
+    cause: Cause
 
 
 @dataclass(frozen=True)

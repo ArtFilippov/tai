@@ -10,7 +10,9 @@ from pathlib import Path
 
 from attacks.fitd import FITDExperiment
 from attacks.adaptive_attacks import AdaptiveAttacksExperiment
-from attacks.shared.contracts import ADAPTIVE_ATTACKS, FITD, StrategyConfiguration
+from attacks.badchars import BadCharactersDeletionExperiment
+from attacks.badchars.profile import deletion_profile
+from attacks.shared.contracts import ADAPTIVE_ATTACKS, BADCHARS_DELETION, FITD, StrategyConfiguration
 from attacks.shared.experiment import Experiment
 from core.evaluation.assembly import EvaluatorSetup
 from core.evaluation.model_evaluator import MODEL_RUBRIC_VERSION
@@ -37,6 +39,13 @@ class RoleProfile(ParticipantProfile):
     def create_experiment(self, base: Message, journal_dir: Path | None = None) -> Experiment:
         if self.attack_type == ADAPTIVE_ATTACKS:
             return AdaptiveAttacksExperiment(self.target, base, self.evaluator, journal_dir=journal_dir, journal_factory=self.journal_factory)
+        if self.attack_type == BADCHARS_DELETION:
+            profile = deletion_profile(self.strategy().parameters)
+            return BadCharactersDeletionExperiment(
+                self.target, base, self.evaluator, journal_dir=journal_dir, journal_factory=self.journal_factory,
+                perturbation_budget=profile.perturbation_budget, max_position_candidates=profile.max_position_candidates,
+                max_ascii_variants=profile.max_ascii_variants,
+            )
         assert self.attacker is not None and self.max_calls_per_conv is not None
         return FITDExperiment(
             self.target, self.attacker, base, self.evaluator,
@@ -45,6 +54,8 @@ class RoleProfile(ParticipantProfile):
         )
 
     def strategy(self) -> StrategyConfiguration:
+        if self.assembly is not None:
+            return self.assembly.strategy
         return strategy_configuration(self.attack_type, self.max_calls_per_conv)
 
     def fresh(self) -> RoleProfile:
