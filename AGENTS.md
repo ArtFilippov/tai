@@ -54,3 +54,16 @@ when retaining this Qwen environment. All Eryx commands accept `--project`.
 Tool fixes require a branch and PR in `ArtFilippov/eryx`, autonomous regression
 tests and consumer checks. After that PR merges, open a separate tai PR pinning
 the merged SHA and linking the tool PR. See `eryx/README.md` for the full workflow.
+
+
+## English
+
+After every user command written in English, check its grammar before doing anything else.
+
+- If there are grammatical errors, start your response with: `Better say: <corrected version>`
+- Preserve the user's original meaning and phrasing as much as possible.
+- If the grammar is already correct, start your response with: `Great grammar`
+- If there is reasonable doubt about the intended meaning and correcting the grammar would require guessing the user's intent, ask a clarifying question instead of assuming the meaning.
+- After the grammar feedback or clarification, proceed with the user's request normally.
+
+Keep your own responses extremely concise, simple, and easy to understand.
