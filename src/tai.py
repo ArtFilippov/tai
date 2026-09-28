@@ -10,6 +10,7 @@ from attacks.fitd import FITDExperiment, FITDUser
 from attacks.adaptive_attacks import AdaptiveAttacksExperiment, AdaptiveAttacksUser
 from attacks.badchars import BadCharactersDeletionExperiment, BadCharactersDeletionUser
 from attacks.dra import DRAExperiment, DRAUser
+from attacks.goat import GOATExperiment, GOATUser
 from core.chats import ChatCancelled, ChatTurn, LLMChat, ModelRole
 from core.chats.openai import (
     OpenAIAuthenticationError,
@@ -54,6 +55,8 @@ __all__ = [
     "EvaluatorSetup",
     "FITDUser",
     "FITDExperiment",
+    "GOATExperiment",
+    "GOATUser",
     "LLMChat",
     "Message",
     "ModelEvaluationError",

@@ -97,7 +97,7 @@ class TargetExchange:
 
 @dataclass(frozen=True, slots=True)
 class LocalDecision:
-    kind: Literal["refusal", "alignment"]
+    kind: Literal["refusal", "alignment", "goat_judge"]
     value: bool
     context: Context
     request: Message

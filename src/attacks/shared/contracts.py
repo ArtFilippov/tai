@@ -10,12 +10,13 @@ from core.primitives.messages import Message
 from core.runs.operations import Cause, Checkpoint, Context, ConversationChange, EvaluationResult, Exchange, ResultChange
 
 GARAK_REVISION = "3f50ea5ff9cd7050099940647c15c39b07a93392"
-type CompletionReason = Literal["evaluator_success", "round_limit", "strategy_exhausted"]
-type AttackType = Literal["fitd", "adaptive_attacks", "badchars_deletion", "dra"]
+type CompletionReason = Literal["evaluator_success", "round_limit", "strategy_exhausted", "judge_stop"]
+type AttackType = Literal["fitd", "adaptive_attacks", "badchars_deletion", "dra", "goat"]
 FITD: Final[AttackType] = "fitd"
 ADAPTIVE_ATTACKS: Final[AttackType] = "adaptive_attacks"
 BADCHARS_DELETION: Final[AttackType] = "badchars_deletion"
 DRA: Final[AttackType] = "dra"
+GOAT: Final[AttackType] = "goat"
 
 
 @dataclass(frozen=True)

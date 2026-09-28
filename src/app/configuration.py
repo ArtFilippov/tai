@@ -12,9 +12,10 @@ from attacks.fitd import FITDExperiment
 from attacks.adaptive_attacks import AdaptiveAttacksExperiment
 from attacks.badchars import BadCharactersDeletionExperiment
 from attacks.dra import DRAExperiment
+from attacks.goat import GOATExperiment
 from attacks.badchars.profile import deletion_profile
 from attacks.dra.profile import dra_profile
-from attacks.shared.contracts import ADAPTIVE_ATTACKS, BADCHARS_DELETION, DRA, FITD, StrategyConfiguration
+from attacks.shared.contracts import ADAPTIVE_ATTACKS, BADCHARS_DELETION, DRA, FITD, GOAT, StrategyConfiguration
 from attacks.shared.experiment import Experiment
 from core.evaluation.assembly import EvaluatorSetup
 from core.evaluation.model_evaluator import MODEL_RUBRIC_VERSION
@@ -56,10 +57,10 @@ class RoleProfile(ParticipantProfile):
                 benign_trunc=dra.benign_trunc, benign_full_token_prob=dra.benign_full_token_prob,
             )
         assert self.attacker is not None and self.max_calls_per_conv is not None
-        return FITDExperiment(
-            self.target, self.attacker, base, self.evaluator,
-            journal_dir=journal_dir, max_calls_per_conv=self.max_calls_per_conv,
-            journal_factory=self.journal_factory,
+        experiment_type = GOATExperiment if self.attack_type == GOAT else FITDExperiment
+        return experiment_type(
+            self.target, self.attacker, base, self.evaluator, journal_dir=journal_dir,
+            max_calls_per_conv=self.max_calls_per_conv, journal_factory=self.journal_factory,
         )
 
     def strategy(self) -> StrategyConfiguration:
@@ -145,7 +146,7 @@ def load_profile(config: Path, *, alert_series: bool = False, server_log: Path =
     server = create_server(data.get("server"), server_log)
     return ProfileAssembly(
         chat_factory(data.get("target"), "target", server),
-        chat_factory(data.get("attacker"), "attacker", server) if strategy.attack_type == FITD else None,
+        chat_factory(data.get("attacker"), "attacker", server) if strategy.attack_type in (FITD, GOAT) else None,
         _evaluator(data.get("evaluator"), server, alert_series=alert_series),
         strategy, server,
     ).create()

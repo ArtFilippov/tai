@@ -4,7 +4,8 @@ from attacks.adaptive_attacks.profile import ADAPTIVE_PROFILE
 from attacks.badchars.profile import PARAMETERS, DeletionProfile, deletion_profile
 from attacks.dra.profile import PARAMETERS as DRA_PARAMETERS, DRAProfile, dra_profile
 from attacks.fitd.profile import FITDProfile
-from attacks.shared.contracts import ADAPTIVE_ATTACKS, BADCHARS_DELETION, DRA, FITD, AttackType, StrategyConfiguration
+from attacks.goat.profile import GOATProfile
+from attacks.shared.contracts import ADAPTIVE_ATTACKS, BADCHARS_DELETION, DRA, FITD, GOAT, AttackType, StrategyConfiguration
 
 from .configuration_values import round_limit, table
 
@@ -19,7 +20,7 @@ def strategy_configuration(kind: AttackType, rounds: int | None) -> StrategyConf
     if kind == DRA:
         return DRAProfile().configuration()
     assert rounds is not None
-    return FITDProfile(max_calls_per_conv=rounds).configuration()
+    return (GOATProfile(rounds) if kind == GOAT else FITDProfile(max_calls_per_conv=rounds)).configuration()
 
 
 def attack_configuration(data: dict[str, object]) -> StrategyConfiguration:
@@ -29,12 +30,18 @@ def attack_configuration(data: dict[str, object]) -> StrategyConfiguration:
     attack = table(attack, "attack", allowed)
     if kind == FITD:
         return strategy_configuration(FITD, round_limit(data.get("run", {})))
+    if kind == GOAT:
+        if ATTACKER_SECTION not in data:
+            raise ValueError("goat: требуется роль Attacker")
+        run = table(data.get("run", {}), "run")
+        rounds = round_limit({"max_calls_per_conv": GOATProfile().max_calls_per_conv, **run})
+        return GOATProfile(rounds).configuration()
     return _candidate_configuration(data, attack)
 
 
 def _candidate_configuration(data: dict[str, object], attack: dict[str, object]) -> StrategyConfiguration:
     if (kind := attack.get("type")) not in (ADAPTIVE_ATTACKS, BADCHARS_DELETION, DRA):
-        raise ValueError("attack.type: поддерживается fitd, adaptive_attacks, badchars_deletion или dra")
+        raise ValueError("attack.type: поддерживается fitd, adaptive_attacks, badchars_deletion, dra или goat")
     if ATTACKER_SECTION in data:
         raise ValueError(f"{kind}: роль Attacker не используется")
     run = table(data.get("run", {}), "run", {"generations"})

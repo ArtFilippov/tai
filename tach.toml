@@ -21,6 +21,7 @@ depends_on = [
     "attacks.badchars",
     "attacks.dra",
     "attacks.fitd",
+    "attacks.goat",
     "core.chats",
     "core.chats.openai",
     "core.chats.qwen",
@@ -98,6 +99,7 @@ depends_on = [
     "attacks.badchars.profile",
     "attacks.dra",
     "attacks.dra.profile",
+    "attacks.goat",
     "attacks.shared.contracts",
     "attacks.shared.experiment",
     "core.chats",
@@ -824,7 +826,7 @@ depends_on = ["attacks.adaptive_attacks.bootstrap", "attacks.shared.assembly", "
 [[modules]]
 path = "app.attack_configuration"
 layer = "Bootstrap"
-depends_on = ["app.configuration_values", "attacks.adaptive_attacks.profile", "attacks.badchars.profile", "attacks.dra.profile", "attacks.fitd.profile", "attacks.shared.contracts"]
+depends_on = ["app.configuration_values", "attacks.adaptive_attacks.profile", "attacks.badchars.profile", "attacks.dra.profile", "attacks.fitd.profile", "attacks.goat.profile", "attacks.shared.contracts"]
 
 [[modules]]
 path = "attacks.shared.candidates"
@@ -857,6 +859,32 @@ path = "attacks.badchars.experiment"
 layer = "Bootstrap"
 depends_on = ["attacks.badchars.bootstrap", "attacks.badchars.profile", "attacks.shared.assembly", "attacks.shared.experiment", "core.chats", "core.evaluation", "core.evaluation.configuration", "core.primitives.messages", "core.runs.journal", "core.runs.journal_ports"]
 
+[[modules]]
+path = "attacks.goat"
+layer = "Bootstrap"
+depends_on = ["attacks.goat.bootstrap", "attacks.goat.experiment"]
+
+[[modules]]
+path = "attacks.goat.profile"
+layer = "Domain"
+depends_on = ["attacks.shared.contracts"]
+
+[[modules]]
+path = "attacks.goat.garak_adapter"
+layer = "Infrastructure"
+cannot_depend_on = ["attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
+depends_on = ["attacks.goat.profile", "attacks.shared.contracts", "core.primitives.messages", "core.runs.operations"]
+
+[[modules]]
+path = "attacks.goat.bootstrap"
+layer = "Bootstrap"
+depends_on = ["attacks.goat.garak_adapter", "attacks.goat.profile", "attacks.shared.assembly", "attacks.shared.execution_state", "attacks.shared.user", "core.chats", "core.evaluation", "core.evaluation.configuration", "core.primitives.messages"]
+
+[[modules]]
+path = "attacks.goat.experiment"
+layer = "Bootstrap"
+depends_on = ["attacks.goat.bootstrap", "attacks.goat.garak_adapter", "attacks.goat.profile", "attacks.shared.assembly", "attacks.shared.experiment", "attacks.shared.observation", "core.chats", "core.evaluation", "core.evaluation.configuration", "core.primitives.messages", "core.runs.journal", "core.runs.journal_ports"]
+
 [[interfaces]]
 from = ['^attacks\.dra$']
 expose = ['^DRAExperiment$', '^DRAUser$']
@@ -881,6 +909,8 @@ expose = [
     '^EvaluatorSetup$',
     '^FITDUser$',
     '^FITDExperiment$',
+    '^GOATExperiment$',
+    '^GOATUser$',
     '^LLMChat$',
     '^Message$',
     '^ModelEvaluationError$',
@@ -924,6 +954,10 @@ from = ['^attacks\.fitd$']
 expose = ['^FITDExperiment$', '^FITDUser$']
 
 [[interfaces]]
+from = ['^attacks\.goat$']
+expose = ['^GOATExperiment$', '^GOATUser$']
+
+[[interfaces]]
 from = ['^attacks\.adaptive_attacks$']
 expose = ['^AdaptiveAttacksExperiment$', '^AdaptiveAttacksUser$']
 
@@ -962,7 +996,7 @@ from = [
     '^app\.[^.]+$',
     '^alert\.[^.]+$',
     '^attacks\.fitd\.[^.]+$',
-    '^attacks\.(shared|adaptive_attacks|badchars|dra)\.[^.]+$',
+    '^attacks\.(shared|adaptive_attacks|badchars|dra|goat)\.[^.]+$',
     '^core\.(chats|evaluation|runs)\.[^.]+$',
     '^core\.primitives\.(messages|diagnostics)\.[^.]+$',
 ]
