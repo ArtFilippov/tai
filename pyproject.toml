@@ -12,9 +12,15 @@ dependencies = ["garak", "rich==15.0.0"]
 
 [project.optional-dependencies]
 qwen = [
-    "transformers==4.51.3",
+    "transformers==4.45.2",
     "torch==2.5.1+cu121; sys_platform == 'linux' and platform_machine == 'x86_64'",
-    "huggingface-hub[cli]==0.34.4",
+    "huggingface-hub[cli]==0.26.2",
+]
+vllm = [
+    "vllm==0.6.4.post1; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "torchvision==0.20.1+cu121; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "xformers==0.0.28.post3; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "numpy==1.26.4; sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
 
 [project.scripts]
@@ -44,6 +50,8 @@ link-mode = "copy"
 [tool.uv.sources]
 garak = { git = "https://github.com/NVIDIA/garak.git", rev = "3f50ea5ff9cd7050099940647c15c39b07a93392" }
 torch = { index = "pytorch-cu121", extra = "qwen" }
+torchvision = { index = "pytorch-cu121", extra = "vllm" }
+xformers = { index = "pytorch-cu121", extra = "vllm" }
 
 [[tool.uv.index]]
 name = "pytorch-cu121"

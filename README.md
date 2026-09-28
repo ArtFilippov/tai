@@ -198,7 +198,8 @@ Runtime-тесты pytest и офлайн-пример запускаются о
 uv run --locked --group dev python -B -m unittest discover -s eryx/tests
 ```
 
-При работе с окружением Qwen добавляйте `--extra qwen` к командам uv.
+При работе с окружением Qwen добавляйте `--extra qwen` к командам uv; если также
+установлен vLLM, добавляйте `--extra vllm`.
 Подробности профиля и ограничения: [`eryx/PROFILE.md`](eryx/PROFILE.md);
 инструкции для агентов: [`AGENTS.md`](AGENTS.md) и [`eryx/AGENTS.md`](eryx/AGENTS.md).
 Исправления совместимости: [`eryx/COMPATIBILITY.md`](eryx/COMPATIBILITY.md).
@@ -206,8 +207,8 @@ uv run --locked --group dev python -B -m unittest discover -s eryx/tests
 При обновлении gitlink при необходимости выполните установку повторно:
 
 ```bash
-bash eryx/install.sh --project . --extra qwen --dry-run --json
-bash eryx/install.sh --project . --extra qwen
+bash eryx/install.sh --project . --extra qwen --extra vllm --dry-run --json
+bash eryx/install.sh --project . --extra qwen --extra vllm
 ```
 
 Для окружения без Qwen при первой установке опустите `--extra qwen`; повторная
@@ -220,7 +221,7 @@ uv source/index/metadata. При сбое управляемые файлы от
 **PR в Eryx**. После CI, ревью и слияния закрепите точный merged SHA в
 **отдельном PR tai**, со ссылкой на PR инструмента. Полный цикл описан в
 [`eryx/README.md`](eryx/README.md). Для отдельного клона инструмента используйте
-`uv run --locked --group dev --extra qwen python /path/to/eryx/check.py --project .`.
+`uv run --locked --group dev --extra qwen --extra vllm python /path/to/eryx/check.py --project .`.
 
 ### Архитектурные настройки Eryx (Tach)
 
@@ -561,10 +562,12 @@ CUDA-зависимостей превысило квоту; установка 
 кеша с `--offline` прошла. Команды и обе ошибки сохранены в
 [итоговом отчёте](docs/acceptance/2026-09-15-fitd.md).
 
-`uv.lock` закрепляет Transformers **4.51.3**, PyTorch **2.5.1+cu121** из CUDA-index,
-Hugging Face Hub **0.34.4** и транзитивные зависимости. Обычный `uv sync --locked`
+`uv.lock` закрепляет Transformers **4.45.2**, PyTorch **2.5.1+cu121** из CUDA-index,
+Hugging Face Hub **0.26.2** и транзитивные зависимости. Обычный `uv sync --locked`
 устанавливает лёгкий HTTP/тестовый профиль; при работе с Qwen сохраняйте
 `--extra qwen`, иначе uv удалит опциональные зависимости из этого окружения.
+Для одновременной работы Transformers и vLLM добавляйте **оба** extra:
+`--extra qwen --extra vllm` ко всем `uv sync` и `uv run` (см. [vLLM](docs/vllm.md)).
 Импорт `tai`, чтение конфигурации и `settings()` не импортируют PyTorch/Transformers.
 
 ### Офлайн preflight и FITD

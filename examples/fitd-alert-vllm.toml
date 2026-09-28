@@ -1,7 +1,7 @@
-# Prepare environments/vllm and the pinned snapshot first; see docs/vllm.md.
+# Prepare both optional backends and the pinned snapshot first; see docs/vllm.md.
 # No tai system instructions; the model's native chat template is unchanged.
 [server]
-python = "/vg/isp/tai/environments/vllm/.venv/bin/python"
+python = "/vg/isp/tai/.venv/bin/python"
 model = "Qwen/Qwen2.5-0.5B-Instruct"
 revision = "7ae557604adf67be50417f59c2c2f167def9a775"
 cache_dir = "~/.cache/tai/huggingface"
@@ -9,7 +9,7 @@ device = "cuda:1"
 dtype = "float16"
 max_model_len = 8192
 max_num_seqs = 32
-gpu_memory_utilization = 0.5
+gpu_memory_utilization = 0.7
 startup_timeout = 300.0
 shutdown_timeout = 10.0
 

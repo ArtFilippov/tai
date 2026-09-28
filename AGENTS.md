@@ -37,6 +37,7 @@ Run relevant runtime tests with `uv run --locked --group dev pytest`. When editi
 `uv run --locked --group dev python -B -m unittest discover -s eryx/tests`.
 For an environment prepared for Qwen, include `--extra qwen` in uv commands to
 retain its optional dependencies.
+For a shared Qwen/vLLM environment, include both `--extra qwen --extra vllm`.
 
 Change readability limits in `.eryx/readability.toml` and shared exclusions in
 `.eryx/scope.toml`, then run
@@ -48,8 +49,8 @@ Architecture is already initialized in this repository. Do not run `tach sync`
 as part of routine checks or relax rules/exclusions to hide diagnostics.
 Keep the gitlink, `.gitmodules`, `.eryx/` settings and native configs in Git.
 Only `.eryx/reports/`, `.eryx/logs/`, `.eryx/cache/` and native caches are ignored.
-Install/update integration with `bash eryx/install.sh --project . --extra qwen`
-when retaining this Qwen environment. All Eryx commands accept `--project`.
+Install/update integration with `bash eryx/install.sh --project . --extra qwen --extra vllm`
+when retaining both backends. All Eryx commands accept `--project`.
 
 Tool fixes require a branch and PR in `ArtFilippov/eryx`, autonomous regression
 tests and consumer checks. After that PR merges, open a separate tai PR pinning

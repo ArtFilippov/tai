@@ -11,7 +11,8 @@
   ],
   "eryx_version": "1.0.0",
   "extras": [
-    "qwen"
+    "qwen",
+    "vllm"
   ],
   "mode": "strict",
   "source_layout": "src"
