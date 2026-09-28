@@ -7,15 +7,18 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
+from typing import cast
 
 from attacks.fitd import FITDExperiment
 from attacks.adaptive_attacks import AdaptiveAttacksExperiment
 from attacks.badchars import BadCharactersDeletionExperiment
 from attacks.dra import DRAExperiment
 from attacks.goat import GOATExperiment
+from attacks.autodan import AutoDANExperiment
+from attacks.autodan.profile import AutoDANOptions, autodan_profile
 from attacks.badchars.profile import deletion_profile
 from attacks.dra.profile import dra_profile
-from attacks.shared.contracts import ADAPTIVE_ATTACKS, BADCHARS_DELETION, DRA, FITD, GOAT, StrategyConfiguration
+from attacks.shared.contracts import ADAPTIVE_ATTACKS, AUTODAN, BADCHARS_DELETION, DRA, FITD, GOAT, StrategyConfiguration
 from attacks.shared.experiment import Experiment
 from core.evaluation.assembly import EvaluatorSetup
 from core.evaluation.model_evaluator import MODEL_RUBRIC_VERSION
@@ -32,6 +35,7 @@ from .profiles import ParticipantProfile
 from .server_factory import create_server
 
 DEFAULT_SERVER_LOG = Path("runs/vllm.log")
+GENERATIONS_SETTING = "generations"
 
 
 @dataclass(frozen=True)
@@ -40,8 +44,20 @@ class RoleProfile(ParticipantProfile):
     journal_factory: Callable[..., Journal] = RunJournal
 
     def create_experiment(self, base: Message, journal_dir: Path | None = None) -> Experiment:
+        if self.attack_type == AUTODAN:
+            return self._autodan(base, journal_dir)
         if self.attack_type == ADAPTIVE_ATTACKS:
             return AdaptiveAttacksExperiment(self.target, base, self.evaluator, journal_dir=journal_dir, journal_factory=self.journal_factory)
+        if self.attack_type in (BADCHARS_DELETION, DRA):
+            return self._candidate(base, journal_dir)
+        assert self.attacker is not None and self.max_calls_per_conv is not None
+        experiment_type = GOATExperiment if self.attack_type == GOAT else FITDExperiment
+        return experiment_type(
+            self.target, self.attacker, base, self.evaluator, journal_dir=journal_dir,
+            max_calls_per_conv=self.max_calls_per_conv, journal_factory=self.journal_factory,
+        )
+
+    def _candidate(self, base: Message, journal_dir: Path | None) -> Experiment:
         if self.attack_type == BADCHARS_DELETION:
             profile = deletion_profile(self.strategy().parameters)
             return BadCharactersDeletionExperiment(
@@ -49,18 +65,20 @@ class RoleProfile(ParticipantProfile):
                 perturbation_budget=profile.perturbation_budget, max_position_candidates=profile.max_position_candidates,
                 max_ascii_variants=profile.max_ascii_variants,
             )
-        if self.attack_type == DRA:
-            dra = dra_profile(self.strategy().parameters)
-            return DRAExperiment(
-                self.target, base, self.evaluator, journal_dir=journal_dir, journal_factory=self.journal_factory,
-                max_variants=dra.max_variants, seed=dra.seed, toxic_trunc=dra.toxic_trunc,
-                benign_trunc=dra.benign_trunc, benign_full_token_prob=dra.benign_full_token_prob,
-            )
-        assert self.attacker is not None and self.max_calls_per_conv is not None
-        experiment_type = GOATExperiment if self.attack_type == GOAT else FITDExperiment
-        return experiment_type(
+        dra = dra_profile(self.strategy().parameters)
+        return DRAExperiment(
+            self.target, base, self.evaluator, journal_dir=journal_dir, journal_factory=self.journal_factory,
+            max_variants=dra.max_variants, seed=dra.seed, toxic_trunc=dra.toxic_trunc,
+            benign_trunc=dra.benign_trunc, benign_full_token_prob=dra.benign_full_token_prob,
+        )
+
+    def _autodan(self, base: Message, journal_dir: Path | None) -> AutoDANExperiment:
+        assert self.attacker is not None
+        autodan = autodan_profile(self.strategy().parameters)
+        return AutoDANExperiment(
             self.target, self.attacker, base, self.evaluator, journal_dir=journal_dir,
-            max_calls_per_conv=self.max_calls_per_conv, journal_factory=self.journal_factory,
+            journal_factory=self.journal_factory,
+            **cast(AutoDANOptions, {key: value for key, value in autodan.configuration().parameters.items() if key != GENERATIONS_SETTING}),
         )
 
     def strategy(self) -> StrategyConfiguration:
@@ -146,7 +164,7 @@ def load_profile(config: Path, *, alert_series: bool = False, server_log: Path =
     server = create_server(data.get("server"), server_log)
     return ProfileAssembly(
         chat_factory(data.get("target"), "target", server),
-        chat_factory(data.get("attacker"), "attacker", server) if strategy.attack_type in (FITD, GOAT) else None,
+        chat_factory(data.get("attacker"), "attacker", server) if strategy.attack_type in (FITD, GOAT, AUTODAN) else None,
         _evaluator(data.get("evaluator"), server, alert_series=alert_series),
         strategy, server,
     ).create()

@@ -17,6 +17,7 @@ path = "tai"
 layer = "Bootstrap"
 depends_on = [
     "alert",
+    "attacks.autodan",
     "attacks.adaptive_attacks",
     "attacks.badchars",
     "attacks.dra",
@@ -88,6 +89,8 @@ depends_on = [
 path = "app.configuration"
 layer = "Bootstrap"
 depends_on = [
+    "attacks.autodan",
+    "attacks.autodan.profile",
     "app.attack_configuration",
     "app.chat_factory",
     "app.configuration_values",
@@ -259,7 +262,7 @@ depends_on = ["core.chats.conversation", "core.chats.openai_config", "core.chats
 path = "core.chats.qwen"
 layer = "Infrastructure"
 cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
-depends_on = ["core.chats.conversation", "core.chats.qwen_config", "core.chats.qwen_executor", "core.primitives.diagnostics"]
+depends_on = ["core.chats.conversation", "core.chats.qwen_config", "core.chats.qwen_executor", "core.chats.scoring", "core.primitives.diagnostics"]
 
 [[modules]]
 path = "core.evaluation"
@@ -449,6 +452,8 @@ depends_on = ["attacks.shared.contracts", "core.chats", "core.evaluation.configu
 path = "app.readiness"
 layer = "UseCase"
 depends_on = [
+    "attacks.shared.contracts",
+    "core.chats.scoring",
     "alert.values",
     "app.contracts",
     "app.failure_capture",
@@ -624,7 +629,7 @@ depends_on = ["core.chats.conversation", "core.chats.qwen_config", "core.chats.q
 path = "core.chats.qwen_runtime"
 layer = "Infrastructure"
 cannot_depend_on = ["app.failure_capture", "app.lifecycle", "app.readiness", "app.readiness_session", "app.series_execution", "app.series_attempt", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
-depends_on = ["core.chats.conversation", "core.chats.qwen_config", "core.chats.qwen_contracts"]
+depends_on = ["core.chats.conversation", "core.chats.qwen_config", "core.chats.qwen_contracts", "core.chats.qwen_scoring"]
 
 [[modules]]
 path = "core.evaluation.configuration"
@@ -826,7 +831,7 @@ depends_on = ["attacks.adaptive_attacks.bootstrap", "attacks.shared.assembly", "
 [[modules]]
 path = "app.attack_configuration"
 layer = "Bootstrap"
-depends_on = ["app.configuration_values", "attacks.adaptive_attacks.profile", "attacks.badchars.profile", "attacks.dra.profile", "attacks.fitd.profile", "attacks.goat.profile", "attacks.shared.contracts"]
+depends_on = ["app.configuration_values", "attacks.adaptive_attacks.profile", "attacks.autodan.profile", "attacks.badchars.profile", "attacks.dra.profile", "attacks.fitd.profile", "attacks.goat.profile", "attacks.shared.contracts"]
 
 [[modules]]
 path = "attacks.shared.candidates"
@@ -867,7 +872,7 @@ depends_on = ["attacks.goat.bootstrap", "attacks.goat.experiment"]
 [[modules]]
 path = "attacks.goat.profile"
 layer = "Domain"
-depends_on = ["attacks.shared.contracts"]
+depends_on = ["attacks.shared.contracts", "core.runs.operations"]
 
 [[modules]]
 path = "attacks.goat.garak_adapter"
@@ -885,6 +890,46 @@ path = "attacks.goat.experiment"
 layer = "Bootstrap"
 depends_on = ["attacks.goat.bootstrap", "attacks.goat.garak_adapter", "attacks.goat.profile", "attacks.shared.assembly", "attacks.shared.experiment", "attacks.shared.observation", "core.chats", "core.evaluation", "core.evaluation.configuration", "core.primitives.messages", "core.runs.journal", "core.runs.journal_ports"]
 
+[[modules]]
+path = "core.chats.scoring"
+layer = "Domain"
+depends_on = []
+
+[[modules]]
+path = "core.chats.qwen_scoring"
+layer = "Infrastructure"
+depends_on = ["core.chats.qwen_config"]
+
+[[modules]]
+path = "attacks.autodan"
+layer = "Bootstrap"
+depends_on = ["attacks.autodan.bootstrap", "attacks.autodan.experiment"]
+
+[[modules]]
+path = "attacks.autodan.profile"
+layer = "Domain"
+depends_on = ["attacks.shared.contracts"]
+
+[[modules]]
+path = "attacks.autodan.genetic"
+layer = "Infrastructure"
+depends_on = ["attacks.autodan.profile"]
+
+[[modules]]
+path = "attacks.autodan.garak_adapter"
+layer = "Infrastructure"
+depends_on = ["attacks.autodan.genetic", "attacks.autodan.profile", "attacks.shared.contracts", "core.chats.scoring", "core.primitives.messages", "core.runs.operations"]
+
+[[modules]]
+path = "attacks.autodan.bootstrap"
+layer = "Bootstrap"
+depends_on = ["attacks.autodan.garak_adapter", "attacks.autodan.profile", "attacks.shared.assembly", "attacks.shared.execution_state", "attacks.shared.user", "core.chats", "core.chats.scoring", "core.evaluation", "core.evaluation.configuration", "core.primitives.messages"]
+
+[[modules]]
+path = "attacks.autodan.experiment"
+layer = "Bootstrap"
+depends_on = ["attacks.autodan.bootstrap", "attacks.autodan.garak_adapter", "attacks.autodan.profile", "attacks.shared.assembly", "attacks.shared.experiment", "core.chats", "core.chats.scoring", "core.evaluation", "core.evaluation.configuration", "core.primitives.messages", "core.runs.journal", "core.runs.journal_ports"]
+
 [[interfaces]]
 from = ['^attacks\.dra$']
 expose = ['^DRAExperiment$', '^DRAUser$']
@@ -893,6 +938,8 @@ expose = ['^DRAExperiment$', '^DRAUser$']
 [[interfaces]]
 from = ['^tai$']
 expose = [
+    '^AutoDANExperiment$',
+    '^AutoDANUser$',
     '^AdaptiveAttacksExperiment$',
     '^AdaptiveAttacksUser$',
     '^AlertManifest$',
@@ -958,6 +1005,10 @@ from = ['^attacks\.goat$']
 expose = ['^GOATExperiment$', '^GOATUser$']
 
 [[interfaces]]
+from = ['^attacks\.autodan$']
+expose = ['^AutoDANExperiment$', '^AutoDANUser$']
+
+[[interfaces]]
 from = ['^attacks\.adaptive_attacks$']
 expose = ['^AdaptiveAttacksExperiment$', '^AdaptiveAttacksUser$']
 
@@ -996,7 +1047,7 @@ from = [
     '^app\.[^.]+$',
     '^alert\.[^.]+$',
     '^attacks\.fitd\.[^.]+$',
-    '^attacks\.(shared|adaptive_attacks|badchars|dra|goat)\.[^.]+$',
+    '^attacks\.(shared|adaptive_attacks|autodan|badchars|dra|goat)\.[^.]+$',
     '^core\.(chats|evaluation|runs)\.[^.]+$',
     '^core\.primitives\.(messages|diagnostics)\.[^.]+$',
 ]

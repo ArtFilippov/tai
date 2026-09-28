@@ -10,12 +10,12 @@ from attacks.shared.contracts import GARAK_REVISION, CompletionReason, StrategyP
 from core.primitives.messages import Message
 from core.runs.operations import Cause, Exchange, LocalDecision
 
-from .profile import GOATProfile
+from .profile import GOATProbeContract, GOATProfile
 
 UNSAFE = "unsafe"
 
 
-class NativeGOAT(GOATAttack):
+class _NativeGOAT(GOATAttack):
     """Load native resources without garak's dataset, globals or model plugin.
 
     Args:
@@ -57,12 +57,11 @@ class NativeGOAT(GOATAttack):
         system = self.system_prompt_template.format(goal=goal, attack_techniques=self._format_attack_techniques())
         return f"{system}\n\n{self.initial_prompt_template.format(goal=goal)}"
 
-
-class GOATProbe:
+class GOATProbe(GOATProbeContract):
     def __init__(self, base: Message, ports: StrategyPorts, profile: GOATProfile) -> None:
         super().__init__()
         self.base, self.ports, self.profile = base, ports, profile
-        self.native = NativeGOAT(base.to_string())
+        self.native = _NativeGOAT(base.to_string())
 
     def _judge_exchange(self, prompt: str, cause: Cause) -> Exchange:
         conversation = self.ports.conversation
@@ -73,6 +72,7 @@ class GOATProbe:
         _ = conversation.restore("Attacker", snapshot, cause)
         return judgment
 
+    @override
     def judge(self, exchange: Exchange, checkpoint_id: str, turn: int) -> LocalDecision:
         """Use garak's verify prompt and decision rule without losing attacker history.
 
@@ -130,6 +130,7 @@ class GOATProbe:
         _ = self.ports.publish(exchange.response, exchange.context, checkpoint.id)
         return checkpoint.id
 
+    @override
     def __call__(self) -> CompletionReason:
         previous: tuple[Message, Message] | None = None
         for turn in range(1, self.profile.max_calls_per_conv + 1):

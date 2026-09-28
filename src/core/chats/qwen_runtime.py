@@ -10,6 +10,7 @@ from .qwen_config import Generation, LocalCheckpoint, QwenContextError, QwenErro
 from .qwen_contracts import (
     InputBatch, LocalRuntimeProtocol, Model, Tensor, Tokenizer, Torch, Transformers,
 )
+from .qwen_scoring import score_continuation as score_local_continuation
 
 _BFLOAT16 = "bfloat16"
 
@@ -68,6 +69,21 @@ class LocalRuntime(LocalRuntimeProtocol):
     transformers: Transformers
     tokenizer: Tokenizer
     model: Model
+
+    @override
+    def score_continuation(self, prompt: str, expected: str, system: str, *, device: str) -> float:
+        """Score the assistant continuation under the shared model weights.
+
+        Args:
+            prompt (str): Full user prompt.
+            expected (str): Assistant continuation.
+            system (str): Target system instruction.
+            device (str): Pinned CUDA device.
+
+        Returns:
+            float: Mean token loss.
+        """
+        return score_local_continuation((self.torch, self.tokenizer, self.model), prompt, expected, system, device=device)
 
     @override
     def actual_dtype(self) -> str:

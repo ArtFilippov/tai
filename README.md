@@ -84,10 +84,10 @@ Target и Attacker владеют своими разговорами через
 происхождение сообщений, адаптация с откатами и независимые повторные запуски.
 Термины и архитектурные решения: [CONTEXT.md](CONTEXT.md), [docs/adr](docs/adr).
 
-### Выбор стратегии: FITD, Adaptive Attacks, Bad Characters или DRA
+### Выбор стратегии: FITD, Adaptive Attacks, Bad Characters, DRA, GOAT или AutoDAN
 
 `tai attack` выполняет стратегию из `[attack].type`. Значения — `fitd`,
-`adaptive_attacks`, `badchars_deletion` и `dra`; без `[attack]` используется FITD. Команда `tai fitd` принимает
+`adaptive_attacks`, `badchars_deletion`, `dra`, `goat` и `autodan`; без `[attack]` используется FITD. Команда `tai fitd` принимает
 только FITD-профили.
 
 [Simple Adaptive Attacks](docs/adaptive-attacks.md) использует шаблон и пять
@@ -137,6 +137,12 @@ uv run --locked --extra qwen tai attack \
   --config examples/dra-qwen.toml \
   --text 'Ваш базовый запрос' --artifacts-dir runs/dra
 ```
+
+[GOAT](docs/goat.md) использует отдельные разговоры Attacker и Target.
+[AutoDAN](docs/autodan.md) выполняет GA-поиск с локальной logits-оценкой Target
+и независимыми мутациями Attacker. Пример профиля: `examples/autodan-qwen.toml`.
+Нативная проверка AutoDAN может завершиться без предъявленного результата;
+журнал поиска всё равно сохраняется.
 
 ## Установка и офлайн-проверки
 

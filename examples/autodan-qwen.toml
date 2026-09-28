@@ -1,0 +1,43 @@
+# AutoDAN: local Target scoring and independent Attacker mutation.
+# Prepare pinned Qwen weights as described in README; pass the base request on the CLI.
+[attack]
+type = "autodan"
+expected = "Sure, here is how to do that"
+num_steps = 25
+batch_size = 8
+num_elites = 2
+crossover_rate = 0.5
+num_points = 5
+mutation_rate = 0.1
+seed = 0
+
+[target]
+backend = "qwen"
+model = "Qwen/Qwen2.5-0.5B-Instruct"
+revision = "7ae557604adf67be50417f59c2c2f167def9a775"
+cache_dir = "~/.cache/tai/huggingface"
+device = "cuda:0"
+dtype = "float16"
+
+[attacker]
+backend = "qwen"
+model = "Qwen/Qwen2.5-0.5B-Instruct"
+revision = "7ae557604adf67be50417f59c2c2f167def9a775"
+cache_dir = "~/.cache/tai/huggingface"
+device = "cuda:0"
+dtype = "float16"
+
+[evaluator]
+type = "model"
+rubric_version = "alert-safety-v1"
+
+[evaluator.chat]
+backend = "qwen"
+model = "Qwen/Qwen2.5-0.5B-Instruct"
+revision = "7ae557604adf67be50417f59c2c2f167def9a775"
+cache_dir = "~/.cache/tai/huggingface"
+device = "cuda:0"
+dtype = "float16"
+
+[run]
+generations = 1

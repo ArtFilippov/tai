@@ -15,6 +15,7 @@ from .qwen_config import (
     QwenOptions, generation_config, local_checkpoint, validate_dtype, validate_system,
 )
 from .qwen_executor import shared_executor
+from .scoring import ContinuationScorer
 
 __all__ = ["QwenChat", "QwenError", "QwenContextError"]
 
@@ -29,7 +30,7 @@ def _versions() -> dict[str, str | None]:
     return result
 
 
-class QwenChat(LLMChat):
+class QwenChat(LLMChat, ContinuationScorer):
     """One local conversation on an explicit CUDA device, loaded lazily on send.
 
     ``cache_dir`` is a prepared Hugging Face Hub cache (``~`` is expanded).
@@ -58,8 +59,9 @@ class QwenChat(LLMChat):
         self._checkpoint = replace(checkpoint, cache=cache.expanduser().resolve())
         dtype = validate_dtype(options.get("dtype", "float16"))
         self._generation = generation_config(options.get("generation"))
+        self._system = validate_system(options.get("system", ""))
         super().__init__(
-            lambda turns: "", model=model, system=validate_system(options.get("system", "")),
+            lambda turns: "", model=model, system=self._system,
         )
         self._executor = shared_executor(self._checkpoint, dtype)
 
@@ -80,4 +82,25 @@ class QwenChat(LLMChat):
         return self._executor.generate(
             turns, cancellation, self._generation,
             checkpoint=self._checkpoint, importer=import_module,
+        )
+
+    @override
+    def score_continuation(self, prompt: str, expected: str) -> float:
+        """Return local logits loss, without reading or changing active history.
+
+        Args:
+            prompt (str): Full user prompt.
+            expected (str): Expected assistant continuation.
+
+        Returns:
+            float: Mean token cross-entropy.
+
+        Raises:
+            ValueError: The prompt or continuation is empty.
+        """
+        if not prompt or not expected:
+            raise ValueError("AutoDAN scoring requires a prompt and expected continuation")
+        system = self._system
+        return self._executor.score_continuation(
+            prompt, expected, system, checkpoint=self._checkpoint, importer=import_module,
         )

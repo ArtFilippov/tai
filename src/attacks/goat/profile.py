@@ -2,11 +2,17 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TypedDict, cast
+from typing import Protocol, TypedDict, cast
 
 from attacks.shared.contracts import GOAT, StrategyConfiguration
+from core.runs.operations import Exchange, LocalDecision
 
 PARAMETERS = frozenset({"max_calls_per_conv"})
+
+
+class GOATProbeContract(Protocol):
+    def judge(self, exchange: Exchange, checkpoint_id: str, turn: int) -> LocalDecision: ...
+    def __call__(self) -> str: ...
 
 
 class GOATOptions(TypedDict, total=False):

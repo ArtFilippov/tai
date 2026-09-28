@@ -48,6 +48,16 @@ class Executor(QwenExecutorProtocol):
         return self._loaded is not None
 
     @override
+    def score_continuation(
+        self, prompt: str, expected: str, system: str, *, checkpoint: LocalCheckpoint,
+        importer: Callable[[str], object],
+    ) -> float:
+        with self._admitted(Event()):
+            if self._loaded is None:
+                self._loaded = load_runtime(checkpoint, self.dtype, Event(), importer)
+            return self._loaded.score_continuation(prompt, expected, system, device=self.device)
+
+    @override
     def generate(
         self, turns: tuple[ChatTurn, ...], cancellation: Event,
         generation: Generation, *, checkpoint: LocalCheckpoint,

@@ -7,16 +7,19 @@
 Термин «серия запусков» определён в [`CONTEXT.md`](../CONTEXT.md).
 
 Стратегию задаёт `[attack].type`: `fitd` (также по умолчанию),
-`adaptive_attacks`, `badchars_deletion` или `dra`. Для [Adaptive Attacks](adaptive-attacks.md)
+`adaptive_attacks`, `badchars_deletion`, `dra`, `goat` или `autodan`. Для [Adaptive Attacks](adaptive-attacks.md)
 используйте `--profile examples/adaptive-attacks-qwen.toml --jobs 1`, для
 [Bad Characters/deletion](badchars-deletion.md) —
 `--profile examples/badchars-deletion-qwen.toml --jobs 1`, для [DRA](dra.md) —
 `--profile examples/dra-qwen.toml --jobs 1` с `--extra qwen` в uv.
 Всем трём профилям нужны Target и модельный оценщик; Attacker не создаётся.
+Для [AutoDAN](autodan.md) используйте
+`--profile examples/autodan-qwen.toml --jobs 1 --extra qwen` и явно задайте
+`attack.expected`; Target должен работать через локальный Qwen с logits-scoring.
 Один base остаётся одной записью независимо от количества вариантов.
 Пять cached-суффиксов, deletion-профиль `1 / 8 / 4` (до 32 вариантов) и
 ранняя остановка по оценке описаны в документации стратегий;
-`run.max_calls_per_conv` применяется только к FITD.
+`run.max_calls_per_conv` применяется к FITD и GOAT, но не к AutoDAN.
 
 ## Команда
 
@@ -168,7 +171,7 @@ JSON всегда остаётся в stdout; исходные состояни�
 | Файл | Данные |
 | --- | --- |
 | `manifest.json`, `ALERT_taxonomy.md` | Точные байтовые копии проверенных входов, включая prompts, seed, ревизию источника, исходные ID и таксономию. |
-| `effective-profile.json` | Фактический `attack.type`, параметры под `fitd`, `adaptive_attacks`, `badchars_deletion` или `dra`, ревизия garak, версия tai/Python, платформа, начальные настройки только используемых ролей, версия и полный текст рубрики. |
+| `effective-profile.json` | Фактический `attack.type`, параметры под выбранной стратегией (`fitd`, `adaptive_attacks`, `badchars_deletion`, `dra`, `goat` или `autodan`), ревизия garak, версия tai/Python, платформа, начальные настройки только используемых ролей, версия и полный текст рубрики. |
 | `final-settings.json` | Та же схема после серии: фактическая готовность/версия сервера либо `loaded`/`actual_dtype` Qwen. Истории каждого запуска находятся в его metadata. |
 | `index.json` | План из 32 ID и сохранённый префикс предпринятых попыток с фактическими исходами; схема ниже. |
 | `report.json` | Короткая детерминированная агрегация; схема и формула ниже. |

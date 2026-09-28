@@ -184,6 +184,9 @@ class Transformers:
 
 class LocalRuntimeProtocol(Protocol):
     @abstractmethod
+    def score_continuation(self, prompt: str, expected: str, system: str, *, device: str) -> float: ...
+
+    @abstractmethod
     def actual_dtype(self) -> str: ...
 
     @abstractmethod
@@ -202,6 +205,12 @@ class QwenExecutorProtocol(Protocol):
 
     @abstractmethod
     def is_loaded(self) -> bool: ...
+
+    @abstractmethod
+    def score_continuation(
+        self, prompt: str, expected: str, system: str, *, checkpoint: LocalCheckpoint,
+        importer: Callable[[str], object],
+    ) -> float: ...
 
     @abstractmethod
     def generate(

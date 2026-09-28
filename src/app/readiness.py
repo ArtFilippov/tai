@@ -1,16 +1,19 @@
 """Role readiness execution through injected observation contracts."""
 
 import json
+import math
 from functools import partial
 from uuid import uuid4
 
 from core.chats import LLMChat, ModelRole
+from core.chats.scoring import require_scorer
 from core.evaluation import evaluate
 from core.evaluation.configuration import EvaluatorSetup
 from core.primitives.messages import Message
 from core.runs import Evaluation
 from core.runs.operations import Cause, Context, ConversationChange, EvaluationResult, Exchange
 from alert.values import object_value
+from attacks.shared.contracts import AUTODAN
 
 from .contracts import ReadinessServices
 from .failure_capture import Failure
@@ -114,6 +117,18 @@ def _check_evaluator(services: ReadinessServices, run_id: str, setup: EvaluatorS
 
 def check_roles(profile: ParticipantProfile, services: ReadinessServices, run_id: str) -> dict[str, object]:
     results = [_check_chat(services, run_id, role, chat) for role, chat in profile.chats().items() if role != EVALUATOR_ROLE]
+    if profile.attack_type == AUTODAN:
+        result: dict[str, object] = {"role": "TargetScoring", "started_at": services.clock.now()}
+        with Failure() as failure:
+            scorer = require_scorer(profile.target)
+            loss = services.journal.call("preflight.scoring", lambda: scorer.score_continuation("Reply with exactly READY.", "READY"))
+            if not math.isfinite(loss):
+                raise ValueError("AutoDAN logits scoring returned a non-finite loss")
+            result.update(ok=True, loss=loss)
+        if failure.error is not None:
+            services.journal.check()
+            result.update(error_data(failure.error))
+        results.append(result)
     results.append(_check_evaluator(services, run_id, profile.evaluator))
     return {
         "check": "role_readiness", "tai_version": services.version,
