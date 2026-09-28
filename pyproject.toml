@@ -58,7 +58,7 @@ name = "pytorch-cu121"
 url = "https://download.pytorch.org/whl/cu121"
 explicit = true
 
-# Runtime closure of the pinned FITD / Attempt / Prefixes / AdaptiveAttacks / BadCharacters text-only paths.
+# Runtime closure of the pinned FITD / Attempt / Prefixes / AdaptiveAttacks / BadCharacters / DRA text-only paths.
 # garak's distribution makes every provider and GPU backend mandatory; this
 # application only supports its private text-only integration (see README).
 [[tool.uv.dependency-metadata]]
@@ -198,7 +198,7 @@ auto-regenerate-baseline = false
 [tool.clean-arch]
 project_type = "generic"
 visibility_enforcement = true
-infrastructure_modules = ["alert", "alert.manifest", "alert.preparation", "alert.report", "app.runtime", "app.series_storage", "attacks.adaptive_attacks.garak_adapter", "attacks.badchars.garak_adapter", "attacks.fitd.continuation", "attacks.fitd.garak_adapter", "attacks.fitd.native", "attacks.fitd.native_configuration", "attacks.fitd.probe", "attacks.fitd.target", "core.chats.http_worker", "core.chats.openai", "core.chats.openai_transport", "core.chats.qwen", "core.chats.qwen_executor", "core.chats.qwen_runtime", "core.chats.qwen_server", "core.chats.server_chat", "core.chats.server_process", "core.evaluation.observation", "core.runs.artifact_io", "core.runs.console_journal", "core.runs.journal", "core.runs.journal_delegate", "core.runs.journal_lifecycle", "core.runs.journal_output", "core.runs.journal_state", "core.runs.storage"]
+infrastructure_modules = ["alert", "alert.manifest", "alert.preparation", "alert.report", "app.runtime", "app.series_storage", "attacks.adaptive_attacks.garak_adapter", "attacks.badchars.garak_adapter", "attacks.dra.garak_adapter", "attacks.fitd.continuation", "attacks.fitd.garak_adapter", "attacks.fitd.native", "attacks.fitd.native_configuration", "attacks.fitd.probe", "attacks.fitd.target", "core.chats.http_worker", "core.chats.openai", "core.chats.openai_transport", "core.chats.qwen", "core.chats.qwen_executor", "core.chats.qwen_runtime", "core.chats.qwen_server", "core.chats.server_chat", "core.chats.server_process", "core.evaluation.observation", "core.runs.artifact_io", "core.runs.console_journal", "core.runs.journal", "core.runs.journal_delegate", "core.runs.journal_lifecycle", "core.runs.journal_output", "core.runs.journal_state", "core.runs.storage"]
 
 [tool.clean-arch.layer_map]
 Domain = ["domain"]
@@ -309,6 +309,10 @@ name = "Bootstrap"
 
 [[tool.clean-arch.layers]]
 module = "core.runs.journal_delegate"
+name = "Infrastructure"
+
+[[tool.clean-arch.layers]]
+module = "attacks.dra.garak_adapter"
 name = "Infrastructure"
 
 [[tool.clean-arch.layers]]
@@ -452,6 +456,10 @@ module = "core.runs.journal_state"
 name = "Infrastructure"
 
 [[tool.clean-arch.layers]]
+module = "attacks.dra.experiment"
+name = "Bootstrap"
+
+[[tool.clean-arch.layers]]
 module = "attacks.fitd.bootstrap"
 name = "Bootstrap"
 
@@ -478,6 +486,10 @@ name = "Infrastructure"
 [[tool.clean-arch.layers]]
 module = "app.readiness_session"
 name = "UseCase"
+
+[[tool.clean-arch.layers]]
+module = "attacks.dra.bootstrap"
+name = "Bootstrap"
 
 [[tool.clean-arch.layers]]
 module = "core.chats.chat_state"
@@ -510,6 +522,10 @@ name = "Domain"
 [[tool.clean-arch.layers]]
 module = "app.failure_capture"
 name = "UseCase"
+
+[[tool.clean-arch.layers]]
+module = "attacks.dra.profile"
+name = "Domain"
 
 [[tool.clean-arch.layers]]
 module = "attacks.fitd.native"
@@ -674,6 +690,10 @@ name = "Bootstrap"
 [[tool.clean-arch.layers]]
 module = "app.runtime"
 name = "Infrastructure"
+
+[[tool.clean-arch.layers]]
+module = "attacks.dra"
+name = "Bootstrap"
 
 [[tool.clean-arch.layers]]
 module = "app.series"

@@ -84,10 +84,10 @@ Target и Attacker владеют своими разговорами через
 происхождение сообщений, адаптация с откатами и независимые повторные запуски.
 Термины и архитектурные решения: [CONTEXT.md](CONTEXT.md), [docs/adr](docs/adr).
 
-### Выбор стратегии: FITD, Adaptive Attacks или Bad Characters
+### Выбор стратегии: FITD, Adaptive Attacks, Bad Characters или DRA
 
 `tai attack` выполняет стратегию из `[attack].type`. Значения — `fitd`,
-`adaptive_attacks` и `badchars_deletion`; без `[attack]` используется FITD. Команда `tai fitd` принимает
+`adaptive_attacks`, `badchars_deletion` и `dra`; без `[attack]` используется FITD. Команда `tai fitd` принимает
 только FITD-профили.
 
 [Simple Adaptive Attacks](docs/adaptive-attacks.md) использует шаблон и пять
@@ -125,6 +125,18 @@ uv run --locked --extra qwen tai attack \
 полные артефакты с SHA-256 и готовые TOML с явной инструкцией оценщику о JSON-формате.
 В исходных примерах собственные system-инструкции отсутствуют; Qwen 0.5B может
 нарушать формат и неверно применять рубрику. Оба вида ошибок отражены в отчёте.
+
+[DRA](docs/dra.md) строит маскировку одного явного базового запроса с помощью
+закреплённых шаблонов, карты букв и cache-only moderation garak. Четыре шаблона
+дают до четырёх вариантов; `max_variants` и `seed` задают воспроизводимую выборку.
+Python API: `DRAUser` и `DRAExperiment`. Для `preflight`, `attack` и ALERT подходит
+один профиль `examples/dra-qwen.toml`.
+
+```bash
+uv run --locked --extra qwen tai attack \
+  --config examples/dra-qwen.toml \
+  --text 'Ваш базовый запрос' --artifacts-dir runs/dra
+```
 
 ## Установка и офлайн-проверки
 

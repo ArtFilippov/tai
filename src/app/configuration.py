@@ -11,8 +11,10 @@ from pathlib import Path
 from attacks.fitd import FITDExperiment
 from attacks.adaptive_attacks import AdaptiveAttacksExperiment
 from attacks.badchars import BadCharactersDeletionExperiment
+from attacks.dra import DRAExperiment
 from attacks.badchars.profile import deletion_profile
-from attacks.shared.contracts import ADAPTIVE_ATTACKS, BADCHARS_DELETION, FITD, StrategyConfiguration
+from attacks.dra.profile import dra_profile
+from attacks.shared.contracts import ADAPTIVE_ATTACKS, BADCHARS_DELETION, DRA, FITD, StrategyConfiguration
 from attacks.shared.experiment import Experiment
 from core.evaluation.assembly import EvaluatorSetup
 from core.evaluation.model_evaluator import MODEL_RUBRIC_VERSION
@@ -45,6 +47,13 @@ class RoleProfile(ParticipantProfile):
                 self.target, base, self.evaluator, journal_dir=journal_dir, journal_factory=self.journal_factory,
                 perturbation_budget=profile.perturbation_budget, max_position_candidates=profile.max_position_candidates,
                 max_ascii_variants=profile.max_ascii_variants,
+            )
+        if self.attack_type == DRA:
+            dra = dra_profile(self.strategy().parameters)
+            return DRAExperiment(
+                self.target, base, self.evaluator, journal_dir=journal_dir, journal_factory=self.journal_factory,
+                max_variants=dra.max_variants, seed=dra.seed, toxic_trunc=dra.toxic_trunc,
+                benign_trunc=dra.benign_trunc, benign_full_token_prob=dra.benign_full_token_prob,
             )
         assert self.attacker is not None and self.max_calls_per_conv is not None
         return FITDExperiment(

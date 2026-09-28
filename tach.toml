@@ -19,6 +19,7 @@ depends_on = [
     "alert",
     "attacks.adaptive_attacks",
     "attacks.badchars",
+    "attacks.dra",
     "attacks.fitd",
     "core.chats",
     "core.chats.openai",
@@ -95,6 +96,8 @@ depends_on = [
     "attacks.adaptive_attacks",
     "attacks.badchars",
     "attacks.badchars.profile",
+    "attacks.dra",
+    "attacks.dra.profile",
     "attacks.shared.contracts",
     "attacks.shared.experiment",
     "core.chats",
@@ -146,6 +149,32 @@ depends_on = ["app.configuration", "app.experiments", "app.runtime", "app.termin
 path = "attacks"
 layer = "Bootstrap"
 depends_on = []
+
+[[modules]]
+path = "attacks.dra"
+layer = "Bootstrap"
+depends_on = ["attacks.dra.bootstrap", "attacks.dra.experiment"]
+
+[[modules]]
+path = "attacks.dra.profile"
+layer = "Domain"
+depends_on = ["attacks.shared.contracts"]
+
+[[modules]]
+path = "attacks.dra.garak_adapter"
+layer = "Infrastructure"
+cannot_depend_on = ["attacks.shared.candidates", "attacks.shared.execution", "attacks.shared.execution_operations", "attacks.shared.execution_state", "attacks.shared.user"]
+depends_on = ["attacks.dra.profile", "attacks.shared.contracts", "core.primitives.messages", "core.runs.operations"]
+
+[[modules]]
+path = "attacks.dra.bootstrap"
+layer = "Bootstrap"
+depends_on = ["attacks.dra.garak_adapter", "attacks.dra.profile", "attacks.shared.assembly", "attacks.shared.candidates", "attacks.shared.execution_state", "attacks.shared.user", "core.chats", "core.evaluation", "core.evaluation.configuration", "core.primitives.messages"]
+
+[[modules]]
+path = "attacks.dra.experiment"
+layer = "Bootstrap"
+depends_on = ["attacks.dra.bootstrap", "attacks.dra.profile", "attacks.shared.assembly", "attacks.shared.experiment", "core.chats", "core.evaluation", "core.evaluation.configuration", "core.primitives.messages", "core.runs.journal", "core.runs.journal_ports"]
 
 [[modules]]
 path = "attacks.fitd"
@@ -795,7 +824,7 @@ depends_on = ["attacks.adaptive_attacks.bootstrap", "attacks.shared.assembly", "
 [[modules]]
 path = "app.attack_configuration"
 layer = "Bootstrap"
-depends_on = ["app.configuration_values", "attacks.adaptive_attacks.profile", "attacks.badchars.profile", "attacks.fitd.profile", "attacks.shared.contracts"]
+depends_on = ["app.configuration_values", "attacks.adaptive_attacks.profile", "attacks.badchars.profile", "attacks.dra.profile", "attacks.fitd.profile", "attacks.shared.contracts"]
 
 [[modules]]
 path = "attacks.shared.candidates"
@@ -828,6 +857,10 @@ path = "attacks.badchars.experiment"
 layer = "Bootstrap"
 depends_on = ["attacks.badchars.bootstrap", "attacks.badchars.profile", "attacks.shared.assembly", "attacks.shared.experiment", "core.chats", "core.evaluation", "core.evaluation.configuration", "core.primitives.messages", "core.runs.journal", "core.runs.journal_ports"]
 
+[[interfaces]]
+from = ['^attacks\.dra$']
+expose = ['^DRAExperiment$', '^DRAUser$']
+
 # The facade exposes exactly the documented src/tai.py API.
 [[interfaces]]
 from = ['^tai$']
@@ -838,6 +871,8 @@ expose = [
     '^AlertRecord$',
     '^BadCharactersDeletionExperiment$',
     '^BadCharactersDeletionUser$',
+    '^DRAExperiment$',
+    '^DRAUser$',
     '^ChatCancelled$',
     '^ChatTurn$',
     '^ContainsTextEvaluator$',
@@ -927,7 +962,7 @@ from = [
     '^app\.[^.]+$',
     '^alert\.[^.]+$',
     '^attacks\.fitd\.[^.]+$',
-    '^attacks\.(shared|adaptive_attacks|badchars)\.[^.]+$',
+    '^attacks\.(shared|adaptive_attacks|badchars|dra)\.[^.]+$',
     '^core\.(chats|evaluation|runs)\.[^.]+$',
     '^core\.primitives\.(messages|diagnostics)\.[^.]+$',
 ]
