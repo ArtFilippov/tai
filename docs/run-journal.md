@@ -5,11 +5,17 @@
 и диагностические снимки настроек. `result.txt` и `metadata.json` записывает
 [внешний модуль сохранения](result-storage.md) после ожидания User.
 
-`AdaptiveAttacksUser` / `AdaptiveAttacksExperiment` используют тот же механизм:
+`AdaptiveAttacksUser` / `AdaptiveAttacksExperiment` и
+`BadCharactersDeletionUser` / `BadCharactersDeletionExperiment` используют тот же механизм:
 `attacks.shared.experiment` собирает общий `Execution` и наблюдение его операций.
 Сборка FITD дополнительно оборачивает нативные решения в `attacks.fitd.observation`.
-Для Adaptive Attacks журнал получает сбросы, обмены, публикации и оценки напрямую
-из общего выполнения. Политика стратегии — [adaptive-attacks.md](adaptive-attacks.md).
+Для обеих стратегий журнал получает сбросы, обмены, публикации и оценки напрямую
+из общего выполнения. Политики — [adaptive-attacks.md](adaptive-attacks.md) и
+[badchars-deletion.md](badchars-deletion.md). В deletion `context.cause.metadata`
+сохраняет категорию, число вставок, позиции и ASCII-коды; JSON обратимо сохраняет
+U+0008. История Target сбрасывается перед каждым вариантом, оценщика — перед
+каждой парой. После первой положительной оценки новых обращений нет.
+Полные живые журналы и независимая проверка связей — [приёмка #36](acceptance/2026-09-23-garak-simple-attacks.md).
 
 ## Python interface
 

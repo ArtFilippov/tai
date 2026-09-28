@@ -46,6 +46,8 @@ def test_installed_attack_command_runs_real_variants_and_saves_second_answer(end
     assert all(len(request[2]["messages"]) == 2 for request in targets)
     assert all(request[2]["messages"][0]["content"] == "Target system" for request in targets)
     assert "Target=2" in completed.stdout and "Full second answer" in completed.stdout
+    assert "до первого успеха" in completed.stdout
+    assert "Лимит FITD" not in completed.stdout and "Attacker=" not in completed.stdout
     assert sum(event["kind"] == "evaluation_completed" for event in events) == 2
 
 
@@ -113,6 +115,7 @@ max_calls_per_conv = 1
     _, metadata, _ = read_artifacts(root)
     assert metadata["settings"]["attack"] == {"type": "fitd"}
     assert metadata["reason"] == "round_limit" and metadata["progress"]["target_calls"] == 1
+    assert "Лимит FITD: 1" in completed.stdout and "Attacker=" in completed.stdout
 
 
 @pytest.mark.parametrize("role", ["Target", "Evaluator"])

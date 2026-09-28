@@ -38,7 +38,7 @@ def test_terminal_does_not_reevaluate_or_attribute_old_score_to_new_result(
     assert run_foreground(user, artifacts_dir=tmp_path) == 1
     output = capsys.readouterr().out
     assert "Required evaluation unavailable" in output
-    assert "Unchecked" in output and "финальный текст не оценивался" in output
+    assert "Unchecked" in output and "нет валидной оценки финального текста" in output
     assert "Оценка результата: неуспех" not in output
     assert [r.to_string() for r in evaluator.results] == ["Negative", "Unchecked"]
     assert user.status().evaluation is None

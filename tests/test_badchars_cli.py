@@ -49,6 +49,8 @@ def test_installed_attack_command_preserves_backspace_and_saves_second_evaluated
     assert all(event["input"]["origin"]["text"] == base for event in started)
     assert started[1]["context"]["cause"]["metadata"]["operations"] == {"positions": [0], "ascii_codes": [126]}
     assert "Target=2" in completed.stdout and "Full second answer" in completed.stdout
+    assert "до первого успеха" in completed.stdout
+    assert "Лимит FITD" not in completed.stdout and "Attacker=" not in completed.stdout
 
 
 def _assert_requests(endpoint: HttpPeer, base: str) -> None:

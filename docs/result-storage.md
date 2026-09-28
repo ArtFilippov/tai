@@ -5,8 +5,14 @@
 результат. Наблюдение во время атаки обеспечивает [независимый журнал](run-journal.md).
 CLI и серия используют общий внешний модуль `core.runs.storage`.
 
-Те же правила действуют для `AdaptiveAttacksUser` и `AdaptiveAttacksExperiment`:
-общий снимок и writer сохраняют фактический финальный Message и только его оценку.
+Те же правила действуют для `AdaptiveAttacksUser` / `AdaptiveAttacksExperiment` и
+`BadCharactersDeletionUser` / `BadCharactersDeletionExperiment`: общий снимок и
+writer сохраняют фактический финальный Message и только его оценку. Настройки
+содержат фактический `attack.type`, параметры и настроенные роли без обязательного
+Attacker. После исчерпания это последний оценённый ответ, после первого `true` —
+именно тот ответ, который получил положительную оценку. При ошибке формата
+вердикта результат может присутствовать с `evaluation=null` и `state=FAILED`.
+Эти исходы и сверка полного текста/ID показаны в [приёмке #36](acceptance/2026-09-23-garak-simple-attacks.md).
 
 ```python
 from tai import FITDExperiment, capture_run, save_run

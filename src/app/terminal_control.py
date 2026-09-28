@@ -15,9 +15,11 @@ CALL_STARTED = "call_started"
 
 
 def status_text(status: UserStatus) -> str:
+    attacker = (f", Attacker={status.progress.attacker_calls}"
+                if status.progress.max_calls_per_conv is not None else "")
     return (
         f"Состояние: {status.state}; завершённые обращения: "
-        f"Target={status.progress.target_calls}, Attacker={status.progress.attacker_calls}, "
+        f"Target={status.progress.target_calls}{attacker}, "
         f"Evaluator={status.progress.evaluator_calls}"
     )
 
@@ -27,7 +29,7 @@ def _evaluation(snapshot: RunSnapshot) -> str:
     evaluation = final.evaluation
     if result is not None and evaluation is not None and evaluation.result_id == result.id == final.result_id:
         return "Оценка результата: " + ("успех" if evaluation.success else "неуспех")
-    return "Оценка результата: отсутствует; финальный текст не оценивался"
+    return "Оценка результата: отсутствует; нет валидной оценки финального текста"
 
 
 def show_result(snapshot: RunSnapshot, show: Callable[[str], None]) -> None:
@@ -52,9 +54,10 @@ class ProgressDisplay:
         status = journal.status()
         self.show(f"Запуск: {status.run_id}")
         self.show(f"Артефакты: {directory / str(status.run_id)}")
-        self.show(f"Лимит FITD: {status.progress.max_calls_per_conv} "
-                  + "библиотечных раундов; это не общий бюджет обращений. "
-                  + "Ctrl+C — остановить после текущего вызова.")
+        limit = status.progress.max_calls_per_conv
+        policy = (f"Лимит FITD: {limit} библиотечных раундов; это не общий бюджет обращений. "
+                  if limit is not None else "Перебор вариантов: до первого успеха или исчерпания стратегии. ")
+        self.show(policy + "Ctrl+C — остановить после текущего вызова.")
 
     def update(self, journal: JournalView) -> None:
         if (status := journal.status()) != self.previous:

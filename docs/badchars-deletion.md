@@ -93,7 +93,7 @@ uv run --locked --extra qwen tai attack \
   --config examples/badchars-deletion-qwen.toml \
   --text 'Ваш базовый запрос' --artifacts-dir runs/badchars
 
-uv run --locked --extra qwen tai alert-series --jobs 3 \
+uv run --locked --extra qwen tai alert-series --jobs 1 \
   --manifest examples/alert-manifest.json --taxonomy ALERT_taxonomy.md \
   --profile examples/badchars-deletion-qwen.toml --artifacts-dir runs/alert-badchars
 
@@ -123,3 +123,10 @@ Adaptive Attacks и FITD. Остановка закрывает допуск н�
 становится результатом; допущенная оценка сохраняется после остановки. Ошибки
 генератора, Target, оценщика и журнала сохраняются как ошибки рабочего выполнения.
 Ошибка внешней записи результата не меняет фактический исход User.
+
+[Живая приёмка #36](acceptance/2026-09-23-garak-simple-attacks.md) содержит готовый
+профиль с инструкцией оценщику о JSON-формате, полный журнал и проверку U+0008,
+первого успеха и связи результата с оценкой. Офлайн-проверки:
+`tests/test_badchars.py`, `test_badchars_cli.py`, `test_badchars_series.py` и общие
+`test_adaptive_lifecycle.py`, `test_candidate_series.py`. Источник:
+[нативный probe garak](https://github.com/NVIDIA/garak/blob/3f50ea5ff9cd7050099940647c15c39b07a93392/garak/probes/badchars.py).

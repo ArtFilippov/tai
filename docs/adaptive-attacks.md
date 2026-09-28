@@ -125,5 +125,10 @@ Ctrl+C закрывает допуск новых действий, ждёт у�
 не меняет фактический исход рабочего выполнения.
 
 Офлайн-проверки: `tests/test_adaptive_attacks.py`, `test_adaptive_lifecycle.py`,
-`test_adaptive_cli.py`, `test_adaptive_series.py`; они используют настоящий
+`test_adaptive_cli.py`, `test_adaptive_series.py`, `test_candidate_series.py`; они используют настоящий
 установленный garak, управляемые модели и локальный HTTP endpoint.
+
+[Живая приёмка #36](acceptance/2026-09-23-garak-simple-attacks.md) содержит точный
+базовый запрос, отдельный готовый профиль с инструкцией оценщику о JSON-формате,
+команды CUDA/FP16 без внешней сети и полный журнал пяти вариантов. Источник:
+[нативный probe garak](https://github.com/NVIDIA/garak/blob/3f50ea5ff9cd7050099940647c15c39b07a93392/garak/probes/adaptive_attacks.py).

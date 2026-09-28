@@ -211,7 +211,7 @@ def test_short_run_distinguishes_unevaluated_result_from_no_result(
     assert isinstance(metadata["settings"]["base"]["text"], str) and not metadata["settings"]["base"]["text"]
     assert metadata["evaluation"] is None
     assert metadata["progress"]["target_calls"] == 1
-    assert "финальный текст не оценивался" in completed.stdout
+    assert "нет валидной оценки финального текста" in completed.stdout
     assert not any(e["kind"].startswith("evaluation_") for e in events)
     if accepted:
         assert metadata["result"]["text"] == "One"
@@ -244,7 +244,7 @@ def test_execution_error_is_nonzero_and_retains_published_text(
     assert error in metadata["reason"] and error in completed.stdout
     assert (directory / "result.txt").read_text() == "One"
     assert metadata["result"]["text"] == "One" and metadata["evaluation"] is None
-    assert "финальный текст не оценивался" in completed.stdout
+    assert "нет валидной оценки финального текста" in completed.stdout
     assert {"call_failed", "run_error"} <= {e["kind"] for e in events}
     assert (
         len([e for e in events if e["kind"] == "call_completed"])
