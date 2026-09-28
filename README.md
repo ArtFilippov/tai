@@ -139,7 +139,7 @@ uv run --locked --extra qwen tai attack \
 ```
 
 [GOAT](docs/goat.md) использует отдельные разговоры Attacker и Target.
-[AutoDAN](docs/autodan.md) выполняет GA-поиск с локальной logits-оценкой Target
+[AutoDAN](docs/autodan.md) выполняет GA/HGA-поиск с локальной logits-оценкой Target
 и независимыми мутациями Attacker. Пример профиля: `examples/autodan-qwen.toml`.
 Нативная проверка AutoDAN может завершиться без предъявленного результата;
 журнал поиска всё равно сохраняется.

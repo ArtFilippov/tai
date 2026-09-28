@@ -90,6 +90,7 @@ path = "app.configuration"
 layer = "Bootstrap"
 depends_on = [
     "attacks.autodan",
+    "attacks.autodan.genetic",
     "attacks.autodan.profile",
     "app.attack_configuration",
     "app.chat_factory",
@@ -452,6 +453,7 @@ depends_on = ["attacks.shared.contracts", "core.chats", "core.evaluation.configu
 path = "app.readiness"
 layer = "UseCase"
 depends_on = [
+    "attacks.autodan.profile",
     "attacks.shared.contracts",
     "core.chats.scoring",
     "alert.values",

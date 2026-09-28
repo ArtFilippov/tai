@@ -1,6 +1,7 @@
 """Validated participants shared by readiness and experiment composition."""
 
 from dataclasses import dataclass, field
+from collections.abc import Callable
 
 from attacks.shared.contracts import AttackType
 from core.chats import LLMChat, ModelRole
@@ -15,6 +16,8 @@ class ParticipantProfile:
     evaluator: EvaluatorSetup
     max_calls_per_conv: int | None
     attack_type: AttackType = field(default="fitd", kw_only=True)
+    autodan_mode: str = field(default="ga", kw_only=True)
+    check_lexicon: Callable[[], None] = field(default=lambda: None, kw_only=True)
 
     def __post_init__(self) -> None:
         chats = tuple(self.chats().values())

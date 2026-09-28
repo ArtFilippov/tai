@@ -1,4 +1,4 @@
-"""AutoDAN GA over the explicit base; native check deliberately uses only prefix."""
+"""AutoDAN GA/HGA over the explicit base; native check uses only prefix."""
 
 from __future__ import annotations
 
@@ -14,8 +14,8 @@ from core.chats.scoring import ContinuationScorer
 from core.primitives.messages import Message
 from core.runs.operations import Cause, Exchange
 
-from .genetic import accepted, initial_population, next_generation
-from .profile import AutoDANProfile, AutoDANSearch
+from .genetic import accepted, hga_operations, initial_population, next_generation, next_hierarchical_generation
+from .profile import HGA, AutoDANProfile, AutoDANSearch
 
 type Evidence = Callable[[str, dict[str, object]], None]
 
@@ -60,13 +60,24 @@ class AutoDANProbe(AutoDANSearch):
     @override
     def __call__(self) -> CompletionReason:
         population = initial_population(self.profile, self.model)
+        words: dict[str, float] = {}
         for step in range(1, self.profile.num_steps + 1):
             losses = self.score(population, step)
             if (reason := self._check(population, losses, step)) is not None:
                 return reason
             if step < self.profile.num_steps:
-                population = next_generation(population, losses, self.profile, rng=self.rng, mutate=partial(self.mutate, step=step))
+                population, words = self._advance(population, losses, words, step)
         return "strategy_exhausted"
+
+    def _advance(self, population: list[str], losses: list[float], words: dict[str, float], step: int) -> tuple[list[str], dict[str, float]]:
+        mutate = partial(self.mutate, step=step)
+        if self.profile.mode != HGA:
+            return next_generation(population, losses, self.profile, rng=self.rng, mutate=mutate), words
+        population, words = next_hierarchical_generation(
+            population, losses, self.profile, words, operations=hga_operations(self.rng, mutate, self.ports.check_running),
+        )
+        self.evidence("autodan_momentum", {"step": step, "words": words, "population": population})
+        return population, words
 
     def _check(self, population: list[str], losses: list[float], step: int) -> CompletionReason | None:
         best = min(range(len(losses)), key=losses.__getitem__)

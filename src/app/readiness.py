@@ -14,6 +14,7 @@ from core.runs import Evaluation
 from core.runs.operations import Cause, Context, ConversationChange, EvaluationResult, Exchange
 from alert.values import object_value
 from attacks.shared.contracts import AUTODAN
+from attacks.autodan.profile import HGA
 
 from .contracts import ReadinessServices
 from .failure_capture import Failure
@@ -115,6 +116,17 @@ def _check_evaluator(services: ReadinessServices, run_id: str, setup: EvaluatorS
     return result
 
 
+def _check_lexicon(profile: ParticipantProfile, services: ReadinessServices) -> dict[str, object]:
+    result: dict[str, object] = {"role": "HGAResources", "started_at": services.clock.now()}
+    with Failure() as failure:
+        profile.check_lexicon()
+        result["ok"] = True
+    if failure.error is not None:
+        services.journal.check()
+        result.update(error_data(failure.error))
+    return result
+
+
 def check_roles(profile: ParticipantProfile, services: ReadinessServices, run_id: str) -> dict[str, object]:
     results = [_check_chat(services, run_id, role, chat) for role, chat in profile.chats().items() if role != EVALUATOR_ROLE]
     if profile.attack_type == AUTODAN:
@@ -129,6 +141,8 @@ def check_roles(profile: ParticipantProfile, services: ReadinessServices, run_id
             services.journal.check()
             result.update(error_data(failure.error))
         results.append(result)
+        if profile.autodan_mode == HGA:
+            results.append(_check_lexicon(profile, services))
     results.append(_check_evaluator(services, run_id, profile.evaluator))
     return {
         "check": "role_readiness", "tai_version": services.version,

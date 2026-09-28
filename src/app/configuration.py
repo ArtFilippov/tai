@@ -16,6 +16,8 @@ from attacks.dra import DRAExperiment
 from attacks.goat import GOATExperiment
 from attacks.autodan import AutoDANExperiment
 from attacks.autodan.profile import AutoDANOptions, autodan_profile
+from attacks.autodan.genetic import require_hga_resources
+from attacks.autodan.profile import HGA
 from attacks.badchars.profile import deletion_profile
 from attacks.dra.profile import dra_profile
 from attacks.shared.contracts import ADAPTIVE_ATTACKS, AUTODAN, BADCHARS_DELETION, DRA, FITD, GOAT, StrategyConfiguration
@@ -108,6 +110,8 @@ class ProfileAssembly:
         return RoleProfile(
             self.target(), self.attacker() if self.attacker is not None else None, self.evaluator(),
             self.strategy.max_calls_per_conv, self, attack_type=self.strategy.attack_type,
+            autodan_mode=str(self.strategy.parameters.get("mode", "ga")) if self.strategy.attack_type == AUTODAN else "ga",
+            check_lexicon=require_hga_resources if self.strategy.attack_type == AUTODAN and self.strategy.parameters.get("mode") == HGA else lambda: None,
         )
 
     def settings(self) -> dict[str, object]:

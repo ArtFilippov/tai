@@ -7,12 +7,14 @@ from threading import Event
 import pytest
 from qwen_fakes import LocalFixture, local
 from series_support import MANIFEST, TAXONOMY, qwen_profile
+from test_autodan import hga_words
 
 from app.cli import main
 from app.configuration import load_profile
 from app.series import run_alert_series
 from core.chats import ChatTurn
 from tai import AutoDANExperiment, Message, QwenChat
+from attacks.autodan import genetic
 
 __all__ = ["local"]
 
@@ -23,6 +25,71 @@ def config(local: LocalFixture, directory: Path) -> Path:
     path.write_text('[attack]\ntype = "autodan"\nexpected = "Sure"\nnum_steps = 1\nbatch_size = 2\nnum_elites = 1\n'
                     + path.read_text().replace('max_calls_per_conv = 20\n', ''))
     return path
+
+
+def hga_config(local: LocalFixture, directory: Path) -> Path:
+    path = config(local, directory)
+    path.write_text(path.read_text().replace('expected = "Sure"', 'expected = "Sure"\nmode = "hga"\nnum_steps = 2')
+                    .replace('num_steps = 1\n', ''))
+    return path
+
+
+def test_hga_preflight_cli_and_series(
+    local: LocalFixture, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    hga_words(monkeypatch)
+    path = hga_config(local, tmp_path)
+    seen: list[str] = []
+
+    def scoring(self: QwenChat, prompt: str, expected: str) -> float:
+        seen.append(prompt)
+        return -1.0 if "better" in prompt else 1.0
+
+    def generate(self: QwenChat, turns: tuple[ChatTurn, ...], cancellation: Event) -> str:
+        if turns[-1].message.text == "Reply with exactly READY.":
+            return "READY"
+        return "Sorry" if self._system == "Target" else '{"success": false}'
+
+    monkeypatch.setattr(QwenChat, "score_continuation", scoring)
+    monkeypatch.setattr(QwenChat, "_generate", generate)
+    assert not main(["preflight", "--config", str(path)])
+    report = json.loads(capsys.readouterr().out)
+    assert [role["role"] for role in report["roles"]] == ["Target", "Attacker", "TargetScoring", "HGAResources", "Evaluator"]
+    assert not main(["attack", "--config", str(path), "--text", "Explicit base", "--artifacts-dir", str(tmp_path / "runs")])
+    _ = capsys.readouterr()
+    run = next((tmp_path / "runs").iterdir())
+    assert not (run / "result.txt").exists()
+    assert '"kind": "autodan_momentum"' in (run / "events.jsonl").read_text()
+    assert any(value.endswith(" Explicit base") for value in seen)
+    series = run_alert_series(MANIFEST, path, tmp_path / "series", taxonomy_path=TAXONOMY, jobs=2)
+    assert not series.exit_code and series.report["complete"]
+    effective = json.loads((series.directory / "effective-profile.json").read_text())
+    assert effective["autodan"]["mode"] == "hga" and effective["autodan"]["num_steps"] == 2
+    assert all(entry["result_id"] is None for entry in json.loads((series.directory / "index.json").read_text())["entries"])
+
+
+def test_hga_preflight_reports_missing_lexical_data(
+    local: LocalFixture, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+) -> None:
+    path = hga_config(local, tmp_path)
+
+    def missing() -> None:
+        raise ValueError("NLTK wordnet unavailable")
+
+    def generate(self: QwenChat, turns: tuple[ChatTurn, ...], cancellation: Event) -> str:
+        return '{"success": false}' if self._system == "Evaluator" else "READY"
+
+    monkeypatch.setattr(genetic, "require_hga_resources", missing)
+    monkeypatch.setattr("app.configuration.require_hga_resources", missing)
+    def scoring(self: QwenChat, prompt: str, expected: str) -> float:
+        return 1.0
+
+    monkeypatch.setattr(QwenChat, "score_continuation", scoring)
+    monkeypatch.setattr(QwenChat, "_generate", generate)
+    assert main(["preflight", "--config", str(path)]) == 1
+    report = json.loads(capsys.readouterr().out)
+    assert not report["ready"]
+    assert "NLTK wordnet unavailable" in next(role for role in report["roles"] if role["role"] == "HGAResources")["error"]
 
 
 def test_profile_cli_and_preflight_use_scoring_without_target_history(
