@@ -52,11 +52,6 @@ Only `.eryx/reports/`, `.eryx/logs/`, `.eryx/cache/` and native caches are ignor
 Install/update integration with `bash eryx/install.sh --project . --extra qwen --extra vllm`
 when retaining both backends. All Eryx commands accept `--project`.
 
-Tool fixes require a branch and PR in `ArtFilippov/eryx`, autonomous regression
-tests and consumer checks. After that PR merges, open a separate tai PR pinning
-the merged SHA and linking the tool PR. See `eryx/README.md` for the full workflow.
-
-
 ## English
 
 After every user command written in English, check its grammar before doing anything else.
