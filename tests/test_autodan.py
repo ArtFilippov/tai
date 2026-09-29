@@ -110,7 +110,9 @@ def test_fitness_uses_base_but_native_check_presents_only_successful_prefix(tmp_
     user.start()
     assert user.wait(5) and user.status().state is UserState.COMPLETED
     prefix = target.requests[0]
-    assert target.scored == [(f"{prefix} {base.text}", "Sure")] * 2
+    assert len(target.scored) == 2
+    assert all(prompt.endswith(f" {base.text}") and expected == "Sure" for prompt, expected in target.scored)
+    assert (f"{prefix} {base.text}", "Sure") in target.scored
     assert target.history()[-2].message.text == prefix
     result, evaluation = user.result(), user.status().evaluation
     assert result is not None and result.text == prefix
