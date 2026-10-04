@@ -27,7 +27,8 @@ from app.configuration import load_profile
 from app.preflight import run_preflight
 from attacks.fitd.native import FITD
 from attacks.fitd.native_configuration import configure, prepare_goal
-from attacks.fitd.profile import EnglishLanguage, FITDProfile, GARAK_REVISION
+from attacks.fitd.profile import EnglishLanguage, FITDProfile
+from attacks.shared.contracts import GARAK_REVISION
 from tai import Message
 
 
