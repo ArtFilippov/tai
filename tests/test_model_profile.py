@@ -2,6 +2,7 @@
 
 import json
 from collections import deque
+from contextlib import closing
 from pathlib import Path
 
 import pytest
@@ -15,11 +16,44 @@ from tai import (
     ContainsTextEvaluator,
     Message,
     ModelEvaluator,
+    QwenChat,
 )
 from alert.values import array_value, object_value
 from app.configuration import load_profile
 
 ALERT_PROFILE = Path("examples/fitd-alert-qwen.toml")
+MIXED_PROFILE = Path("examples/fitd-alert-qwen3-4b-transformers.toml")
+
+
+def test_mixed_alert_profile_pins_two_shared_weight_groups_without_loading() -> None:
+    with closing(load_profile(MIXED_PROFILE)) as profile, closing(profile.fresh()) as fresh:
+        assert profile.evaluator.chat is not None
+        chats = (profile.target, profile.attacker, profile.evaluator.chat,
+                 fresh.target, fresh.attacker)
+        target, attacker, judge, next_target, next_attacker = chats
+        assert isinstance(target, QwenChat)
+        assert isinstance(attacker, QwenChat)
+        assert isinstance(judge, QwenChat)
+        assert isinstance(next_target, QwenChat)
+        assert isinstance(next_attacker, QwenChat)
+        assert profile.max_calls_per_conv == 10
+        assert target._executor is judge._executor is next_target._executor
+        assert attacker._executor is next_attacker._executor
+        assert attacker._executor is not target._executor
+        for chat, model, revision, tokens in (
+            (target, "Qwen/Qwen2.5-0.5B-Instruct", "7ae557604adf67be50417f59c2c2f167def9a775", 512),
+            (attacker, "Qwen/Qwen3-4B-Instruct-2507", "cdbee75f17c01a7cc42f958dc650907174af0554", 512),
+            (judge, "Qwen/Qwen2.5-0.5B-Instruct", "7ae557604adf67be50417f59c2c2f167def9a775", 320),
+        ):
+            settings = object_value(chat.settings(), "settings")
+            assert (settings["model"], settings["revision"]) == (model, revision)
+            assert settings["backend"] == "qwen" and settings["cache_dir"] == "/vg/mnt/titan"
+            assert settings["device"] == "cuda:0" and settings["dtype"] == "float16"
+            assert settings["loaded"] is False and settings["actual_dtype"] is None
+            assert chat.history() == ()
+            generation = object_value(settings["generation"], "generation")
+            assert generation["max_new_tokens"] == tokens
+            assert generation["do_sample"] is False and generation["repetition_penalty"] == 1.0
 
 
 def test_alert_profile_pins_three_independent_roles_and_reusable_evaluator() -> None:

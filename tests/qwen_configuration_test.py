@@ -40,7 +40,7 @@ def test_missing_local_files_gives_explicit_preparation_command(local: LocalFixt
     lib, kwargs, snapshot = local
     (snapshot / "model.safetensors").unlink()
     chat = QwenChat(**kwargs)
-    with pytest.raises(QwenError, match="hf download Qwen/test --revision"):
+    with pytest.raises(QwenError, match="huggingface-cli download Qwen/test --revision"):
         chat.send(Message("request"))
     assert not lib.records.loads and not chat.history()
 

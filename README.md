@@ -36,7 +36,7 @@ HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 \
 ```bash
 uv sync --locked --python 3.12 --extra qwen
 
-uv run --locked --extra qwen hf download Qwen/Qwen2.5-0.5B-Instruct \
+uv run --locked --extra qwen huggingface-cli download Qwen/Qwen2.5-0.5B-Instruct \
   --revision 7ae557604adf67be50417f59c2c2f167def9a775 \
   --cache-dir "$HOME/.cache/tai/huggingface" \
   --include config.json generation_config.json tokenizer.json tokenizer_config.json \
@@ -441,6 +441,21 @@ HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 \
 полная приёмка #30 пока не пройдена. [Ранее опубликованное сравнение инструкций](docs/acceptance/2026-09-23-alert-attacker.md)
 описывает исторические настройки, предшествовавшие #31.
 
+### Исследование Qwen3-4B Attacker (#32)
+
+[`examples/fitd-alert-qwen3-4b-transformers.toml`](examples/fitd-alert-qwen3-4b-transformers.toml)
+задаёт Qwen3-4B-Instruct-2507 только для Attacker; Target и оценщик используют
+контрольную Qwen2.5-0.5B-Instruct. Все три роли читают закреплённые snapshots из
+смонтированного `/vg/mnt/titan`, без собственных system prompts tai. Три диалога
+независимы, а веса разделены на две группы. Лимит — 10 раундов FITD, 512/512/320
+выходных токенов, FP16, greedy. Штатные chat templates могут различаться:
+Qwen2.5 вставляет свой default system в user-only истории; Qwen3-4B-Instruct-2507
+без system/tools не вставляет system. Шаблоны не меняются.
+
+[Команды подготовки, проверки и состояние живого сравнения](docs/acceptance/2026-10-04-qwen3-4b.md)
+отделяют загрузку весов от офлайн-прогона. Результаты 4B и вывод о качестве можно
+делать только после полного скачивания всех трёх shard и выполнения команд отчёта.
+
 ## Параллельная серия ALERT, живые строки и JSON-отчёт
 
 После [подготовки отдельного vLLM-окружения и профиля](docs/vllm.md) одна команда
@@ -580,8 +595,8 @@ CUDA-зависимостей превысило квоту; установка 
 кеша с `--offline` прошла. Команды и обе ошибки сохранены в
 [итоговом отчёте](docs/acceptance/2026-09-15-fitd.md).
 
-`uv.lock` закрепляет Transformers **4.45.2**, PyTorch **2.5.1+cu121** из CUDA-index,
-Hugging Face Hub **0.26.2** и транзитивные зависимости. Обычный `uv sync --locked`
+`uv.lock` закрепляет Transformers **4.51.3**, PyTorch **2.5.1+cu121** из CUDA-index,
+Hugging Face Hub **0.30.2** и транзитивные зависимости. Обычный `uv sync --locked`
 устанавливает лёгкий HTTP/тестовый профиль; при работе с Qwen сохраняйте
 `--extra qwen`, иначе uv удалит опциональные зависимости из этого окружения.
 Для одновременной работы Transformers и vLLM добавляйте **оба** extra:

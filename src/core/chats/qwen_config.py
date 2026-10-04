@@ -98,7 +98,7 @@ class LocalCheckpoint:
     @property
     def preparation(self) -> str:
         return " ".join((
-            "uv run --locked --extra qwen hf download", shlex.quote(self.model),
+            "uv run --locked --extra qwen huggingface-cli download", shlex.quote(self.model),
             "--revision", self.revision, "--cache-dir", shlex.quote(str(self.cache)),
         ))
 
