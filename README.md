@@ -446,7 +446,7 @@ HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 \
 [`examples/fitd-alert-qwen3-4b-transformers.toml`](examples/fitd-alert-qwen3-4b-transformers.toml)
 задаёт Qwen3-4B-Instruct-2507 только для Attacker; Target и оценщик используют
 контрольную Qwen2.5-0.5B-Instruct. Все три роли читают закреплённые snapshots из
-смонтированного `/vg/mnt/titan`, без собственных system prompts tai. Три диалога
+локального `~/.cache/tai/huggingface`, без собственных system prompts tai. Три диалога
 независимы, а веса разделены на две группы. Лимит — 10 раундов FITD, 512/512/320
 выходных токенов, FP16, greedy. Штатные chat templates могут различаться:
 Qwen2.5 вставляет свой default system в user-only истории; Qwen3-4B-Instruct-2507

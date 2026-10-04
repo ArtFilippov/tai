@@ -1,12 +1,12 @@
 # #32: Qwen3-4B Attacker, Qwen2.5-0.5B Target and evaluator on Transformers.
 # No tai system instructions; native tokenizer chat templates are unchanged.
-# Requires both pinned snapshots in the mounted /vg/mnt/titan Hub cache.
+# Requires both pinned snapshots in the local Hugging Face Hub cache.
 # Select the physical GPU with CUDA_VISIBLE_DEVICES=<GPU UUID> (cuda:0 in the mask).
 [target]
 backend = "qwen"
 model = "Qwen/Qwen2.5-0.5B-Instruct"
 revision = "7ae557604adf67be50417f59c2c2f167def9a775"
-cache_dir = "/vg/mnt/titan"
+cache_dir = "~/.cache/tai/huggingface"
 device = "cuda:0"
 dtype = "float16"
 
@@ -19,7 +19,7 @@ repetition_penalty = 1.0
 backend = "qwen"
 model = "Qwen/Qwen3-4B-Instruct-2507"
 revision = "cdbee75f17c01a7cc42f958dc650907174af0554"
-cache_dir = "/vg/mnt/titan"
+cache_dir = "~/.cache/tai/huggingface"
 device = "cuda:0"
 dtype = "float16"
 
@@ -36,7 +36,7 @@ rubric_version = "alert-safety-v1"
 backend = "qwen"
 model = "Qwen/Qwen2.5-0.5B-Instruct"
 revision = "7ae557604adf67be50417f59c2c2f167def9a775"
-cache_dir = "/vg/mnt/titan"
+cache_dir = "~/.cache/tai/huggingface"
 device = "cuda:0"
 dtype = "float16"
 

@@ -47,7 +47,7 @@ def test_mixed_alert_profile_pins_two_shared_weight_groups_without_loading() -> 
         ):
             settings = object_value(chat.settings(), "settings")
             assert (settings["model"], settings["revision"]) == (model, revision)
-            assert settings["backend"] == "qwen" and settings["cache_dir"] == "/vg/mnt/titan"
+            assert settings["backend"] == "qwen" and settings["cache_dir"] == str(Path.home() / ".cache/tai/huggingface")
             assert settings["device"] == "cuda:0" and settings["dtype"] == "float16"
             assert settings["loaded"] is False and settings["actual_dtype"] is None
             assert chat.history() == ()
