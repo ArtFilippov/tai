@@ -13,6 +13,7 @@ from series_support import MANIFEST, TAXONOMY
 from alert.accounting import SeriesReport, build_series_report
 from alert import load_alert_manifest
 from alert.report import reconstruct_report
+from alert.taxonomy import CATEGORY_ORDER
 from alert.values import array_value, object_value
 from app.series import SeriesResult, run_alert_series
 from app.series_storage import SeriesFiles
@@ -157,6 +158,7 @@ def test_extended_series_saves_640_independent_attempts_with_bounded_overlap(
     assert index["effective_jobs"] == max(snapshot["active"] for snapshot in scenario.snapshots) == 4
     assert {key: counts["total"] for key, counts in result.report["groups"].items()} == EXTENDED_TOTALS
     assert all(counts["evaluated"] == counts["total"] for counts in result.report["groups"].values())
+    assert_complete_micro_report(result)
     assert len({entry["run_id"] for entry in index["entries"]}) == 640
     assert len({entry["base_id"] for entry in index["entries"]}) == 640
     assert len({entry["artifacts"]["events.jsonl"] for entry in index["entries"]}) == 640
@@ -171,7 +173,15 @@ def test_extended_series_saves_640_independent_attempts_with_bounded_overlap(
         assert metadata["settings"]["base"]["text"] == record.base_request
         assert metadata["settings"]["base"]["id"] == entry["base_id"]
         assert metadata["evaluation"] == entry["evaluation"]
-    assert reconstruct_report(result.directory / "index.json") == result.report
+    assert reconstruct_report(result.directory / "index.json", result.directory / "rebuilt.json") == result.report
+    assert (result.directory / "report.json").read_bytes() == (result.directory / "rebuilt.json").read_bytes()
+
+
+def assert_complete_micro_report(result: SeriesResult) -> None:
+    assert list(result.report["micro_categories"]) == list(CATEGORY_ORDER)
+    assert all(counts == {"attempted": 20, "evaluated": 20, "successful": 20,
+                          "unevaluated": 0, "success_percent": 100.0}
+               for counts in result.report["micro_categories"].values())
 
 
 def test_extended_series_interrupt_counts_attempts_and_preserves_finished_evaluation(
@@ -199,6 +209,12 @@ def test_extended_series_interrupt_counts_attempts_and_preserves_finished_evalua
     assert index["entries"][2]["evaluation"]["success"] is True
     assert result.report["groups"]["hate"]["total"] == 4
     assert result.report["groups"]["hate"]["evaluated"] == 1
+    assert result.report["micro_categories"]["hate_body"] == {
+        "attempted": 4, "evaluated": 1, "successful": 1, "unevaluated": 3, "success_percent": 100.0,
+    }
+    assert result.report["micro_categories"]["hate_disabled"] == {
+        "attempted": 0, "evaluated": 0, "successful": 0, "unevaluated": 0, "success_percent": None,
+    }
     assert sum(counts["total"] for counts in result.report["groups"].values()) == 4
     assert reconstruct_report(result.directory / "index.json") == result.report
 

@@ -29,12 +29,21 @@ class GroupCounts(TypedDict):
     success_percent: float | None
 
 
+class MicroCounts(TypedDict):
+    attempted: int
+    evaluated: int
+    successful: int
+    unevaluated: int
+    success_percent: float | None
+
+
 class SeriesReport(TypedDict):
     schema_version: int
     series_id: str
     manifest: str
     complete: bool
     groups: dict[str, GroupCounts]
+    micro_categories: dict[str, MicroCounts]
 
 
 def _result_id(value: object) -> str | None:
@@ -111,7 +120,16 @@ def _planned(value: object) -> list[dict[str, object]]:
         raise ValueError("Series index requires 32 or 640 planned records")
     elif _planned_counts(planned) != {key: len(value) for key, value in MACRO_CATEGORIES.items()}:
         raise ValueError("Planned records must cover all six ALERT groups")
+    else:
+        _validate_legacy_plan(planned)
     return planned
+
+
+def _validate_legacy_plan(planned: list[dict[str, object]]) -> None:
+    for category, record in zip(CATEGORY_ORDER, planned, strict=True):
+        if (record.get("micro_category", category) != category
+                or record["macro_category"] != MICRO_TO_MACRO[category]):
+            raise ValueError("Legacy series plan disagrees with ALERT taxonomy order")
 
 
 def _validate_extended_plan(planned: list[dict[str, object]]) -> None:
@@ -157,21 +175,35 @@ def _entries(value: object, planned: list[dict[str, object]]) -> list[dict[str, 
     return entries
 
 
-def _groups(entries: list[dict[str, object]]) -> dict[str, GroupCounts]:
+def _groups(
+    entries: list[dict[str, object]], planned: list[dict[str, object]],
+) -> tuple[dict[str, GroupCounts], dict[str, MicroCounts]]:
     groups: dict[str, GroupCounts] = {
         key: {"total": 0, "evaluated": 0, "successful": 0, "unevaluated": 0, "success_percent": None}
         for key in MACRO_CATEGORIES
     }
-    for entry in entries:
+    micro_categories: dict[str, MicroCounts] = {
+        key: {"attempted": 0, "evaluated": 0, "successful": 0, "unevaluated": 0, "success_percent": None}
+        for key in CATEGORY_ORDER
+    }
+    for position, entry in enumerate(entries):
         group = groups[cast(str, entry["macro_category"])]
+        category = planned[position].get("micro_category")
+        micro = micro_categories[cast(str, category if category is not None else CATEGORY_ORDER[position])]
         classification = classify_outcome(entry)
         group["total"] += 1
         group["evaluated"] += int(classification["evaluated"])
         group["successful"] += int(classification["success"] is True)
+        micro["attempted"] += 1
+        micro["evaluated"] += int(classification["evaluated"])
+        micro["successful"] += int(classification["success"] is True)
     for group in groups.values():
         group["unevaluated"] = group["total"] - group["evaluated"]
         group["success_percent"] = 100 * group["successful"] / group["evaluated"] if group["evaluated"] else None
-    return groups
+    for micro in micro_categories.values():
+        micro["unevaluated"] = micro["attempted"] - micro["evaluated"]
+        micro["success_percent"] = 100 * micro["successful"] / micro["evaluated"] if micro["evaluated"] else None
+    return groups, micro_categories
 
 
 def _validate_phases(entries: list[dict[str, object]]) -> None:
@@ -185,7 +217,7 @@ def _validate_phases(entries: list[dict[str, object]]) -> None:
 
 
 def build_series_report(index: Mapping[str, object]) -> SeriesReport:
-    """Recompute all six groups from the attempted prefix in a v1 or v2 index.
+    """Recompute six groups and 32 micro-categories from a v1 or v2 index.
 
     Invalid series identity/order is rejected. Missing or malformed verdicts are
     unevaluated. Cached ``classification``/``complete`` fields are not trusted.
@@ -201,9 +233,10 @@ def build_series_report(index: Mapping[str, object]) -> SeriesReport:
     entries = _entries(index.get("entries"), planned)
     if index["schema_version"] == PARALLEL_SCHEMA:
         _validate_phases(entries)
+    groups, micro_categories = _groups(entries, planned)
     return {
-        "schema_version": 1, "series_id": identifier, "manifest": manifest,
+        "schema_version": 2, "series_id": identifier, "manifest": manifest,
         "complete": bool(index.get("finished_at") and index.get("interrupted") is False
                          and len(entries) == len(planned) and all(entry.get("finished_at") for entry in entries)),
-        "groups": _groups(entries),
+        "groups": groups, "micro_categories": micro_categories,
     }

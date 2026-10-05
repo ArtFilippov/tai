@@ -13,6 +13,7 @@ from alert.report import (
     classify_outcome,
     reconstruct_report,
 )
+from alert.taxonomy import CATEGORY_ORDER, MACRO_CATEGORIES
 from alert.values import object_value
 
 
@@ -90,6 +91,7 @@ def test_counts_weight_runs_not_categories_and_zero_evaluated_is_null(tmp_path: 
     index["entries"][1]["evaluation"] = None
     index["entries"][2]["result_id"] = "changed"
     report = build_series_report(index)
+    assert report["schema_version"] == 2
     assert report["complete"] is True
     assert report["groups"]["hate"] == {
         "total": 8,
@@ -113,6 +115,16 @@ def test_counts_weight_runs_not_categories_and_zero_evaluated_is_null(tmp_path: 
         "self_harm": 3,
         "weapon": 5,
     }
+    assert list(report["micro_categories"]) == list(CATEGORY_ORDER)
+    assert report["micro_categories"]["hate_body"] == {
+        "attempted": 1, "evaluated": 1, "successful": 0,
+        "unevaluated": 0, "success_percent": 0.0,
+    }
+    assert report["micro_categories"]["hate_disabled"] == {
+        "attempted": 1, "evaluated": 0, "successful": 0,
+        "unevaluated": 1, "success_percent": None,
+    }
+    assert report["micro_categories"]["weapon_other"]["success_percent"] is None
     path = tmp_path / "index.json"
     path.write_text(json.dumps(index))
     first, second = tmp_path / "first.json", tmp_path / "second.json"
@@ -137,6 +149,37 @@ def test_partial_totals_only_count_attempts_and_always_include_all_groups(attemp
     for group in report["groups"].values():
         if not group["total"]:
             assert group["success_percent"] is None
+    assert list(report["micro_categories"]) == list(CATEGORY_ORDER)
+    assert sum(row["attempted"] for row in report["micro_categories"].values()) == attempts
+    for macro, categories in MACRO_CATEGORIES.items():
+        for field in ("evaluated", "successful", "unevaluated"):
+            assert sum(report["micro_categories"][key][field] for key in categories) == report["groups"][macro][field]
+        assert sum(report["micro_categories"][key]["attempted"] for key in categories) == report["groups"][macro]["total"]
+    for category in CATEGORY_ORDER[attempts:]:
+        assert report["micro_categories"][category] == {
+            "attempted": 0, "evaluated": 0, "successful": 0, "unevaluated": 0, "success_percent": None,
+        }
+
+
+def test_legacy_32_record_index_without_micro_labels_reconstructs_by_taxonomy_position(tmp_path: Path) -> None:
+    index = saved_index()
+    index["entries"][0]["evaluation"] = {"result_id": "result-1", "success": False}
+    path = tmp_path / "index.json"
+    path.write_text(json.dumps(index))
+    report = reconstruct_report(path, tmp_path / "rebuilt.json")
+    assert report["micro_categories"]["hate_body"] == {
+        "attempted": 1, "evaluated": 1, "successful": 0, "unevaluated": 0, "success_percent": 0.0,
+    }
+    assert report["groups"]["hate"]["successful"] == 7
+    assert json.loads((tmp_path / "rebuilt.json").read_text()) == report
+
+
+def test_legacy_plan_rejects_incorrect_micro_category_even_with_matching_macro() -> None:
+    index = saved_index()
+    index["planned"][0]["micro_category"] = "hate_disabled"
+    index["entries"][0]["micro_category"] = "hate_disabled"
+    with pytest.raises(ValueError, match="taxonomy order"):
+        build_series_report(index)
 
 
 def test_reconstruction_rejects_reordered_duplicate_or_foreign_attempts() -> None:
@@ -172,10 +215,70 @@ def test_extended_plan_reconstructs_640_attempts_from_index_alone(tmp_path: Path
     ]
     path = tmp_path / "index.json"
     path.write_text(json.dumps(index))
-    assert {key: counts["total"] for key, counts in reconstruct_report(path)["groups"].items()} == {
+    report = reconstruct_report(path)
+    assert {key: counts["total"] for key, counts in report["groups"].items()} == {
         "hate": 160, "crime": 160, "substance": 100, "sex": 60, "self_harm": 60, "weapon": 100,
     }
-    assert reconstruct_report(path)["complete"] is True
+    assert report["complete"] is True
+    assert list(report["micro_categories"]) == list(CATEGORY_ORDER)
+    assert all(counts == {"attempted": 20, "evaluated": 20, "successful": 20,
+                          "unevaluated": 0, "success_percent": 100.0}
+               for counts in report["micro_categories"].values())
+    object_value(index["entries"][0]["evaluation"], "evaluation")["success"] = False
+    index["entries"][1]["evaluation"] = {"result_id": "stale", "success": True}
+    index["entries"][20]["evaluation"] = {"result_id": "result-21", "success": 1}
+    index["entries"][40]["state"] = "FAILED"
+    index["entries"][41]["evaluation"] = None
+    path.write_text(json.dumps(index))
+    updated = reconstruct_report(path, tmp_path / "first.json")
+    assert reconstruct_report(path, tmp_path / "second.json") == updated
+    assert (tmp_path / "first.json").read_bytes() == (tmp_path / "second.json").read_bytes()
+    assert updated["micro_categories"]["hate_body"] == {
+        "attempted": 20, "evaluated": 19, "successful": 18,
+        "unevaluated": 1, "success_percent": 100 * 18 / 19,
+    }
+    assert updated["micro_categories"]["hate_disabled"] == {
+        "attempted": 20, "evaluated": 19, "successful": 19,
+        "unevaluated": 1, "success_percent": 100.0,
+    }
+    assert updated["micro_categories"]["hate_ethnic"]["evaluated"] == 18
+    assert updated["groups"]["hate"]["evaluated"] == 156
+    assert updated["groups"]["hate"]["successful"] == 155
+
+
+def test_extended_interruption_counts_only_attempted_prefix_and_keeps_zero_categories() -> None:
+    manifest = load_alert_manifest(Path("examples/alert-manifest-20.json"), taxonomy_path=Path("ALERT_taxonomy.md"))
+    index = saved_index()
+    index["planned"] = [
+        {"id": record.id, "source_category": record.source_category,
+         "micro_category": record.micro_category, "macro_category": record.macro_category}
+        for record in manifest.records
+    ]
+    index["entries"] = [
+        {**record, "sequence": sequence, "finished_at": "2026-09-15T00:00:00+00:00",
+         "state": "COMPLETED", "error": None, "result": {"kind": "Message", "id": f"result-{sequence}"},
+         "result_id": f"result-{sequence}",
+         "evaluation": {"result_id": f"result-{sequence}", "success": True}}
+        for sequence, record in enumerate(index["planned"][:23], 1)
+    ]
+    index["entries"][1]["evaluation"] = {"result_id": "other", "success": True}
+    index["entries"][21]["evaluation"] = {"result_id": "result-22", "success": False}
+    index["interrupted"] = True
+    report = build_series_report(index)
+    assert report["complete"] is False
+    assert report["micro_categories"]["hate_body"] == {
+        "attempted": 20, "evaluated": 19, "successful": 19,
+        "unevaluated": 1, "success_percent": 100.0,
+    }
+    assert report["micro_categories"]["hate_disabled"] == {
+        "attempted": 3, "evaluated": 3, "successful": 2,
+        "unevaluated": 0, "success_percent": 100 * 2 / 3,
+    }
+    assert report["micro_categories"]["hate_ethnic"] == {
+        "attempted": 0, "evaluated": 0, "successful": 0,
+        "unevaluated": 0, "success_percent": None,
+    }
+    assert report["groups"]["hate"]["success_percent"] == 100 * 21 / 22
 
 
 @pytest.mark.parametrize("change", ["duplicate", "order", "category", "source", "legacy", "length"])
