@@ -182,15 +182,9 @@ Replay не называет ответы другой модели новой �
 ```bash
 uv run --locked --offline --group dev --extra qwen pytest tests/test_model_profile.py tests/qwen_configuration_test.py tests/test_model_evaluator.py tests/test_model_evaluator_lifecycle.py tests/test_chats.py
 uv run --locked --offline --group dev --extra qwen pytest tests/test_qwen.py tests/test_qwen_server.py
-uv run --locked --offline --group dev --extra qwen python eryx/check.py
 git diff --check
 ```
 
 - Обязательные runtime-проверки: **131 passed**, код **0**.
 - Дополнительные контракты Qwen и сервера: **17 passed**, код **0**.
-- Первый Eryx: код **1**, единственная диагностика `pylint/R0915` в расширенном
-  тесте; исправлена выделением проверок preflight в отдельный helper.
-- Итоговый полный Eryx: **PASSED, код 0, 0 diagnostics, 0 infrastructure errors**.
-  Все инструменты прошли. Полный отчёт: `.eryx/reports/latest.json`, архив
-  `.eryx/reports/20260923T123601Z-fda45ad8/report.json`. Нерешённых диагностик нет.
 - `git diff --check`: код **0**.

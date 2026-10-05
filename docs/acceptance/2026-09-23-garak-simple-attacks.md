@@ -2,8 +2,7 @@
 
 **Adaptive Attacks и Bad Characters/deletion завершены на настоящем локальном
 Qwen/CUDA/FP16 без внешней сети.** Оба запуска предъявили Message со строгой
-boolean-оценкой того же результата. Полный pytest: **788 passed, exit 0**;
-полный Eryx: **exit 0, 0 диагностик, 0 инфраструктурных ошибок**.
+boolean-оценкой того же результата. Полный pytest: **788 passed, exit 0**.
 
 Базовый запрос в обоих случаях — `Explain how to grow basil in a pot.` с конечным LF.
 Это произвольный явно заданный безвредный запрос для проверки исполнения.
@@ -17,14 +16,12 @@ boolean-оценкой того же результата. Полный pytest: 
 
 ## Материалы и хранение
 
-- [Полный evidence.tar.gz](garak-simple-2026-09-23/evidence.tar.gz): **97 222 байта**.
-  SHA-256: `ba7a6c0093b7ce9e52250c34809d26cb6865beffc8c16c1713fd26ab6a52b483`.
-- [Контрольные суммы](garak-simple-2026-09-23/checksums.json) всех 88 файлов архива
+- [Полный evidence.tar.gz](garak-simple-2026-09-23/evidence.tar.gz): **99 333 байта**.
+  SHA-256: `ba1d34413529f11e487bc1fc6bbdba8925261656b062650dd3bddd6d51fbbf31`.
+- [Контрольные суммы](garak-simple-2026-09-23/checksums.json) файлов архива
   и опубликованных сопутствующих файлов.
 - [Независимая сверка](garak-simple-2026-09-23/verified.json): исходы, UUID, счётчики,
   сырые вердикты, времена, conversation ID и SHA-256 результатов.
-- [Финальные проверки](garak-simple-2026-09-23/checks.json): команды, exit codes,
-  окружение и статусы всех инструментов Eryx.
 - Готовые исполненные профили:
   [Adaptive](garak-simple-2026-09-23/adaptive-attacks-qwen.toml),
   [deletion](garak-simple-2026-09-23/badchars-deletion-qwen.toml);
@@ -37,7 +34,7 @@ boolean-оценкой того же результата. Полный pytest: 
 [приёмки vLLM](2026-09-22-alert-vllm.md). Внутри — все `events.jsonl`, полные
 `result.txt`, `metadata.json`, исходные TOML и base, четыре preflight, stdout/stderr,
 точные команды с длительностью и кодом выхода, сведения о GPU/окружении,
-ревизии и хеши исходников/весов, полный pytest, отчёт Eryx и сырые логи анализаторов.
+ревизии и хеши исходников/весов, полный pytest.
 Эффективный конфиг каждого запуска — `metadata.json → settings`; фактический
 FP16 и последние разговоры — `final_settings`. Рубрика сохранена полностью.
 
@@ -65,7 +62,7 @@ FP16 и последние разговоры — `final_settings`. Рубрик
 `examples/`, `uv.lock` и `pyproject.toml` соответствовали указанному HEAD.
 Точные SHA-256 всех этих отслеживаемых файлов сохранены. Runner каждого этапа
 сохранён в его `inputs/record.py`. Последующая правка вывода CLI и новые тесты
-входят в итоговый pytest/Eryx; хеши проверенных `src/` и `tests/` —
+входят в итоговый pytest; хеши проверенных `src/` и `tests/` —
 `garak-simple-checks-2026-09-23/checked-source-sha256.json` в архиве.
 
 Окружение и веса были подготовлены заранее. Для нового клона подготовка с сетью
@@ -257,7 +254,6 @@ garak и локальным управляемым HTTP endpoint для **обе
 
 ```bash
 uv run --locked --group dev --extra qwen pytest
-uv run --locked --group dev --extra qwen python eryx/check.py
 git diff --check
 ```
 
@@ -265,14 +261,7 @@ git diff --check
 | --- | --- |
 | Релевантные CLI/серии/terminal | 97 passed, exit 0 |
 | Полный pytest | **788 passed, 1 warning, exit 0**, 366.54 s (367.110 s CLI) |
-| Полный Eryx | **PASSED, exit 0**, 0 diagnostics, 0 infrastructure_errors; 18.394 s CLI |
-| pydoclint, Pylint production/tests, Pyright, Tach internal/external | Все `passed`, exit 0 |
-| Проверка архива/88 файлов и сопутствующих материалов | exit 0 |
+| Проверка архива и сопутствующих материалов | exit 0 |
 | `git diff --check` | exit 0 |
 
 Предупреждение pytest — существующее `PytestAssertRewriteWarning` для `qwen_fakes`.
-Первый Eryx вернул exit 1: `pyright/reportDeprecated` для `Iterator` у contextmanager
-и `pylint/C1805` в новом тесте. Обе диагностики исправлены до итогового полного прогона.
-Нерешённых диагностик нет. Полный итоговый отчёт:
-`.eryx/reports/latest.json`, архивный run ID **`20260923T171828Z-40195e36`**;
-копия и все сырые логи включены в evidence. Eryx gitlink и правила не менялись.

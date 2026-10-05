@@ -12,45 +12,38 @@ This repo uses the five default triage roles as GitHub labels. Before assigning 
 
 Single-context layout: root `CONTEXT.md` and `docs/adr/`. Before exploring the project, read `docs/agents/domain.md`.
 
-## Eryx
+## Quard
 
-Before changing Python code or analyzer configuration, read `eryx/AGENTS.md`.
-The strict profile, scope, and tool limitations are documented in `eryx/PROFILE.md`;
-runner compatibility fixes are documented in `eryx/COMPATIBILITY.md`.
-
-Eryx is the project's only static analysis workflow, pinned as the `eryx/` submodule.
-From the repository root, prepare a fresh checkout with
-`git submodule update --init --recursive` and `uv sync --locked --group dev`,
-then run the full static check after Python changes:
+Before changing Python code or analyzer configuration, read `quard/AGENTS.md`.
+Consult `quard/PROFILE.md` for analyzer policy and `quard/COMPATIBILITY.md` for
+version-specific compatibility. Quard is the project's only static analysis
+workflow, pinned as the `quard/` submodule. From the repository root, prepare a
+fresh checkout with `git submodule update --init --recursive` and
+`uv sync --locked --group dev`, then run the full static check after Python changes:
 
 ```bash
-uv run --locked --group dev python eryx/check.py
+uv run --locked --group dev python quard/check.py
 ```
 
-Use `.eryx/reports/latest.json` for the complete diagnostics and per-tool status;
+Use `.quard/reports/latest.json` for complete diagnostics and per-tool status;
 raw logs live alongside each archived report. Exit 0 means all checks passed,
-1 means code/documentation/architecture violations, and 2 means a configuration
-or tool execution failure. Report the actual exit code and unresolved diagnostics.
+1 means violations, and 2 means configuration or tool failure. Report the actual
+exit code and unresolved diagnostics. Run relevant runtime tests with
+`uv run --locked --group dev pytest`. When editing `quard/`, also run
+`uv run --locked --group dev python -B -m unittest discover -s quard/tests`.
+For a Qwen environment include `--extra qwen` in uv commands; for a shared
+Qwen/vLLM environment include both `--extra qwen --extra vllm`.
 
-Run relevant runtime tests with `uv run --locked --group dev pytest`. When editing
-`eryx/`, also run
-`uv run --locked --group dev python -B -m unittest discover -s eryx/tests`.
-For an environment prepared for Qwen, include `--extra qwen` in uv commands to
-retain its optional dependencies.
-For a shared Qwen/vLLM environment, include both `--extra qwen --extra vllm`.
-
-Change readability limits in `.eryx/readability.toml` and shared exclusions in
-`.eryx/scope.toml`, then run
-`uv run --locked --group dev python eryx/apply.py --json`.
-Review module boundaries, layers, dependencies, and exports in `tach.toml`; after
-changing layers, run
-`uv run --locked --group dev python eryx/init_architecture.py --accept --json`.
-Architecture is already initialized in this repository. Do not run `tach sync`
-as part of routine checks or relax rules/exclusions to hide diagnostics.
-Keep the gitlink, `.gitmodules`, `.eryx/` settings and native configs in Git.
-Only `.eryx/reports/`, `.eryx/logs/`, `.eryx/cache/` and native caches are ignored.
-Install/update integration with `bash eryx/install.sh --project . --extra qwen --extra vllm`
-when retaining both backends. All Eryx commands accept `--project`.
+Edit readability, scope and optional checks in `.quard/config.toml`, then run
+`uv run --locked --group dev python quard/apply.py --json`. This project uses
+reviewed, consumer-owned `tach.toml` boundaries. Review modules, layers,
+dependencies and exports before accepting changed layers with
+`uv run --locked --group dev python quard/init_architecture.py --accept --json`.
+Keep the gitlink, `.gitmodules`, `.quard/` settings and native configs in Git;
+only `.quard/reports/`, `.quard/logs/`, `.quard/cache/` and native caches are ignored.
+Run `bash quard/install.sh --project . --extra qwen` to update this environment;
+include `--extra vllm` when provisioning a shared environment. All Quard
+commands accept `--project`.
 
 ## English
 

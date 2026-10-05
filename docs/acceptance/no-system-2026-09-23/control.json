@@ -38,16 +38,6 @@
       "stdout": " M README.md\n M docs/acceptance/attacker-2026-09-23/compare.py\n M docs/alert-series.md\n M docs/model-evaluator.md\n M docs/vllm.md\n M examples/fitd-alert-qwen.toml\n M examples/fitd-alert-transformers.toml\n M examples/fitd-alert-vllm.toml\n M tests/qwen_configuration_test.py\n M tests/test_chats.py\n M tests/test_model_profile.py\n?? docs/acceptance/no-system-2026-09-23/\n",
       "stderr": ""
     },
-    "submodules": {
-      "argv": [
-        "git",
-        "submodule",
-        "status"
-      ],
-      "exit_code": 0,
-      "stdout": " 60556a59647dc0e2155b878cee6c0a6a023b9b97 eryx (remotes/origin/main)\n",
-      "stderr": ""
-    },
     "runtime_diff": {
       "argv": [
         "git",

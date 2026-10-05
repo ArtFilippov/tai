@@ -138,13 +138,9 @@ HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 \
 ```bash
 uv run --locked --offline --group dev --extra qwen pytest tests/test_series_console.py tests/test_console_journal.py
 uv run --locked --offline --group dev --extra qwen pytest tests/test_model_profile.py tests/qwen_configuration_test.py
-uv run --locked --offline --group dev --extra qwen python eryx/check.py
 git diff --check
 ```
 
 - Консоль и журнал: **43 passed**, код **0**.
 - Профили и Qwen-конфигурация: **60 passed**, код **0**.
-- Полный Eryx: **PASSED, 0 diagnostics, exit=0**;
-  `.eryx/reports/20260922T224639Z-56fdcb92/report.json`, полный текущий отчёт —
-  `.eryx/reports/latest.json`. Нерешённых статических диагностик нет.
 - `git diff --check`: код **0**.

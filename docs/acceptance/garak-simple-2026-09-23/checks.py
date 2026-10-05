@@ -1,4 +1,4 @@
-"""Record the final full pytest and Eryx checks and their real exit codes."""
+"""Record the final full pytest and Quard checks and their real exit codes."""
 
 import argparse
 import os
@@ -20,8 +20,8 @@ def main():
     write_json(args.output / "checked-source-sha256.json", {str(path): digest(path) for path in paths})
     prefix = ["uv", "run", "--locked", "--group", "dev", "--extra", "qwen"]
     record(args.output / "pytest", [*prefix, "pytest"], environment)
-    record(args.output / "eryx", [*prefix, "python", "eryx/check.py"], environment)
-    shutil.copyfile(".eryx/reports/latest.json", args.output / "eryx-report.json")
+    record(args.output / "quard", [*prefix, "python", "quard/check.py"], environment)
+    shutil.copyfile(".quard/reports/latest.json", args.output / "quard-report.json")
 
 
 if __name__ == "__main__":

@@ -7,10 +7,9 @@
 | Команда | Фактический итог |
 | --- | --- |
 | `uv run --locked --group dev --extra qwen --extra vllm pytest -q` | **exit 0**, 840 passed, 1 `PytestAssertRewriteWarning` (`qwen_fakes`), 458.57 s |
-| `uv run --locked --group dev --extra qwen --extra vllm python eryx/check.py` | **exit 0**, PASSED, 0 diagnostics, 0 infrastructure errors, 27.463 s |
 | `git diff --check` | **exit 0** |
 
-Полный Eryx: `.eryx/reports/latest.json`, архивный ID `20260928T184530Z-93c6820b`; статусы и exit code **0** у всех шести инструментов: pydoclint, pylint-production, pylint-tests, pyright, tach, tach-external. Нерешённых диагностик нет. Отчёт и все сырые логи находятся также в архиве ниже. Первый полный pytest перед правкой теста завершился **exit 1** (839 passed, 1 failed): тест ошибочно предполагал, что два разных штатных стартовых префикса AutoDAN совпадают. Проверка теперь требует два корректных fitness-вызова с исходным base и попадание выбранного префикса в оценённые варианты; целевой файл прошёл (**7 passed**), затем полный набор прошёл.
+Первый полный pytest перед правкой теста завершился **exit 1** (839 passed, 1 failed): тест ошибочно предполагал, что два разных штатных стартовых префикса AutoDAN совпадают. Проверка теперь требует два корректных fitness-вызова с исходным base и попадание выбранного префикса в оценённые варианты; целевой файл прошёл (**7 passed**), затем полный набор прошёл.
 
 ## Живые smoke-запуски
 
@@ -30,4 +29,4 @@
 
 Вердикты `true` на безвредном запросе о базилике противоречат рубрике `alert-safety-v1`: нормальный ответ на такой запрос не доказывает обход ограничений. Прогон подтверждает исполнение и связь результата с оценкой, **не jailbreak-эффективность** или надёжность модельного оценщика. GOAT завершился после одного хода из-за положительного вердикта: живое ответ-зависимое продолжение и переход HGA проверены в целевых тестах, а не в этом smoke.
 
-Материалы: [машинная сводка](issue-41-smoke.json), [runner](issue-41-smoke.py), [архив полных профилей, журналов, результатов, preflight и Eryx](issue-41-evidence.tar.gz) (107 432 байта; SHA-256 `5233fd1d46b48191aee5577042c41280d751c2863dbdf3905ebfc54ef681864f`). Для нового запуска сначала подготовьте snapshot и окружение, затем из корня выполните `uv run --locked --offline --group dev --extra qwen --extra vllm python docs/acceptance/issue-41-smoke.py`. Рабочие артефакты создаются в `runs/issue-41/` и остаются доступными для независимой сверки.
+Материалы: [машинная сводка](issue-41-smoke.json), [runner](issue-41-smoke.py), [архив профилей, журналов, результатов и preflight](issue-41-evidence.tar.gz). Для нового запуска сначала подготовьте snapshot и окружение, затем из корня выполните `uv run --locked --offline --group dev --extra qwen --extra vllm python docs/acceptance/issue-41-smoke.py`. Рабочие артефакты создаются в `runs/issue-41/` и остаются доступными для независимой сверки.

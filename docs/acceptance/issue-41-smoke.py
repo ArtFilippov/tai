@@ -214,13 +214,9 @@ def main():
                                 "roles": [role["role"] for role in preflight["roles"]]},
               "unsupported_vllm": {"command": command, "exit_code": unsupported_exit, "message": unsupported_message}}
     (PUBLIC / "issue-41-smoke.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
-    shutil.copyfile(ROOT / ".eryx/reports/latest.json", OUTPUT / "eryx-report.json")
-    static = json.loads((OUTPUT / "eryx-report.json").read_text())
     with tarfile.open(PUBLIC / "issue-41-evidence.tar.gz", "w:gz") as archive:
         archive.add(OUTPUT, arcname="issue-41")
         archive.add(PUBLIC / "issue-41-smoke.json", arcname="issue-41/smoke.json")
-        archive.add(ROOT / static["report_path"], arcname="issue-41/eryx-archived-report.json")
-        archive.add((ROOT / static["report_path"]).parent / "raw", arcname="issue-41/eryx-raw")
     sys.exit(0 if all(item["exit_code"] == 0 and "verification_error" not in item for item in results.values()) else 1)
 
 

@@ -152,7 +152,7 @@ uv run --locked --extra qwen tai attack \
 ```bash
 git submodule update --init --recursive
 uv sync --locked --group dev
-uv run --locked --group dev python eryx/check.py
+uv run --locked --group dev python quard/check.py
 uv run --locked --group dev pytest
 uv run --locked python examples/offline_fitd.py
 ```
@@ -163,87 +163,68 @@ uv run --locked python examples/offline_fitd.py
 и на HTTP-подпроцессы. Программируются ответы моделей, а построение лестницы,
 переходы FITD и решение о продолжении выполняет настоящая библиотека.
 
-### Статические проверки Eryx
+### Статические проверки Quard
 
-**[Eryx](https://github.com/ArtFilippov/eryx)** — единственный набор статических
-проверок проекта. Код закреплён gitlink в [`eryx/`](eryx/README.md), версии
+**[Quard](https://github.com/ArtFilippov/quard)** — единственный набор статических
+проверок проекта. Код закреплён gitlink в [`quard/`](quard/README.md), версии
 анализаторов — в `pyproject.toml` и `uv.lock`. На свежем клоне выполните
 `git submodule update --init --recursive`, затем `uv sync --locked --group dev`.
-Можно сразу клонировать `tai` с `--recurse-submodules`; нужен доступ к приватному Eryx.
-Настройки проекта находятся в `.eryx/`. Архитектура уже принята: 126 модулей,
-состояние — `.eryx/architecture.ready.json`, границы — `tach.toml`.
+Можно сразу клонировать `tai` с `--recurse-submodules`; нужен доступ к Quard.
+Настройки проекта находятся в `.quard/config.toml`. Принятая архитектура:
+`.quard/architecture.ready.json` и проектный `tach.toml`.
 
 Единая команда проверяет `src/` и `tests/`:
 
 ```bash
-uv run --locked --group dev python eryx/check.py
+uv run --locked --group dev python quard/check.py
 # Полный машиночитаемый вывод:
-uv run --locked --group dev python eryx/check.py --json
+uv run --locked --group dev python quard/check.py --json
 ```
 
-| Инструмент | Проверки |
-| --- | --- |
-| Pylint 4.0.8 + clean-architecture-linter-plugin 1.2.2 | Ошибки, читаемость, сложность, дубли и архитектурные эвристики; отдельные профили production/tests. |
-| Pyright 1.1.414 | Строгая проверка типов. |
-| Tach 0.35.1 | Границы модулей, публичные импорты, слои, циклы и внешние зависимости (`check` и `check-external`). |
-| pydoclint 0.9.1 | Соответствие существующих Google docstrings сигнатуре и телу; наличие docstrings необязательно. |
+Quard запускает Pylint, Pyright, Tach, pydoclint, jscpd и независимые проверки
+структуры классов и модулей. Отдельные задания выбираются через `[checks]` в
+`.quard/config.toml`; проверка чистоты конструкторов по умолчанию выключена.
+Все включённые анализаторы выполняются до конца. Код выхода: **0** — всё прошло,
+**1** — найдены нарушения, **2** — ошибка конфигурации или инструмента.
+Полный отчёт: `.quard/reports/latest.json`; подробные логи находятся рядом с
+архивными отчётами. Проверки не подавляют диагностики и не исправляют код.
 
-Все анализаторы выполняются до конца, даже если один нашёл нарушения. Код выхода:
-**0** — все проверки пройдены, **1** — найдены нарушения, **2** — ошибка конфигурации
-или исполнения инструмента. Успешная установка и принятие архитектурной конфигурации
-сами по себе не означают, что код прошёл строгий профиль.
-
-Полный отчёт всегда сохраняется в `.eryx/reports/latest.json`, история — в
-`.eryx/reports/<run-id>/report.json`, сырые логи — в соседнем `raw/`.
-Для короткого вывода можно добавить `--max-diagnostics 20`; JSON остаётся полным.
-Отчёт содержит SHA запущенного Eryx и признак локальных изменений. Из Git исключены
-только `.eryx/reports/`, `.eryx/logs/` и `.eryx/cache/`; настройки `.eryx/` версионируются.
-Проверки не создают baseline и не исправляют код.
-
-Настройки читаемости меняются в [`.eryx/readability.toml`](.eryx/readability.toml),
-общая область исключений — в [`.eryx/scope.toml`](.eryx/scope.toml). После изменения:
+Настройки читаемости, области проверки и дополнительных заданий меняются в
+[`.quard/config.toml`](.quard/config.toml). После изменения настроек области
+проверки или лимитов выполните:
 
 ```bash
-uv run --locked --group dev python eryx/apply.py --json
+uv run --locked --group dev python quard/apply.py --json
 ```
 
 Настройки типов находятся в `pyrightconfig.json`, архитектуры — в `tach.toml`.
-Runtime-тесты pytest и офлайн-пример запускаются отдельными командами выше.
-Регрессии runner и автономная установка проверяются отдельно (установочным
-тестам нужен uv и сеть либо подготовленный cache):
+Runtime-тесты pytest и офлайн-пример запускаются отдельно. Регрессии инструмента:
 
 ```bash
-uv run --locked --group dev python -B -m unittest discover -s eryx/tests
+uv run --locked --group dev python -B -m unittest discover -s quard/tests
 ```
 
-При работе с окружением Qwen добавляйте `--extra qwen` к командам uv; если также
+Для окружения Qwen добавляйте `--extra qwen` к командам uv; если также
 установлен vLLM, добавляйте `--extra vllm`.
-Подробности профиля и ограничения: [`eryx/PROFILE.md`](eryx/PROFILE.md);
-инструкции для агентов: [`AGENTS.md`](AGENTS.md) и [`eryx/AGENTS.md`](eryx/AGENTS.md).
-Исправления совместимости: [`eryx/COMPATIBILITY.md`](eryx/COMPATIBILITY.md).
+Профиль: [`quard/PROFILE.md`](quard/PROFILE.md); инструкции:
+[`AGENTS.md`](AGENTS.md) и [`quard/AGENTS.md`](quard/AGENTS.md).
 
-При обновлении gitlink при необходимости выполните установку повторно:
+После обновления gitlink при необходимости выполните установку повторно:
 
 ```bash
-bash eryx/install.sh --project . --extra qwen --extra vllm --dry-run --json
-bash eryx/install.sh --project . --extra qwen --extra vllm
+bash quard/install.sh --project . --extra qwen --dry-run --json
+bash quard/install.sh --project . --extra qwen
 ```
 
-Для окружения без Qwen при первой установке опустите `--extra qwen`; повторная
-установка сохраняет выбор extras из `.eryx/installation.json`. Установщик сохраняет
-лимиты, принятую архитектуру, native `ignored-parents` для garak, `stubPath` и
-uv source/index/metadata. При сбое управляемые файлы откатываются.
+В общем окружении Qwen/vLLM добавьте к обеим командам `--extra vllm`.
+Установщик сохраняет лимиты, принятую архитектуру, native `ignored-parents`
+для garak, `stubPath` и uv source/index/metadata.
+Для отдельного клона инструмента используйте `python /path/to/quard/check.py --project .`
+в подготовленном окружении проекта.
 
-Исправление инструмента: создайте ветку **внутри `eryx/`** (HEAD обычно detached),
-воспроизведите проблему на `tai`, добавьте автономную регрессию и откройте
-**PR в Eryx**. После CI, ревью и слияния закрепите точный merged SHA в
-**отдельном PR tai**, со ссылкой на PR инструмента. Полный цикл описан в
-[`eryx/README.md`](eryx/README.md). Для отдельного клона инструмента используйте
-`uv run --locked --group dev --extra qwen --extra vllm python /path/to/eryx/check.py --project .`.
+### Архитектурные настройки Quard (Tach)
 
-### Архитектурные настройки Eryx (Tach)
-
-[Tach](https://docs.gauge.sh/) входит в Eryx и устанавливается
+[Tach](https://docs.gauge.sh/) входит в Quard и устанавливается
 вместе с dev-зависимостями.
 
 Пакеты группируют связанные обязанности; общие механизмы располагаются глубже
@@ -310,7 +291,7 @@ Interface → Infrastructure и Infrastructure → UseCase, которые ра�
 лишь линейный порядок слоёв. Текущие импорты остаются видимыми для диагностики:
 принятие конфигурации не подавляет нарушения границ или слоёв.
 
-Проверки модульных и внешних зависимостей выполняются через `eryx/check.py`.
+Проверки модульных и внешних зависимостей выполняются через `quard/check.py`.
 
 При добавлении модуля задайте в `tach.toml` его слой, зависимости и публичный интерфейс.
 После намеренного изменения зависимостей можно выполнить
@@ -319,8 +300,8 @@ sync записывает фактические импорты, в том чи�
 sync не нужен. После изменения слоёв синхронизируйте clean-architecture-плагин:
 
 ```bash
-uv run --locked --group dev python eryx/init_architecture.py --accept --json
-uv run --locked --group dev python eryx/check.py
+uv run --locked --group dev python quard/init_architecture.py --accept --json
+uv run --locked --group dev python quard/check.py
 ```
 
 ### Закрепление garak

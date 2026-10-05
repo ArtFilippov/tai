@@ -10,7 +10,7 @@ respect_gitignore = false
 # The linear order is supplemented below: Interface cannot import Infrastructure,
 # and Infrastructure cannot import UseCase, even with an explicit dependency.
 layers = ["Bootstrap", "Interface", "Infrastructure", "UseCase", "Domain"]
-exclude = [".git/**", "**/.git/**", ".venv/**", "**/.venv/**", "venv/**", "**/venv/**", "__pycache__/**", "**/__pycache__/**", ".mypy_cache/**", "**/.mypy_cache/**", ".pytest_cache/**", "**/.pytest_cache/**", ".ruff_cache/**", "**/.ruff_cache/**", ".tox/**", "**/.tox/**", ".nox/**", "**/.nox/**", ".eryx/**", "**/.eryx/**", "node_modules/**", "**/node_modules/**", "build/**", "**/build/**", "dist/**", "**/dist/**", "vendor/**", "**/vendor/**", "vendored/**", "**/vendored/**", "_vendor/**", "**/_vendor/**", "generated/**", "**/generated/**", "_generated/**", "**/_generated/**", "migrations/**", "**/migrations/**", "tests/**", "**/tests/**", "**/test/**"]
+exclude = [".git/**", "**/.git/**", ".venv/**", "**/.venv/**", "venv/**", "**/venv/**", "__pycache__/**", "**/__pycache__/**", ".mypy_cache/**", "**/.mypy_cache/**", ".pytest_cache/**", "**/.pytest_cache/**", ".ruff_cache/**", "**/.ruff_cache/**", ".tox/**", "**/.tox/**", ".nox/**", "**/.nox/**", ".quard/**", "**/.quard/**", "node_modules/**", "**/node_modules/**", "build/**", "**/build/**", "dist/**", "**/dist/**", "vendor/**", "**/vendor/**", "vendored/**", "**/vendored/**", "_vendor/**", "**/_vendor/**", "generated/**", "**/generated/**", "_generated/**", "**/_generated/**", "migrations/**", "**/migrations/**", "tests/**", "**/tests/**", "**/test/**"]
 
 [[modules]]
 path = "tai"
