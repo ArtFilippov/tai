@@ -1,7 +1,7 @@
 """Gated real FITD participants and persisted snapshots for parallel acceptance."""
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 from pathlib import Path
 from threading import Event, Lock
 
@@ -17,13 +17,19 @@ from core.evaluation.assembly import EvaluatorSetup
 
 @dataclass
 class ParallelScenario:
-    entered: list[Event] = field(default_factory=lambda: [Event() for _ in range(32)])
-    release: list[Event] = field(default_factory=lambda: [Event() for _ in range(32)])
-    saved: list[Event] = field(default_factory=lambda: [Event() for _ in range(32)])
+    size: InitVar[int] = 32
+    entered: list[Event] = field(init=False)
+    release: list[Event] = field(init=False)
+    saved: list[Event] = field(init=False)
     profiles: list[RoleProfile] = field(default_factory=list[RoleProfile])
     snapshots: list[dict[str, object]] = field(default_factory=list[dict[str, object]])
     lock: Lock = field(default_factory=Lock)
     stopped: Event = field(default_factory=Event)
+
+    def __post_init__(self, size: int) -> None:
+        self.entered = [Event() for _ in range(size)]
+        self.release = [Event() for _ in range(size)]
+        self.saved = [Event() for _ in range(size)]
 
     def fresh(self, _profile: RoleProfile) -> RoleProfile:
         sequence = len(self.profiles)
@@ -53,16 +59,24 @@ class ParallelScenario:
 
         def save(store: SeriesFiles, index: dict[str, object], report: SeriesReport) -> None:
             persist(store, index, report)
-            self.record_snapshot(json.loads((store.directory / "index.json").read_text()))
+            if len(self.entered) == 32:
+                self.record_snapshot(json.loads((store.directory / "index.json").read_text()))
+            else:
+                self.record_snapshot(index)
 
         monkeypatch.setattr("app.series.load_profile", load)
         monkeypatch.setattr(RoleProfile, "fresh", fresh)
         monkeypatch.setattr(SeriesFiles, "persist", save)
 
     def record_snapshot(self, snapshot: dict[str, object]) -> None:
+        entries = array_value(snapshot["entries"], "entries")
         with self.lock:
-            self.snapshots.append(snapshot)
-        for i, value in enumerate(array_value(snapshot["entries"], "entries")):
+            if len(self.entered) == 32:
+                self.snapshots.append(snapshot)
+            else:
+                self.snapshots.append({"active": sum(object_value(value, "entry")["phase"] == "active"
+                                                     for value in entries)})
+        for i, value in enumerate(entries):
             if object_value(value, "entry")["phase"] == "finished":
                 self.saved[i].set()
         if snapshot["interrupted"]:

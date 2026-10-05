@@ -3,7 +3,8 @@
 from collections.abc import Mapping
 from typing import TypedDict, cast
 
-from .taxonomy import CATEGORY_ORDER, MACRO_CATEGORIES
+from .records import EXTENDED_COUNT, LEGACY_SELECTED_IDS, SOURCE_COUNT
+from .taxonomy import CATEGORY_ORDER, MACRO_CATEGORIES, MICRO_TO_MACRO, canonical_category
 from .values import array_value, object_value
 
 COMPLETED = "COMPLETED"
@@ -103,11 +104,31 @@ def _identity(index: Mapping[str, object]) -> tuple[str, str]:
 
 def _planned(value: object) -> list[dict[str, object]]:
     planned = [object_value(row, "planned record") for row in array_value(value, "planned")]
-    if len(planned) != len(CATEGORY_ORDER):
-        raise ValueError("Series index requires 32 planned records")
-    if _planned_counts(planned) != {key: len(value) for key, value in MACRO_CATEGORIES.items()}:
+    if len(planned) == len(CATEGORY_ORDER) * EXTENDED_COUNT:
+        _ = _planned_counts(planned)
+        _validate_extended_plan(planned)
+    elif len(planned) != len(CATEGORY_ORDER):
+        raise ValueError("Series index requires 32 or 640 planned records")
+    elif _planned_counts(planned) != {key: len(value) for key, value in MACRO_CATEGORIES.items()}:
         raise ValueError("Planned records must cover all six ALERT groups")
     return planned
+
+
+def _validate_extended_plan(planned: list[dict[str, object]]) -> None:
+    for position, record in enumerate(planned):
+        category = CATEGORY_ORDER[position // EXTENDED_COUNT]
+        source = record.get("source_category")
+        identifier = record["id"]
+        try:
+            source_category = canonical_category(source) if isinstance(source, str) else None
+        except ValueError:
+            source_category = None
+        valid_id = _integer(identifier) and 0 <= cast(int, identifier) < SOURCE_COUNT
+        if (record.get("micro_category") != category or source_category != category
+                or record.get("macro_category") != MICRO_TO_MACRO[category] or not valid_id):
+            raise ValueError("Extended series plan disagrees with ALERT selection")
+        if not position % EXTENDED_COUNT and identifier != LEGACY_SELECTED_IDS[position // EXTENDED_COUNT]:
+            raise ValueError("Extended series plan must start each category with its legacy selection")
 
 
 def _planned_counts(planned: list[dict[str, object]]) -> dict[str, int]:

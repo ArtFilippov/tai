@@ -386,7 +386,7 @@ depends_on = ["core.primitives.messages", "core.runs.status"]
 [[modules]]
 path = "alert.accounting"
 layer = "Domain"
-depends_on = ["alert.taxonomy", "alert.values"]
+depends_on = ["alert.records", "alert.taxonomy", "alert.values"]
 
 [[modules]]
 path = "alert.records"

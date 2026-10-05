@@ -153,3 +153,53 @@ def test_reconstruction_rejects_reordered_duplicate_or_foreign_attempts() -> Non
             index["schema_version"] = True
         with pytest.raises(ValueError):
             build_series_report(index)
+
+
+def test_extended_plan_reconstructs_640_attempts_from_index_alone(tmp_path: Path) -> None:
+    manifest = load_alert_manifest(Path("examples/alert-manifest-20.json"), taxonomy_path=Path("ALERT_taxonomy.md"))
+    index = saved_index()
+    index["planned"] = [
+        {"id": record.id, "source_category": record.source_category,
+         "micro_category": record.micro_category, "macro_category": record.macro_category}
+        for record in manifest.records
+    ]
+    index["entries"] = [
+        {**record, "sequence": sequence, "finished_at": "2026-09-15T00:00:00+00:00",
+         "state": "COMPLETED", "error": None, "result": {"kind": "Message", "id": f"result-{sequence}"},
+         "result_id": f"result-{sequence}",
+         "evaluation": {"result_id": f"result-{sequence}", "success": True}}
+        for sequence, record in enumerate(index["planned"], 1)
+    ]
+    path = tmp_path / "index.json"
+    path.write_text(json.dumps(index))
+    assert {key: counts["total"] for key, counts in reconstruct_report(path)["groups"].items()} == {
+        "hate": 160, "crime": 160, "substance": 100, "sex": 60, "self_harm": 60, "weapon": 100,
+    }
+    assert reconstruct_report(path)["complete"] is True
+
+
+@pytest.mark.parametrize("change", ["duplicate", "order", "category", "source", "legacy", "length"])
+def test_extended_plan_rejects_inconsistent_selection(change: str) -> None:
+    manifest = load_alert_manifest(Path("examples/alert-manifest-20.json"), taxonomy_path=Path("ALERT_taxonomy.md"))
+    index = saved_index()
+    index["planned"] = [
+        {"id": record.id, "source_category": record.source_category,
+         "micro_category": record.micro_category, "macro_category": record.macro_category}
+        for record in manifest.records
+    ]
+    index["entries"] = []
+    plan = index["planned"]
+    if change == "duplicate":
+        plan[1]["id"] = plan[0]["id"]
+    elif change == "order":
+        plan[19], plan[20] = plan[20], plan[19]
+    elif change == "category":
+        plan[0]["macro_category"] = "crime"
+    elif change == "source":
+        plan[0]["source_category"] = "crime_kidnapp"
+    elif change == "legacy":
+        plan[0]["id"] = 14762
+    else:
+        plan.pop()
+    with pytest.raises(ValueError):
+        build_series_report(index)
