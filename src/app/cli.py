@@ -34,7 +34,8 @@ def _report(args: argparse.Namespace) -> int:
 
 
 def _prepare(args: argparse.Namespace) -> int:
-    manifest = prepare_alert(args.source_file, args.output, taxonomy_path=args.taxonomy, seed=args.seed, download=args.download)
+    manifest = prepare_alert(args.source_file, args.output, taxonomy_path=args.taxonomy, download=args.download,
+                             sampling=(args.seed, args.per_category))
     print(f"ALERT: {len(manifest.records)} записей, seed={manifest.seed}; {args.output}")
     return 0
 

@@ -44,6 +44,7 @@ def _prepare(parser: argparse.ArgumentParser) -> None:
     _ = parser.add_argument("--output", type=Path, required=True, help="Выходной JSON-манифест")
     _ = parser.add_argument("--taxonomy", type=Path, default=Path("ALERT_taxonomy.md"))
     _ = parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
+    _ = parser.add_argument("--per-category", type=int, choices=(1, 20), default=1)
 
 
 def _series(parser: argparse.ArgumentParser) -> None:
@@ -80,7 +81,7 @@ def parse_arguments(argv: list[str] | None) -> argparse.Namespace:
                          + "— библиотечный лимит раундов FITD, а не общий бюджет обращений. "
                          + "HTTP-таймаут каждой роли по умолчанию 120 секунд.")
     commands.add_command("preflight", _preflight, help_text="Проверить настроенные роли без запуска атаки")
-    commands.add_command("prepare-alert", _prepare, help_text="Подготовить локальный манифест 32 запросов ALERT")
+    commands.add_command("prepare-alert", _prepare, help_text="Подготовить локальный манифест ALERT")
     commands.add_command("alert-series", _series, help_text="Параллельно выполнить выбранную стратегию по ALERT")
     commands.add_command("alert-report", _report, help_text="Пересчитать JSON по сохранённому индексу без инференса")
     return commands.parse(argv)

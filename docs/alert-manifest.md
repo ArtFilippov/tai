@@ -206,3 +206,52 @@ alias и сохранение текста; негативные случаи п
 | `ruff check .` | All checks passed |
 | `ruff format --check .` | 59 files already formatted |
 | `mypy` | Success: no issues found in 19 source files |
+
+## Расширенная выборка: 20 запросов на микрокатегорию (#45)
+
+[`examples/alert-manifest-20.json`](../examples/alert-manifest-20.json) содержит
+**640 базовых запросов**: по 20 различных ID в каждой из 32 микрокатегорий.
+Исходные байты, ревизия и таксономия закреплены выше; старый манифест на 32 записи
+не менялся. SHA-256 нового файла:
+`eb8a2bfb79a43345958502ff4b0b59b603a0a541f6318c1766dc81def23186fa`.
+
+В документе используется `schema_version: 2`. В `selection` дополнительно
+записаны `per_category: 20` и `legacy_selected_ids` (32 ID исходного
+манифеста). Алгоритм — `python3.12-random-mt19937-choice-plus-sample-v1`:
+после проверки **всего** закреплённого JSONL записи группируются по Figure 2
+и сортируются по числовому ID. Отдельный `random.Random` с исходным seed
+`20260915` выбирает старый ID для каждой группы тем же `choice`, что и v1.
+Далее новый независимый генератор с записанным seed выбирает 19 записей
+`sample` из остальных ID группы в отсортированном порядке. Сначала в группе
+записывается старый ID, затем 19 выбранных в порядке `sample`; группы следуют
+порядку Figure 2. Требуется не менее 20 различных записей на категорию.
+`base_request` побайтно повторяет исходный текст `prompt` после декодирования
+JSONL. Для исходного seed загрузчик также сверяет канонический SHA-256 всех
+640 объектов `records`, защищая от согласованной замены обоих текстовых полей.
+Другие seed допускаются, но членство в источнике для них подтверждается только
+повторной подготовкой из закреплённого JSONL.
+
+Подготовка из чистого клона с явным скачиванием (каталог `runs` создать заранее):
+
+```bash
+uv run --locked tai prepare-alert --download \
+  --source-file runs/alert.jsonl --taxonomy ALERT_taxonomy.md \
+  --seed 20260915 --per-category 20 \
+  --output examples/alert-manifest-20.json
+```
+
+После скачивания повторить **без сети** (без `--download`):
+
+```bash
+uv run --locked --offline tai prepare-alert \
+  --source-file runs/alert.jsonl --taxonomy ALERT_taxonomy.md \
+  --seed 20260915 --per-category 20 \
+  --output runs/alert-manifest-20-reproduced.json
+cmp examples/alert-manifest-20.json runs/alert-manifest-20-reproduced.json
+sha256sum examples/alert-manifest-20.json
+```
+
+`load_alert_manifest(Path("examples/alert-manifest-20.json"),
+taxonomy_path=Path("ALERT_taxonomy.md"))` полностью проверяет документ
+до создания моделей. Без `--per-category` команда подготовки по-прежнему
+создаёт исходный v1-манифест с 32 записями.

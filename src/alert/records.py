@@ -20,6 +20,15 @@ SELECTION_ALGORITHM = "python3.12-random-mt19937-choice-v1"
 RECORD_ORDER = "source id ascending (numeric), within each canonical micro category"
 BASE_REPRESENTATION = "raw-prompt-v1"
 MAX_SEED = 2**64 - 1
+EXTENDED_COUNT = 20
+EXTENDED_ALGORITHM = "python3.12-random-mt19937-choice-plus-sample-v1"
+# The original official manifest's selected_ids, in Figure 2 order.
+LEGACY_SELECTED_IDS = (
+    5861, 5936, 6195, 7579, 8847, 8974, 9706, 7631,
+    2582, 827, 4657, 2754, 4927, 4417, 3882, 1879,
+    10222, 11776, 10675, 12031, 11405, 12613, 12871, 12260,
+    13144, 13308, 13469, 14514, 13713, 13625, 14679, 14329,
+)
 
 
 def source_metadata() -> JsonObject:
@@ -71,10 +80,12 @@ class AlertManifest:
     Attributes:
         seed (int): Deterministic sampler seed.
         records (tuple[AlertRecord, ...]): Validated selected source rows.
+        per_category (int, default=1): Records selected per micro category (1 or 20).
     """
 
     seed: int
     records: tuple[AlertRecord, ...]
+    per_category: int = 1
 
     def dump(self) -> JsonObject:
         """Return a fresh JSON-compatible snapshot including provenance metadata.
@@ -82,13 +93,18 @@ class AlertManifest:
         Returns:
             JsonObject: Detached manifest document.
         """
-        return {
-            "schema_version": 1, "source": source_metadata(), "taxonomy": taxonomy_metadata(),
-            "selection": {
-                "seed": self.seed, "algorithm": SELECTION_ALGORITHM,
+        extended = self.per_category == EXTENDED_COUNT
+        selection: JsonObject = {
+                "seed": self.seed, "algorithm": EXTENDED_ALGORITHM if extended else SELECTION_ALGORITHM,
                 "record_order": RECORD_ORDER, "category_order": list(CATEGORY_ORDER),
                 "selected_ids": [record.id for record in self.records],
-            },
+        }
+        if extended:
+            selection["per_category"] = EXTENDED_COUNT
+            selection["legacy_selected_ids"] = list(LEGACY_SELECTED_IDS)
+        return {
+            "schema_version": 2 if extended else 1, "source": source_metadata(), "taxonomy": taxonomy_metadata(),
+            "selection": selection,
             "base_request_representation": BASE_REPRESENTATION,
             "records": [record.dump() for record in self.records],
         }
@@ -125,8 +141,24 @@ def _source_records(rows: Iterable[object]) -> list[AlertRecord]:
     return records
 
 
-def select_alert_records(rows: Iterable[object], *, seed: int = DEFAULT_SEED) -> tuple[AlertRecord, ...]:
-    """Validate every source row, then sample one per micro category (no I/O).
+def _extended_selection(groups: dict[str, list[AlertRecord]], seed: int) -> tuple[AlertRecord, ...]:
+    rng = random.Random(seed)
+    legacy_rng = random.Random(DEFAULT_SEED)
+    selected: list[AlertRecord] = []
+    for category in CATEGORY_ORDER:
+        group = groups[category]
+        if len(group) < EXTENDED_COUNT:
+            raise ValueError(f"Insufficient distinct ALERT records for {category}: {len(group)} < 20")
+        legacy = legacy_rng.choice(group)
+        remaining = [record for record in group if record.id != legacy.id]
+        selected.extend((legacy, *rng.sample(remaining, EXTENDED_COUNT - 1)))
+    return tuple(selected)
+
+
+def select_alert_records(
+    rows: Iterable[object], *, seed: int = DEFAULT_SEED, per_category: int = 1,
+) -> tuple[AlertRecord, ...]:
+    """Validate every source row, then sample one or 20 per category (no I/O).
 
     This pure sampler also accepts controlled fixtures. Only preparation verifies
     the official source checksum; sampling alone does not attest provenance.
@@ -134,14 +166,22 @@ def select_alert_records(rows: Iterable[object], *, seed: int = DEFAULT_SEED) ->
     Args:
         rows (Iterable[object]): Decoded source rows to validate.
         seed (int, default=DEFAULT_SEED): Deterministic random seed.
+        per_category (int, default=1): Sample size, either 1 or 20.
 
     Returns:
-        tuple[AlertRecord, ...]: One record per canonical category, in category order.
+        tuple[AlertRecord, ...]: Records grouped in canonical category order.
+
+    Raises:
+        ValueError: Invalid source row, seed, sample size or insufficient records.
     """
     _ = integer_value(seed, "selection.seed", maximum=MAX_SEED)
+    _ = integer_value(per_category, "selection.per_category", maximum=EXTENDED_COUNT)
+    if per_category not in (1, EXTENDED_COUNT):
+        raise ValueError("selection.per_category: expected 1 or 20")
     groups: dict[str, list[AlertRecord]] = {category: [] for category in CATEGORY_ORDER}
     for record in sorted(_source_records(rows), key=lambda record: record.id):
         groups[record.micro_category].append(record)
-    rng = random.Random()
-    rng.seed(seed, version=2)
-    return tuple(rng.choice(groups[category]) for category in CATEGORY_ORDER)
+    if per_category == 1:
+        rng = random.Random(seed)
+        return tuple(rng.choice(groups[category]) for category in CATEGORY_ORDER)
+    return _extended_selection(groups, seed)

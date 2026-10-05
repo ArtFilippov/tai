@@ -46,8 +46,8 @@ def prepare_alert(
     output: Path,
     *,
     taxonomy_path: Path,
-    seed: int = DEFAULT_SEED,
     download: bool = False,
+    sampling: tuple[int, int] = (DEFAULT_SEED, 1),
 ) -> AlertManifest:
     """Verify pinned source bytes and all rows before writing the sample.
 
@@ -58,8 +58,8 @@ def prepare_alert(
         source_file (Path): Pinned source JSONL, or destination for a download.
         output (Path): Destination for the sampled manifest.
         taxonomy_path (Path): Local pinned taxonomy document.
-        seed (int, default=DEFAULT_SEED): Deterministic sampling seed.
         download (bool, default=False): Whether to explicitly download the official source.
+        sampling (tuple[int, int], default=(DEFAULT_SEED, 1)): Seed and records per category.
 
     Returns:
         AlertManifest: Validated selected records.
@@ -68,17 +68,14 @@ def prepare_alert(
         ValueError: The source row count differs from the pinned source.
     """
     _validate_paths(source_file, output, taxonomy_path)
+    seed, per_category = sampling
     _ = integer_value(seed, "selection.seed", maximum=MAX_SEED)
     raw = _source_bytes(source_file, download)
     rows = decode_json_lines(raw.decode("utf-8"))
-    records = select_alert_records(rows, seed=seed)
+    manifest = AlertManifest(seed, select_alert_records(rows, seed=seed, per_category=per_category), per_category)
     if len(rows) != SOURCE_COUNT:
         raise ValueError(f"Source record count mismatch; expected {SOURCE_COUNT}")
-    manifest = AlertManifest(seed, records)
-    content = (json.dumps(manifest.dump(), ensure_ascii=False, indent=2) + "\n").encode(
-        "utf-8"
-    )
     if download:
         _ = source_file.write_bytes(raw)
-    _ = output.write_bytes(content)
+    _ = output.write_bytes((json.dumps(manifest.dump(), ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
     return manifest

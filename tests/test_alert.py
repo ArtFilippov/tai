@@ -248,7 +248,7 @@ def test_loader_rejects_reordered_records_even_if_id_list_is_updated(
     ("path", "value", "diagnostic"),
     [
         (("schema_version",), True, "schema_version"),
-        (("schema_version",), 2, "schema_version"),
+        (("schema_version",), 3, "schema_version"),
         (
             ("base_request_representation",),
             "extract-instruction",
