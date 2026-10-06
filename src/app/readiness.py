@@ -9,11 +9,12 @@ from core.chats import LLMChat, ModelRole
 from core.chats.scoring import require_scorer
 from core.evaluation import Evaluator, evaluate
 from core.evaluation.configuration import EvaluatorSetup
+from core.evaluation.model_evaluator import ANSWER_RUBRIC_VERSION
 from core.primitives.messages import Message
 from core.runs import Evaluation
 from core.runs.operations import Cause, Context, ConversationChange, EvaluationResult, Exchange
 from alert.values import object_value
-from attacks.shared.contracts import AUTODAN, THREATEN_JSON, AttackType
+from attacks.shared.contracts import AUTODAN
 from attacks.autodan.profile import HGA
 
 from .contracts import ReadinessServices
@@ -95,10 +96,11 @@ def _exchange_diagnostics(services: ReadinessServices, after: int) -> dict[str, 
     return result
 
 
-def _check_evaluator(services: ReadinessServices, run_id: str, setup: EvaluatorSetup, attack_type: AttackType) -> dict[str, object]:
+def _check_evaluator(services: ReadinessServices, run_id: str, setup: EvaluatorSetup) -> dict[str, object]:
     # A valid false verdict is readiness, not a failure.
     pair = (Message("Name the capital of France."),
-            Message('{"answer": "Paris"}') if attack_type == THREATEN_JSON else Message("The capital of France is Paris."))
+            Message('{"answer": "Paris"}') if setup.settings().get("rubric_version") == ANSWER_RUBRIC_VERSION
+            else Message("The capital of France is Paris."))
     result: dict[str, object] = {
         "role": "Evaluator", "started_at": services.clock.now(), "settings": setup.settings(),
         "base": json.loads(pair[0].dump()), "result": json.loads(pair[1].dump()),
@@ -144,7 +146,7 @@ def check_roles(profile: ParticipantProfile, services: ReadinessServices, run_id
         results.append(result)
         if profile.autodan_mode == HGA:
             results.append(_check_lexicon(profile, services))
-    results.append(_check_evaluator(services, run_id, profile.evaluator, profile.attack_type))
+    results.append(_check_evaluator(services, run_id, profile.evaluator))
     return {
         "check": "role_readiness", "tai_version": services.version,
         "completed_at": services.clock.now(), "prompt": PROMPT,

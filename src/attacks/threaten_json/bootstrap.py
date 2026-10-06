@@ -10,7 +10,7 @@ from core.evaluation.configuration import EvaluatorSetup, evaluator_setup
 from core.primitives.messages import Message
 
 from .evaluator import JSONAnswerEvaluator
-from .runtime import ThreatenJSONRuntime
+from .threaten_json_runtime import ThreatenJSONRuntime
 
 
 def execution_settings(target: LLMChat, base: Message, setup: EvaluatorSetup) -> ExecutionSettings:

@@ -175,19 +175,19 @@ layer = "Domain"
 depends_on = ["core.evaluation", "core.primitives.messages"]
 
 [[modules]]
-path = "attacks.threaten_json.runtime"
+path = "attacks.threaten_json.threaten_json_runtime"
 layer = "UseCase"
 depends_on = ["attacks.shared.contracts", "attacks.threaten_json.evaluator", "attacks.threaten_json.requests", "core.primitives.messages", "core.runs.operations"]
 
 [[modules]]
 path = "attacks.threaten_json.bootstrap"
 layer = "Bootstrap"
-depends_on = ["attacks.shared.assembly", "attacks.shared.contracts", "attacks.shared.execution_state", "attacks.shared.user", "attacks.threaten_json.evaluator", "attacks.threaten_json.runtime", "core.chats", "core.evaluation", "core.evaluation.configuration", "core.primitives.messages"]
+depends_on = ["attacks.shared.assembly", "attacks.shared.contracts", "attacks.shared.execution_state", "attacks.shared.user", "attacks.threaten_json.evaluator", "attacks.threaten_json.threaten_json_runtime", "core.chats", "core.evaluation", "core.evaluation.configuration", "core.primitives.messages"]
 
 [[modules]]
 path = "attacks.threaten_json.experiment"
 layer = "Bootstrap"
-depends_on = ["attacks.shared.assembly", "attacks.shared.experiment", "attacks.threaten_json.bootstrap", "attacks.threaten_json.runtime", "core.chats", "core.evaluation", "core.evaluation.configuration", "core.primitives.messages", "core.runs.journal", "core.runs.journal_ports"]
+depends_on = ["attacks.shared.assembly", "attacks.shared.experiment", "attacks.threaten_json.bootstrap", "attacks.threaten_json.threaten_json_runtime", "core.chats", "core.evaluation", "core.evaluation.configuration", "core.primitives.messages", "core.runs.journal", "core.runs.journal_ports"]
 
 [[modules]]
 path = "attacks.dra"
@@ -497,6 +497,7 @@ depends_on = [
     "core.chats",
     "core.evaluation",
     "core.evaluation.configuration",
+    "core.evaluation.model_evaluator",
     "core.primitives.messages",
     "core.runs",
     "core.runs.operations",

@@ -14,7 +14,7 @@ from core.runs.journal import RunJournal
 from core.runs.journal_ports import Journal
 
 from .bootstrap import execution_settings
-from .runtime import ThreatenJSONRuntime
+from .threaten_json_runtime import ThreatenJSONRuntime
 
 
 class ExperimentOptions(TypedDict, total=False):

@@ -51,7 +51,7 @@ class RoleProfile(ParticipantProfile):
         if self.attack_type == AUTODAN:
             return self._autodan(base, journal_dir)
         if self.attack_type in (ADAPTIVE_ATTACKS, THREATEN_JSON):
-            experiment_type = ThreatenJSONExperiment if self.attack_type == THREATEN_JSON else AdaptiveAttacksExperiment
+            experiment_type = ThreatenJSONExperiment if self.strategy().attack_type == THREATEN_JSON else AdaptiveAttacksExperiment
             return experiment_type(self.target, base, self.evaluator, journal_dir=journal_dir, journal_factory=self.journal_factory)
         if self.attack_type in (BADCHARS_DELETION, DRA):
             return self._candidate(base, journal_dir)
