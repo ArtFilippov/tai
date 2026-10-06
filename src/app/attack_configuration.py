@@ -6,7 +6,7 @@ from attacks.dra.profile import PARAMETERS as DRA_PARAMETERS, DRAProfile, dra_pr
 from attacks.fitd.profile import FITDProfile
 from attacks.goat.profile import GOATProfile
 from attacks.autodan.profile import PARAMETERS as AUTODAN_PARAMETERS, autodan_profile
-from attacks.shared.contracts import ADAPTIVE_ATTACKS, AUTODAN, BADCHARS_DELETION, DRA, FITD, GOAT, AttackType, StrategyConfiguration
+from attacks.shared.contracts import ADAPTIVE_ATTACKS, AUTODAN, BADCHARS_DELETION, DRA, FITD, GOAT, THREATEN_JSON, AttackType, StrategyConfiguration
 
 from .configuration_values import QWEN_BACKEND, round_limit, table
 
@@ -17,8 +17,9 @@ TYPE = "type"
 def strategy_configuration(kind: AttackType, rounds: int | None) -> StrategyConfiguration:
     if kind == AUTODAN:
         raise ValueError("autodan requires an explicit expected continuation")
-    if kind == ADAPTIVE_ATTACKS:
-        return ADAPTIVE_PROFILE
+    if kind in (ADAPTIVE_ATTACKS, THREATEN_JSON):
+        return (ADAPTIVE_PROFILE if kind == ADAPTIVE_ATTACKS else
+                StrategyConfiguration(THREATEN_JSON, {"attempts": ("control", "pressured")}))
     if kind == BADCHARS_DELETION:
         return DeletionProfile().configuration()
     if kind == DRA:
@@ -47,12 +48,14 @@ def attack_configuration(data: dict[str, object]) -> StrategyConfiguration:
 
 
 def _candidate_configuration(data: dict[str, object], attack: dict[str, object]) -> StrategyConfiguration:
-    if (kind := attack.get("type")) not in (ADAPTIVE_ATTACKS, BADCHARS_DELETION, DRA):
-        raise ValueError("attack.type: поддерживается fitd, adaptive_attacks, badchars_deletion, dra, goat или autodan")
+    if (kind := attack.get("type")) not in (ADAPTIVE_ATTACKS, BADCHARS_DELETION, DRA, THREATEN_JSON):
+        raise ValueError("attack.type: поддерживается fitd, adaptive_attacks, badchars_deletion, dra, goat, autodan или threaten_json")
     if ATTACKER_SECTION in data:
         raise ValueError(f"{kind}: роль Attacker не используется")
     run = table(data.get("run", {}), "run", {"generations"})
     _ = round_limit(run)
+    if kind == THREATEN_JSON:
+        return strategy_configuration(THREATEN_JSON, None)
     if kind == BADCHARS_DELETION:
         return deletion_profile(attack).configuration()
     return dra_profile(attack).configuration() if kind == DRA else ADAPTIVE_PROFILE

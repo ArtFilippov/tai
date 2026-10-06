@@ -80,6 +80,7 @@ def parse_arguments(argv: list[str] | None) -> argparse.Namespace:
                          description="Один базовый запрос, generations=1. max_calls_per_conv (по умолчанию 10) "
                          + "— библиотечный лимит раундов FITD, а не общий бюджет обращений. "
                          + "HTTP-таймаут каждой роли по умолчанию 120 секунд.")
+    commands.add_command("threaten-json", _attack, help_text="Запустить ThreatenJSON с контрольным JSON-ответом")
     commands.add_command("preflight", _preflight, help_text="Проверить настроенные роли без запуска атаки")
     commands.add_command("prepare-alert", _prepare, help_text="Подготовить локальный манифест ALERT")
     commands.add_command("alert-series", _series, help_text="Параллельно выполнить выбранную стратегию по ALERT")

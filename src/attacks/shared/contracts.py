@@ -18,6 +18,7 @@ BADCHARS_DELETION: Final[AttackType] = "badchars_deletion"
 DRA: Final[AttackType] = "dra"
 GOAT: Final[AttackType] = "goat"
 AUTODAN: Final[AttackType] = "autodan"
+THREATEN_JSON: Final[AttackType] = "threaten_json"
 
 
 @dataclass(frozen=True)

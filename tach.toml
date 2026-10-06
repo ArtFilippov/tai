@@ -107,6 +107,8 @@ depends_on = [
     "attacks.goat",
     "attacks.shared.contracts",
     "attacks.shared.experiment",
+    "attacks.threaten_json",
+    "attacks.threaten_json.evaluator",
     "core.chats",
     "core.chats.qwen_server",
     "core.evaluation.assembly",

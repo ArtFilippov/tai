@@ -13,6 +13,8 @@ from attacks.fitd import FITDExperiment
 from attacks.adaptive_attacks import AdaptiveAttacksExperiment
 from attacks.badchars import BadCharactersDeletionExperiment
 from attacks.dra import DRAExperiment
+from attacks.threaten_json import ThreatenJSONExperiment
+from attacks.threaten_json.evaluator import JSONAnswerEvaluator
 from attacks.goat import GOATExperiment
 from attacks.autodan import AutoDANExperiment
 from attacks.autodan.profile import AutoDANOptions, autodan_profile
@@ -20,10 +22,10 @@ from attacks.autodan.genetic import require_hga_resources
 from attacks.autodan.profile import HGA
 from attacks.badchars.profile import deletion_profile
 from attacks.dra.profile import dra_profile
-from attacks.shared.contracts import ADAPTIVE_ATTACKS, AUTODAN, BADCHARS_DELETION, DRA, FITD, GOAT, StrategyConfiguration
+from attacks.shared.contracts import ADAPTIVE_ATTACKS, AUTODAN, BADCHARS_DELETION, DRA, FITD, GOAT, THREATEN_JSON, StrategyConfiguration, AttackType
 from attacks.shared.experiment import Experiment
 from core.evaluation.assembly import EvaluatorSetup
-from core.evaluation.model_evaluator import MODEL_RUBRIC_VERSION
+from core.evaluation.model_evaluator import ANSWER_RUBRIC_VERSION, MODEL_RUBRIC_VERSION
 from core.chats import LLMChat
 from core.chats.qwen_server import QwenServer
 from core.primitives.messages import Message
@@ -48,8 +50,9 @@ class RoleProfile(ParticipantProfile):
     def create_experiment(self, base: Message, journal_dir: Path | None = None) -> Experiment:
         if self.attack_type == AUTODAN:
             return self._autodan(base, journal_dir)
-        if self.attack_type == ADAPTIVE_ATTACKS:
-            return AdaptiveAttacksExperiment(self.target, base, self.evaluator, journal_dir=journal_dir, journal_factory=self.journal_factory)
+        if self.attack_type in (ADAPTIVE_ATTACKS, THREATEN_JSON):
+            experiment_type = ThreatenJSONExperiment if self.attack_type == THREATEN_JSON else AdaptiveAttacksExperiment
+            return experiment_type(self.target, base, self.evaluator, journal_dir=journal_dir, journal_factory=self.journal_factory)
         if self.attack_type in (BADCHARS_DELETION, DRA):
             return self._candidate(base, journal_dir)
         assert self.attacker is not None and self.max_calls_per_conv is not None
@@ -131,24 +134,30 @@ def _read_config(config: Path) -> dict[str, object]:
             raise ValueError("Некорректный TOML; проверьте синтаксис конфигурации") from None
 
 
-def _model_setup(value: object, server: QwenServer | None) -> Callable[[], EvaluatorSetup]:
+def _model_setup(value: object, server: QwenServer | None, rubric: str) -> Callable[[], EvaluatorSetup]:
     evaluation = table(value, "evaluator", {"type", "rubric_version", "chat"})
-    if (rubric_version := string(evaluation.get("rubric_version"), "evaluator.rubric_version")) != MODEL_RUBRIC_VERSION:
-        raise ValueError(f"evaluator.rubric_version: требуется {MODEL_RUBRIC_VERSION}")
+    if string(evaluation.get("rubric_version"), "evaluator.rubric_version") != rubric:
+        raise ValueError(f"evaluator.rubric_version: требуется {rubric}")
     factory = chat_factory(evaluation.get("chat"), "evaluator.chat", server)
-    return lambda: EvaluatorSetup.model(factory(), rubric_version)
+    def answer() -> EvaluatorSetup:
+        chat = factory()
+        setup = EvaluatorSetup.answer(chat)
+        return EvaluatorSetup(JSONAnswerEvaluator(setup.evaluator), chat, setup.configuration)
+
+    return answer if rubric == ANSWER_RUBRIC_VERSION else (lambda: EvaluatorSetup.model(factory()))
 
 
-def _evaluator(value: object, server: QwenServer | None, *, alert_series: bool) -> Callable[[], EvaluatorSetup]:
+def _evaluator(value: object, server: QwenServer | None, *, alert_series: bool, attack_type: AttackType) -> Callable[[], EvaluatorSetup]:
     evaluation = table(value, "evaluator")
     kind = evaluation.get("type")
-    if alert_series and kind != MODEL_EVALUATOR:
-        raise ValueError("ALERT series requires evaluator.type=model")
+    if (alert_series or attack_type == THREATEN_JSON) and kind != MODEL_EVALUATOR:
+        raise ValueError("ThreatenJSON requires evaluator.type=model" if attack_type == THREATEN_JSON
+                         else "ALERT series requires evaluator.type=model")
     if kind == TEXT_EVALUATOR:
         evaluation = table(evaluation, "evaluator", {"type", "criterion"})
         return partial(EvaluatorSetup.contains_text, string(evaluation.get("criterion"), "evaluator.criterion"))
     if kind == MODEL_EVALUATOR:
-        return _model_setup(evaluation, server)
+        return _model_setup(evaluation, server, ANSWER_RUBRIC_VERSION if attack_type == THREATEN_JSON else MODEL_RUBRIC_VERSION)
     raise ValueError("evaluator.type: поддерживается contains_text или model")
 
 
@@ -169,6 +178,6 @@ def load_profile(config: Path, *, alert_series: bool = False, server_log: Path =
     return ProfileAssembly(
         chat_factory(data.get("target"), "target", server),
         chat_factory(data.get("attacker"), "attacker", server) if strategy.attack_type in (FITD, GOAT, AUTODAN) else None,
-        _evaluator(data.get("evaluator"), server, alert_series=alert_series),
+        _evaluator(data.get("evaluator"), server, alert_series=alert_series, attack_type=strategy.attack_type),
         strategy, server,
     ).create()

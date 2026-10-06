@@ -8,7 +8,7 @@ from pathlib import Path
 
 from alert.preparation import prepare_alert
 from alert.report import reconstruct_report
-from attacks.shared.contracts import FITD
+from attacks.shared.contracts import FITD, THREATEN_JSON
 from core.primitives.messages import Message
 
 from .arguments import parse_arguments
@@ -16,6 +16,8 @@ from .configuration import load_profile
 from .preflight import run_preflight
 from .series import run_alert_series
 from .terminal import run_profile
+
+THREATEN_COMMAND = "threaten-json"
 
 
 def _series(args: argparse.Namespace) -> int:
@@ -57,12 +59,17 @@ def _attack(args: argparse.Namespace) -> int:
     with closing(load_profile(args.config, server_log=args.artifacts_dir / "vllm.log")) as profile:
         if args.command == FITD and profile.attack_type != FITD:
             raise ValueError("tai fitd требует attack.type=fitd; используйте tai attack")
+        if args.command == THREATEN_COMMAND and profile.attack_type != THREATEN_JSON:
+            raise ValueError("tai threaten-json требует attack.type=threaten_json; используйте tai attack")
         return run_profile(profile, base, args.artifacts_dir)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_arguments(argv)
-    commands = {"attack": _attack, "fitd": _attack, "preflight": _preflight, "prepare-alert": _prepare, "alert-series": _series, "alert-report": _report}
+    commands = {
+        "attack": _attack, "fitd": _attack, THREATEN_COMMAND: _attack, "preflight": _preflight,
+        "prepare-alert": _prepare, "alert-series": _series, "alert-report": _report,
+    }
     try:
         return commands[args.command](args)
     except UnicodeError:

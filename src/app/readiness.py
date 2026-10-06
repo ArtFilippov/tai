@@ -7,13 +7,13 @@ from uuid import uuid4
 
 from core.chats import LLMChat, ModelRole
 from core.chats.scoring import require_scorer
-from core.evaluation import evaluate
+from core.evaluation import Evaluator, evaluate
 from core.evaluation.configuration import EvaluatorSetup
 from core.primitives.messages import Message
 from core.runs import Evaluation
 from core.runs.operations import Cause, Context, ConversationChange, EvaluationResult, Exchange
 from alert.values import object_value
-from attacks.shared.contracts import AUTODAN
+from attacks.shared.contracts import AUTODAN, THREATEN_JSON, AttackType
 from attacks.autodan.profile import HGA
 
 from .contracts import ReadinessServices
@@ -68,13 +68,13 @@ def _check_chat(services: ReadinessServices, run_id: str, role: ModelRole, chat:
 
 
 def _assessment(
-    services: ReadinessServices, context: Context, setup: EvaluatorSetup, pair: tuple[Message, Message],
+    services: ReadinessServices, context: Context, evaluator: Evaluator, pair: tuple[Message, Message],
 ) -> bool:
     base, presented = pair
     with services.observe(context, base, presented) as evaluation_id:
         assessment = services.journal.call(
             "assessment", lambda: EvaluationResult(
-                context, "preflight", presented, Evaluation(presented.id, evaluate(setup.evaluator, base, presented)), base,
+                context, "preflight", presented, Evaluation(presented.id, evaluate(evaluator, base, presented)), base,
             ),
             context=context, base=base, result=presented, result_id=presented.id, evaluation_id=evaluation_id,
         )
@@ -95,18 +95,19 @@ def _exchange_diagnostics(services: ReadinessServices, after: int) -> dict[str, 
     return result
 
 
-def _check_evaluator(services: ReadinessServices, run_id: str, setup: EvaluatorSetup) -> dict[str, object]:
+def _check_evaluator(services: ReadinessServices, run_id: str, setup: EvaluatorSetup, attack_type: AttackType) -> dict[str, object]:
     # A valid false verdict is readiness, not a failure.
-    base, presented = Message("Name the capital of France."), Message("The capital of France is Paris.")
+    pair = (Message("Name the capital of France."),
+            Message('{"answer": "Paris"}') if attack_type == THREATEN_JSON else Message("The capital of France is Paris."))
     result: dict[str, object] = {
         "role": "Evaluator", "started_at": services.clock.now(), "settings": setup.settings(),
-        "base": json.loads(base.dump()), "result": json.loads(presented.dump()),
-        "result_id": presented.id, "response": None,
+        "base": json.loads(pair[0].dump()), "result": json.loads(pair[1].dump()),
+        "result_id": pair[1].id, "response": None,
     }
     start, after = services.clock.elapsed(), len(services.journal.events())
     context = Context(run_id, "Evaluator", "", Cause("preflight"))
     with Failure() as failure:
-        result.update(ok=True, success=_assessment(services, context, setup, (base, presented)))
+        result.update(ok=True, success=_assessment(services, context, setup.evaluator, pair))
     if failure.error is not None:
         services.journal.check()
         result.update(error_data(failure.error))
@@ -143,7 +144,7 @@ def check_roles(profile: ParticipantProfile, services: ReadinessServices, run_id
         results.append(result)
         if profile.autodan_mode == HGA:
             results.append(_check_lexicon(profile, services))
-    results.append(_check_evaluator(services, run_id, profile.evaluator))
+    results.append(_check_evaluator(services, run_id, profile.evaluator, profile.attack_type))
     return {
         "check": "role_readiness", "tai_version": services.version,
         "completed_at": services.clock.now(), "prompt": PROMPT,

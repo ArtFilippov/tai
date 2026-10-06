@@ -135,3 +135,21 @@ def test_stop_during_control_finishes_call_without_publishing_or_assessing() -> 
     assert user.status().state is UserState.STOPPED and user.result() is None
     assert not judge.pairs
     assert len([event for event in user.journal.events() if event.kind == "call_completed"]) == 1
+
+
+def test_stop_during_pressured_call_retains_format_comparison_without_assessing() -> None:
+    held = HeldResponse('{"answer": 2}')
+    judge = AnswerJudge(True)
+    user = ThreatenJSONExperiment(LLMChat.cancellable(ScriptedModel(["not JSON", held])), Message("Give 2"), judge)
+    user.start()
+    try:
+        assert held.entered.wait(5)
+        user.stop()
+    finally:
+        held.release.set()
+    assert user.wait(10)
+    assert user.status().state is UserState.STOPPED and user.result() is None
+    assert not judge.pairs
+    comparisons = [json.loads(event.dump())["data"] for event in user.journal.events() if event.kind == "json_comparison"]
+    assert len(comparisons) == 1 and comparisons[0]["control_parseable"] is False
+    assert comparisons[0]["result_parseable"] is True

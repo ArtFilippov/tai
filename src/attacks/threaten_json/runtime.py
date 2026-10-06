@@ -36,7 +36,7 @@ class ThreatenJSONRuntime(StrategyRuntime):
         pressured_cause = Cause("json_pressured", pressured.id)
         _ = ports.conversation.reset("Target", pressured_cause)
         exchange = ports.send("Target", pressured, pressured_cause)
+        self.comparison(reference.response, exchange.response, parseable(reference.response), parseable(exchange.response))
         checkpoint = ports.conversation.checkpoint("Target", pressured_cause)
         _ = ports.publish(exchange.response, exchange.context, checkpoint.id)
-        self.comparison(reference.response, exchange.response, parseable(reference.response), parseable(exchange.response))
         return "evaluator_success" if ports.evaluate(exchange.response, exchange.context, checkpoint.id).evaluation.success else "strategy_exhausted"
