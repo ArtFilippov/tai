@@ -23,6 +23,7 @@ depends_on = [
     "attacks.dra",
     "attacks.fitd",
     "attacks.goat",
+    "attacks.threaten_json",
     "core.chats",
     "core.chats.openai",
     "core.chats.qwen",
@@ -155,6 +156,36 @@ depends_on = ["app.configuration", "app.experiments", "app.runtime", "app.termin
 path = "attacks"
 layer = "Bootstrap"
 depends_on = []
+
+[[modules]]
+path = "attacks.threaten_json"
+layer = "Bootstrap"
+depends_on = ["attacks.threaten_json.bootstrap", "attacks.threaten_json.experiment"]
+
+[[modules]]
+path = "attacks.threaten_json.requests"
+layer = "Domain"
+depends_on = ["core.primitives.messages"]
+
+[[modules]]
+path = "attacks.threaten_json.evaluator"
+layer = "Domain"
+depends_on = ["core.evaluation", "core.primitives.messages"]
+
+[[modules]]
+path = "attacks.threaten_json.runtime"
+layer = "UseCase"
+depends_on = ["attacks.shared.contracts", "attacks.threaten_json.evaluator", "attacks.threaten_json.requests", "core.primitives.messages", "core.runs.operations"]
+
+[[modules]]
+path = "attacks.threaten_json.bootstrap"
+layer = "Bootstrap"
+depends_on = ["attacks.shared.assembly", "attacks.shared.contracts", "attacks.shared.execution_state", "attacks.shared.user", "attacks.threaten_json.evaluator", "attacks.threaten_json.runtime", "core.chats", "core.evaluation", "core.evaluation.configuration", "core.primitives.messages"]
+
+[[modules]]
+path = "attacks.threaten_json.experiment"
+layer = "Bootstrap"
+depends_on = ["attacks.shared.assembly", "attacks.shared.experiment", "attacks.threaten_json.bootstrap", "attacks.threaten_json.runtime", "core.chats", "core.evaluation", "core.evaluation.configuration", "core.primitives.messages", "core.runs.journal", "core.runs.journal_ports"]
 
 [[modules]]
 path = "attacks.dra"
@@ -960,6 +991,8 @@ expose = [
     '^FITDExperiment$',
     '^GOATExperiment$',
     '^GOATUser$',
+    '^ThreatenJSONExperiment$',
+    '^ThreatenJSONUser$',
     '^LLMChat$',
     '^Message$',
     '^ModelEvaluationError$',
@@ -1019,6 +1052,10 @@ from = ['^attacks\.badchars$']
 expose = ['^BadCharactersDeletionExperiment$', '^BadCharactersDeletionUser$']
 
 [[interfaces]]
+from = ['^attacks\.threaten_json$']
+expose = ['^ThreatenJSONExperiment$', '^ThreatenJSONUser$']
+
+[[interfaces]]
 from = ['^core\.chats$']
 expose = ['^ChatCancelled$', '^ChatTurn$', '^LLMChat$', '^ModelRole$']
 
@@ -1049,7 +1086,7 @@ from = [
     '^app\.[^.]+$',
     '^alert\.[^.]+$',
     '^attacks\.fitd\.[^.]+$',
-    '^attacks\.(shared|adaptive_attacks|autodan|badchars|dra|goat)\.[^.]+$',
+    '^attacks\.(shared|adaptive_attacks|autodan|badchars|dra|goat|threaten_json)\.[^.]+$',
     '^core\.(chats|evaluation|runs)\.[^.]+$',
     '^core\.primitives\.(messages|diagnostics)\.[^.]+$',
 ]

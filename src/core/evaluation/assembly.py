@@ -15,6 +15,8 @@ from .configuration import EvaluatorSetup as SetupContract
 from .configuration import evaluator_setup
 from .evaluator import EvaluationChat, Evaluator
 from .model_evaluator import (
+    ANSWER_RUBRIC,
+    ANSWER_RUBRIC_VERSION,
     MODEL_RUBRIC,
     MODEL_RUBRIC_VERSION,
     ModelEvaluator,
@@ -68,3 +70,7 @@ class EvaluatorSetup(SetupContract):
             ContainsTextEvaluator(criterion),
             configuration=lambda: {"type": "contains_text", "criterion": criterion},
         )
+
+    @classmethod
+    def answer(cls, chat: LLMChat) -> Self:
+        return cls.model(chat, ANSWER_RUBRIC_VERSION, rubric=ANSWER_RUBRIC)

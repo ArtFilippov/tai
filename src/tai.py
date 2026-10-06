@@ -12,6 +12,7 @@ from attacks.badchars import BadCharactersDeletionExperiment, BadCharactersDelet
 from attacks.dra import DRAExperiment, DRAUser
 from attacks.goat import GOATExperiment, GOATUser
 from attacks.autodan import AutoDANExperiment, AutoDANUser
+from attacks.threaten_json import ThreatenJSONExperiment, ThreatenJSONUser
 from core.chats import ChatCancelled, ChatTurn, LLMChat, ModelRole
 from core.chats.openai import (
     OpenAIAuthenticationError,
@@ -87,6 +88,8 @@ __all__ = [
     "User",
     "UserState",
     "UserStatus",
+    "ThreatenJSONExperiment",
+    "ThreatenJSONUser",
     "capture_run",
     "load_alert_manifest",
     "save_run",
