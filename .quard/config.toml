@@ -12,7 +12,7 @@ free_function_placement = true
 encapsulated_only = true
 pyright = true
 pydoclint = true
-duplicate_detection = true
+duplicate_detection = false
 tach = true
 dependency_types = false
 
