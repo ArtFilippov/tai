@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from core.chats.qwen_config import local_checkpoint
+from core.chats.envelopes.qwen_checkpoint_utils import local_checkpoint
 from core.chats.qwen_server import QwenServer
 from core.chats.server_config import ServerConfig, ServerLimits, positive_integer, positive_number
 from core.primitives.diagnostics import RedactionFactory

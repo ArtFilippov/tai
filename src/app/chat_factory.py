@@ -6,7 +6,7 @@ from functools import partial
 
 from core.chats import LLMChat
 from core.chats.envelopes.openai import OpenAIChat
-from core.chats.qwen import QwenChat
+from core.chats.envelopes.qwen_chat import QwenChat
 from core.chats.qwen_server import QwenServer
 from core.chats.server_chat import QwenServerChat
 from core.primitives.diagnostics import RedactionFactory

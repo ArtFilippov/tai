@@ -5,7 +5,8 @@ from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from .qwen_config import LocalCheckpoint, generation_config
+from .qwen_checkpoint import LocalCheckpoint
+from .qwen_generation_utils import generation_config
 
 VLLM_VERSION = "0.6.4.post1"
 SERVER_DTYPE = "float16"

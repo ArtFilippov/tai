@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 
 from app.chat_factory import chat_factory
-from core.chats.qwen import QwenChat
+from core.chats.envelopes.qwen_chat import QwenChat
 from core.primitives.diagnostics import DiagnosticRedactor
 from core.primitives.diagnostics.diagnostic_redactor.redaction import Redaction
 from core.primitives.messages.message.text_message import TextMessage

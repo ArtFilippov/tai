@@ -31,7 +31,7 @@ from core.chats.envelopes.openai import (
     OpenAITimeoutError,
     OpenAITransportError,
 )
-from core.chats.qwen import QwenChat, QwenContextError, QwenError
+from core.chats.envelopes.qwen_chat import QwenChat, QwenContextError, QwenError
 from core.evaluation import Evaluator
 from core.evaluation.assembly import EvaluatorSetup
 from core.evaluation.model_evaluator import (

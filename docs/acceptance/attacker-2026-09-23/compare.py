@@ -17,7 +17,7 @@ from importlib.metadata import version
 from importlib.resources import files
 from pathlib import Path
 
-from core.chats.qwen import QwenChat
+from core.chats.envelopes.qwen_chat import QwenChat
 from core.primitives.diagnostics.diagnostic_redactor.redaction import Redaction
 from core.primitives.messages.message.text_message import TextMessage
 
