@@ -5,38 +5,29 @@ from __future__ import annotations
 import json
 from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
-from typing import Concatenate
-from uuid import uuid4
+from typing import Concatenate, override
+from uuid import UUID, uuid4
 
-def _new_id() -> str:
-    return str(uuid4())
-
+from .message import Message
 
 @dataclass(frozen=True, slots=True)
-class Message:
+class TextMessage(Message):
     """One immutable text version with separate transformation and origin links.
 
     Attributes:
         text (str): Current computed text.
-        id (str, default=field(default_factory=_new_id, init=False)):
+        identity (UUID, default=field(default_factory=uuid4, init=False)):
             Unique identity of this version.
-        _previous (Message | None, default=field(
-            default=None, init=False, repr=False, compare=False)):
-            Previous transformation version.
-        _origin (Message | None, default=field(
-            default=None, init=False, repr=False, compare=False)):
-            Source of a spawned root.
-        _depth (int, default=field(default=0, init=False, repr=False, compare=False)):
-            Number of transformations since the root.
+        links (tuple[Message | None, Message | None, int], default=field(
+            default=(None, None, 0), init=False, repr=False, compare=False)):
+            Previous version, spawning origin and transformation depth.
     """
 
     text: str
-    id: str = field(default_factory=_new_id, init=False)
-    _previous: Message | None = field(
-        default=None, init=False, repr=False, compare=False
+    identity: UUID = field(default_factory=uuid4, init=False)
+    links: tuple[Message | None, Message | None, int] = field(
+        default=(None, None, 0), init=False, repr=False, compare=False
     )
-    _origin: Message | None = field(default=None, init=False, repr=False, compare=False)
-    _depth: int = field(default=0, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         def validate(value: object) -> None:
@@ -46,28 +37,39 @@ class Message:
         validate(self.text)
 
     @property
-    def previous(self) -> Message | None:
-        return self._previous
+    @override
+    def id(self) -> str:
+        return str(self.identity)
 
     @property
-    def origin(self) -> Message | None:
-        return self._origin
+    @override
+    def previous(self) -> Message | None:
+        return self.links[0]
 
+    @property
+    @override
+    def origin(self) -> Message | None:
+        return self.links[1]
+
+    @override
     def versions(self) -> Generator[Message]:
         version = self
         yield version
-        for _ in range(self._depth):
+        for _ in range(self.links[2]):
             previous = version.previous
             assert previous is not None
             version = previous
             yield version
 
+    @override
     def base(self) -> str:
-        return self.revert(self._depth).text
+        return self.revert(self.links[2]).text
 
+    @override
     def to_string(self) -> str:
         return self.text
 
+    @override
     def transform[**P](
         self,
         function: Callable[Concatenate[str, P], str],
@@ -85,11 +87,11 @@ class Message:
         Returns:
             Message: New version linked to this one.
         """
-        transformed = Message(function(self.text, *args, **kwargs))
-        object.__setattr__(transformed, "_previous", self)
-        object.__setattr__(transformed, "_depth", self._depth + 1)
+        transformed = TextMessage(function(self.text, *args, **kwargs))
+        object.__setattr__(transformed, "links", (self, None, self.links[2] + 1))
         return transformed
 
+    @override
     def revert(self, n: int) -> Message:
         """Return an existing version, without rerunning any transformation.
 
@@ -111,6 +113,7 @@ class Message:
             version = previous
         return version
 
+    @override
     def spawn(self, payload: str) -> Message:
         """Start a new text root whose provenance is this exact version.
 
@@ -122,10 +125,11 @@ class Message:
         Returns:
             Message: A root retaining this version as provenance.
         """
-        spawned = Message(payload)
-        object.__setattr__(spawned, "_origin", self)
+        spawned = TextMessage(payload)
+        object.__setattr__(spawned, "links", (None, self.revert(0), 0))
         return spawned
 
+    @override
     def dump(self) -> str:
         """Serialize computed text versions, never executable functions.
 
@@ -139,6 +143,7 @@ class Message:
         """
         return json.dumps(self.snapshot(), ensure_ascii=False)
 
+    @override
     def snapshot(self) -> dict[str, object]:
         versions = tuple(self.versions())
         root = versions[-1]
@@ -147,7 +152,7 @@ class Message:
             for version, previous in zip(versions, versions[1:])
         ]
         return {
-            "id": self.id,
+            "id": str(self.identity),
             "base": root.text,
             "text": self.text,
             "origin": root.origin.snapshot() if root.origin is not None else None,

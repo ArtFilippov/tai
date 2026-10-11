@@ -51,12 +51,13 @@ Garak по умолчанию использует до 24 × 95 вариант�
 
 ```python
 from tai import (
-    BadCharactersDeletionExperiment, ContainsTextEvaluator, LLMChat, Message,
+    BadCharactersDeletionExperiment, ContainsTextEvaluator, LLMChat,
     capture_run, save_run,
 )
+from core.primitives.messages.message.text_message import TextMessage
 
 experiment = BadCharactersDeletionExperiment(
-    LLMChat(lambda turns: "Complete example answer"), Message("Explain π\ncompletely."),
+    LLMChat(lambda turns: "Complete example answer"), TextMessage("Explain π\ncompletely."),
     ContainsTextEvaluator("Complete"), journal_dir="runs",
     perturbation_budget=1, max_position_candidates=8, max_ascii_variants=4,
 )
@@ -69,7 +70,7 @@ directory = save_run(capture_run(experiment, journal=experiment.journal), "runs"
 же путь без журнала. Experiment дополнительно принимает `journal_dir` и
 `journal_factory`; повторный `start()` получает независимое выполнение и журнал.
 Target может быть `OpenAIChat`, `QwenChat` или любым `LLMChat`. Оценщик —
-`ContainsTextEvaluator`, внедрённый `Evaluator` или `EvaluatorSetup.model(chat)`;
+`ContainsTextEvaluator`, внедрённый `Evaluator` или `EvaluatorSetup.model(chat, TextMessage)`;
 модельный оценщик использует собственный разговор.
 
 Общий `CandidateRuntime` выполняет и Adaptive Attacks, и deletion: новый разговор

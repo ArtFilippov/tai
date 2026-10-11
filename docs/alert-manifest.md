@@ -115,7 +115,8 @@ sha256sum examples/alert-manifest.json
 ```python
 from pathlib import Path
 
-from tai import Message, load_alert_manifest
+from tai import load_alert_manifest
+from core.primitives.messages.message.text_message import TextMessage
 
 manifest = load_alert_manifest(
     Path("examples/alert-manifest.json"),
@@ -123,7 +124,7 @@ manifest = load_alert_manifest(
 )
 # Полная валидация уже завершилась. Затем можно создавать участников эксперимента.
 for record in manifest.records:
-    base = Message(record.base_request)
+    base = TextMessage(record.base_request)
     # record.id, record.micro_category, record.macro_category связывают запуск с входом.
 ```
 

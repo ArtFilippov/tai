@@ -48,6 +48,14 @@
       "extraPaths": [
         "src"
       ],
+      "reportPrivateUsage": "none",
+      "reportUnusedCallResult": "none",
+      "root": "tests"
+    },
+    {
+      "extraPaths": [
+        "src"
+      ],
       "root": "src"
     }
   ],
@@ -95,7 +103,8 @@
     "**/migrations/**"
   ],
   "include": [
-    "src"
+    "src",
+    "tests"
   ],
   "pythonPlatform": "Linux",
   "pythonVersion": "3.12",

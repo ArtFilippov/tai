@@ -629,7 +629,8 @@ backend независимо. Общий `RoleProfile` содержит `LLMChat
 также нет beam search, квантования, multi-GPU и пользовательского KV-cache.
 
 ```python
-from tai import Message, QwenChat
+from tai import QwenChat
+from core.primitives.messages.message.text_message import TextMessage
 
 chat = QwenChat(
     model="Qwen/Qwen2.5-0.5B-Instruct",
@@ -638,9 +639,10 @@ chat = QwenChat(
     device="cuda:0",
     dtype="float16",
     system="Help solve fictional puzzles.",
+    initial=TextMessage("Help solve fictional puzzles."),
     generation={"max_new_tokens": 512, "do_sample": False},
 )
-response = chat.send(Message("Reply with exactly READY."))
+response = chat.send(TextMessage("Reply with exactly READY."))
 ```
 
 QwenChat наследует историю, происхождение Message, checkpoint/restore/reset и
@@ -738,7 +740,7 @@ CUDA/OOM и генерации остаются явными ошибками, �
 ### Проверка готовности Zen
 
 Отдельная команда загружает **тот же полный TOML-профиль**, что и `tai fitd`, и
-вызывает публичный `OpenAIChat.send(Message("Reply with exactly READY."))` по одному
+вызывает публичный `OpenAIChat.send(TextMessage("Reply with exactly READY."))` по одному
 разу для Target и Attacker. Системные инструкции и параметры профиля сохраняются.
 Обе роли получают отдельную диагностику: ошибка первой не отменяет проверку второй.
 Успех требует непустого (после удаления пробелов) текстового ответа каждой роли;
@@ -845,18 +847,21 @@ CLI обрабатывает Ctrl+C: обработчик только выст�
 
 ## Публичный Python API
 
-Все публичные типы доступны из `tai`; типы garak скрыты в `tai/_fitd.py`.
+Публичные контракты доступны из `tai`; конкретный `TextMessage` импортируется из
+`core.primitives.messages.message.text_message`. Типы garak скрыты в `tai/_fitd.py`.
 
-- `Message(text)` — неизменяемый текст с уникальным `id`, методами `base()`,
+- `Message` — контракт неизменяемого текста; `TextMessage(text)` из
+  `core.primitives.messages.message.text_message` создаёт результат с уникальным `id`, методами `base()`,
   `to_string()`, `transform()`, `revert()`, `spawn()` и JSON-снимком `dump()`.
-- `LLMChat(generate, model="…", system="…")` — владелец истории. Синхронный
+- `LLMChat(generate, model="…", system="…", initial=TextMessage(system))` — владелец истории.
+  При непустой системной инструкции требуется отдельное подготовленное Message. Синхронный
   `send(Message)` передаёт функции `generate` неизменяемый кортеж `ChatTurn`
   с ролями и полным контекстом; функция возвращает строку. В историю попадает
   только завершённый обмен. `history()` возвращает неизменяемый снимок.
   `checkpoint()`, `restore(point)` и `reset()` управляют активным разговором;
   `settings()` возвращает отдельный JSON-совместимый снимок настроек и истории.
   Свойство `conversation_id` — UUID актуального разговора, также включённый в снимок.
-- `LLMChat.cancellable(generate, model="…", system="…")` — та же история,
+- `LLMChat.cancellable(generate, create=TextMessage, model="…", system="…")` — та же история,
   но `generate(turns, cancellation)` получает также `threading.Event` отмены.
   `cancel()` выставляет сигнал активного обмена и возвращает `None`; без активного
   обмена ничего не меняет. Генератор завершает своё выполнение и очистку ресурсов
@@ -910,12 +915,12 @@ CLI обрабатывает Ctrl+C: обработчик только выст�
   не-boolean; исключения остаются ошибками, а не отрицательной оценкой.
 - `ContainsTextEvaluator(criterion)` ищет непустую строку с учётом регистра
   только в полном `result.to_string()`; базовый запрос не служит доказательством.
-- `ModelEvaluator(chat, rubric_version="alert-safety-v1")` получает базовый Message
+- `ModelEvaluator(chat, TextMessage, rubric_version="alert-safety-v1")` получает базовый Message
   при каждом `evaluate(base, result)` и сбрасывает разговор перед оценкой.
   Возвращает строгий bool либо явную `ModelEvaluationError` (`ModelVerdictError`
   при невалидном JSON). Рубрика задаётся при создании, история и веса принадлежат чату.
 - `EvaluatorSetup` — данные сборки, отдельно от рабочего интерфейса оценщика.
-  Для FITD используйте `EvaluatorSetup.model(chat)` или
+  Для FITD используйте `EvaluatorSetup.model(chat, TextMessage)` или
   `EvaluatorSetup.contains_text(criterion)`: сборка знает исходный чат и настройки,
   устанавливает обёртки журналирования и резервирует независимые разговоры.
   Простой пользовательский оценщик передаётся напрямую; необязательные диагностические
@@ -944,9 +949,10 @@ CLI обрабатывает Ctrl+C: обработчик только выст�
 ### Преобразования и происхождение Message
 
 ```python
-from tai import ContainsTextEvaluator, Message
+from tai import ContainsTextEvaluator
+from core.primitives.messages.message.text_message import TextMessage
 
-base = Message("Explain the puzzle")
+base = TextMessage("Explain the puzzle")
 prepared = base.transform(str.replace, "puzzle", "fictional puzzle")
 branch = prepared.transform(str.upper)
 assert branch.revert(1) is prepared
@@ -976,9 +982,9 @@ snapshot = answer.dump()
 
 ```python
 point = chat.checkpoint()
-chat.send(Message("A possible next clue"))
+chat.send(TextMessage("A possible next clue"))
 chat.restore(point)
-chat.send(Message("An alternative clue"))
+chat.send(TextMessage("An alternative clue"))
 chat.reset()
 ```
 

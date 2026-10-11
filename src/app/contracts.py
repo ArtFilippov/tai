@@ -9,6 +9,7 @@ from typing import Protocol, TypedDict, Unpack, override
 
 from core.primitives.diagnostics import DiagnosticObject, DiagnosticRedactor
 from core.primitives.messages import Message
+from core.primitives.messages.message.message_factory import MessageFactory
 from core.runs import RunSnapshot, UserStatus
 from core.runs.operations import Context, WorkerOutcome
 
@@ -93,8 +94,12 @@ class Clock:
 class ReadinessServices:
     journal: ReadinessJournal
     observe: Callable[[Context, Message, Message], AbstractContextManager[str]]
+    create_message: MessageFactory
     clock: Clock
     version: str
+
+    def message(self, text: str) -> Message:
+        return self.create_message(text)
 
 
 @dataclass(frozen=True)

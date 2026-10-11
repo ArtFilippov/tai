@@ -29,7 +29,7 @@ from attacks.fitd.native import FITD
 from attacks.fitd.native_configuration import configure, prepare_goal
 from attacks.fitd.profile import EnglishLanguage, FITDProfile
 from attacks.shared.contracts import GARAK_REVISION
-from tai import Message
+from core.primitives.messages.message.text_message import TextMessage
 
 
 ENVIRONMENT = (
@@ -112,7 +112,7 @@ class Recorder:
                  "initial_history": [], "model_input_index": index}
         self.report["attacker_calls"].append(entry)
         started = time.monotonic()
-        response = chat.send(Message(case["input"])).to_string()
+        response = chat.send(TextMessage(case["input"])).to_string()
         assert len(self.report["model_inputs"]) == index + 1
         assert self.report["model_inputs"][index]["messages"] == [{"role": "user", "content": case["input"]}]
         entry.update(response=response, elapsed_seconds=time.monotonic() - started)
@@ -172,7 +172,7 @@ def preflight(recorder):
     stdout, stderr = io.StringIO(), io.StringIO()
     first_input = len(recorder.report["model_inputs"])
     with redirect_stdout(stdout), redirect_stderr(stderr):
-        exit_code = run_preflight(recorder.profile)
+        exit_code = run_preflight(recorder.profile, TextMessage)
     report = json.loads(stdout.getvalue())
     assert len(recorder.report["model_inputs"]) == first_input + 3
     for offset, role in enumerate(report["roles"]):
@@ -244,7 +244,7 @@ def main():
                               "--query-gpu=uuid,name,memory.free,driver_version", "--format=csv"),
         "attacker_calls": [], "model_inputs": [], "completed": False,
     }
-    with closing(load_profile(args.profile)) as profile:
+    with closing(load_profile(args.profile, TextMessage)) as profile:
         chats = (profile.target, profile.attacker, profile.evaluator.chat)
         assert all(chat is not None and chat.history() == () for chat in chats)
         assert all(chat.settings()["backend"] == "qwen" for chat in chats)

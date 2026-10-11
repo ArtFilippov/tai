@@ -68,11 +68,12 @@ JSON-answerable base `Message`, and an evaluator. The experiment additionally ac
 and experiment journals.
 
 ```python
-from tai import EvaluatorSetup, Message, ThreatenJSONExperiment
+from tai import EvaluatorSetup, ThreatenJSONExperiment
+from core.primitives.messages.message.text_message import TextMessage
 
 # target and judge are independent LLMChat instances supplied by the caller.
-experiment = ThreatenJSONExperiment(target, Message("Give the number 2 as JSON"),
-                                    EvaluatorSetup.answer(judge))
+experiment = ThreatenJSONExperiment(target, TextMessage("Give the number 2 as JSON"),
+                                    EvaluatorSetup.answer(judge, TextMessage))
 experiment.start()
 experiment.wait()
 print(experiment.result(), experiment.status().evaluation)

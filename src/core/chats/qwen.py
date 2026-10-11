@@ -8,6 +8,7 @@ from threading import Event
 from typing import Unpack, override
 
 from core.primitives.diagnostics import DiagnosticObject
+from core.primitives.messages import Message
 
 from .conversation import ChatTurn, LLMChat
 from .qwen_config import (
@@ -42,6 +43,7 @@ class QwenChat(LLMChat, ContinuationScorer):
         revision (str): Full pinned commit hash.
         cache_dir (str | Path): Prepared local Hub cache.
         device (str): Explicit CUDA device.
+        initial (Message | None): Prepared system turn, when present.
         **options (Unpack[QwenOptions]): Dtype, system instructions and generation parameters.
 
     Raises:
@@ -50,18 +52,17 @@ class QwenChat(LLMChat, ContinuationScorer):
 
     def __init__(
         self, *, model: str, revision: str, cache_dir: str | Path,
-        device: str, **options: Unpack[QwenOptions],
+        device: str, initial: Message | None, **options: Unpack[QwenOptions],
     ) -> None:
         if unknown := options.keys() - {"dtype", "system", "generation"}:
             raise TypeError(f"Unexpected QwenChat options: {', '.join(sorted(unknown))}")
         checkpoint = local_checkpoint(model, revision, cache_dir, device)
-        cache = checkpoint.cache
-        self._checkpoint = replace(checkpoint, cache=cache.expanduser().resolve())
+        self._checkpoint = replace(checkpoint, cache=checkpoint.cache.expanduser().resolve())
         dtype = validate_dtype(options.get("dtype", "float16"))
         self._generation = generation_config(options.get("generation"))
         self._system = validate_system(options.get("system", ""))
         super().__init__(
-            lambda turns: "", model=model, system=self._system,
+            lambda turns: "", initial=initial, model=model, system=self._system,
         )
         self._executor = shared_executor(self._checkpoint, dtype)
 

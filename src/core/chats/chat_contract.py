@@ -18,6 +18,7 @@ class LLMChatProtocol(Protocol):
     @abstractmethod
     def cancellable(
         cls, generate: Callable[[tuple[ChatTurn, ...], Event], str], *,
+        create: Callable[[str], Message],
         model: str = "custom", system: str = "",
     ) -> Self: ...
 

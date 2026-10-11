@@ -23,14 +23,15 @@ User предъявляет ответ, затем вызывает внедрё
 
 ```python
 from tai import (
-    AdaptiveAttacksExperiment, ContainsTextEvaluator, LLMChat, Message,
+    AdaptiveAttacksExperiment, ContainsTextEvaluator, LLMChat,
     capture_run, save_run,
 )
+from core.primitives.messages.message.text_message import TextMessage
 
 # Офлайн-пример с управляемой моделью; вместо неё можно передать OpenAIChat/QwenChat.
 target = LLMChat(lambda turns: "Complete example answer")
 experiment = AdaptiveAttacksExperiment(
-    target, Message("Explain {this} fictional puzzle\ncompletely."),
+    target, TextMessage("Explain {this} fictional puzzle\ncompletely."),
     ContainsTextEvaluator("Complete"), journal_dir="runs",
 )
 experiment.start()
@@ -46,7 +47,7 @@ directory = save_run(record, "runs")
 совпадают с FITD. Повторный `start()` создаёт независимое выполнение.
 
 Attacker не создаётся. Для модельного оценщика передайте
-`EvaluatorSetup.model(evaluator_chat)`: его `LLMChat` должен отличаться от Target,
+`EvaluatorSetup.model(evaluator_chat, TextMessage)`: его `LLMChat` должен отличаться от Target,
 но может использовать тот же вычислительный ресурс. Сборка и чтение профиля не
 выполняют инференс. Оценщик начинает новый разговор перед каждой парой.
 

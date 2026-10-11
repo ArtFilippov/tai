@@ -39,7 +39,7 @@ def _reset(run_id: str, role: ModelRole, chat: LLMChat) -> ConversationChange:
 
 
 def _exchange(services: ReadinessServices, run_id: str, role: ModelRole, chat: LLMChat) -> Message:
-    context, call_id, request = _context(run_id, role, chat), str(uuid4()), Message(PROMPT)
+    context, call_id, request = _context(run_id, role, chat), str(uuid4()), services.message(PROMPT)
     return services.journal.call(
         "exchange", lambda: Exchange(context, call_id, request, chat.send(request)),
         context=context, call_id=call_id, message=request,
@@ -98,9 +98,9 @@ def _exchange_diagnostics(services: ReadinessServices, after: int) -> dict[str, 
 
 def _check_evaluator(services: ReadinessServices, run_id: str, setup: EvaluatorSetup) -> dict[str, object]:
     # A valid false verdict is readiness, not a failure.
-    pair = (Message("Name the capital of France."),
-            Message('{"answer": "Paris"}') if setup.settings().get("rubric_version") == ANSWER_RUBRIC_VERSION
-            else Message("The capital of France is Paris."))
+    pair = (services.message("Name the capital of France."),
+            services.message('{"answer": "Paris"}') if setup.settings().get("rubric_version") == ANSWER_RUBRIC_VERSION
+            else services.message("The capital of France is Paris."))
     result: dict[str, object] = {
         "role": "Evaluator", "started_at": services.clock.now(), "settings": setup.settings(),
         "base": json.loads(pair[0].dump()), "result": json.loads(pair[1].dump()),

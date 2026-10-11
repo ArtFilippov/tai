@@ -10,6 +10,7 @@ from collections.abc import Callable, Mapping
 from typing import Self
 
 from core.chats import LLMChat
+from core.primitives.messages import Message
 
 from .configuration import EvaluatorSetup as SetupContract
 from .configuration import evaluator_setup
@@ -49,13 +50,14 @@ class EvaluatorSetup(SetupContract):
     def model(
         cls,
         chat: LLMChat,
+        create: Callable[[str], Message],
         rubric_version: str = MODEL_RUBRIC_VERSION,
         *,
         rubric: str = MODEL_RUBRIC,
     ) -> Self:
         return cls.with_chat(
             chat,
-            lambda wrapped: ModelEvaluator(wrapped, rubric_version, rubric),
+            lambda wrapped: ModelEvaluator(wrapped, create, rubric_version, rubric),
             settings=lambda: {
                 "type": "model",
                 "rubric_version": rubric_version,
@@ -72,5 +74,5 @@ class EvaluatorSetup(SetupContract):
         )
 
     @classmethod
-    def answer(cls, chat: LLMChat) -> Self:
-        return cls.model(chat, ANSWER_RUBRIC_VERSION, rubric=ANSWER_RUBRIC)
+    def answer(cls, chat: LLMChat, create: Callable[[str], Message]) -> Self:
+        return cls.model(chat, create, ANSWER_RUBRIC_VERSION, rubric=ANSWER_RUBRIC)

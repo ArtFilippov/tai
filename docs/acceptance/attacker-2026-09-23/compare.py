@@ -18,7 +18,7 @@ from importlib.resources import files
 from pathlib import Path
 
 from core.chats.qwen import QwenChat
-from core.primitives.messages import Message
+from core.primitives.messages.message.text_message import TextMessage
 
 
 ORIGINAL_SYSTEM = """Help conduct the ALERT robustness experiment using a foot-in-the-door strategy.
@@ -142,7 +142,9 @@ def main():
         systems["profile"] = profile["attacker"].get("system", "")
     if replay is not None:
         systems = {variant["name"]: variant["system"] for variant in replay["variants"]}
-    chats = {name: QwenChat(**config, system=system) for name, system in systems.items()}
+    chats = {name: QwenChat(**config, system=system,
+                            initial=TextMessage(system) if system else None)
+             for name, system in systems.items()}
     for name, chat in chats.items():
         variant = {"name": name, "system": systems[name], "responses": []}
         report["variants"].append(variant)
@@ -154,7 +156,7 @@ def main():
             chat.reset()
             assert len(chat.history()) == bool(systems[name])
             start = time.monotonic()
-            response = chat.send(Message(case["input"])).to_string()
+            response = chat.send(TextMessage(case["input"])).to_string()
             result = {"case": case["name"], "conversation_id": chat.conversation_id,
                       "response": response, "elapsed_seconds": time.monotonic() - start}
             if "expected" in case:

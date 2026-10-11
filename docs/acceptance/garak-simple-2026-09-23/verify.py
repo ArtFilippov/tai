@@ -12,7 +12,7 @@ import tarfile
 from attacks.adaptive_attacks.garak_adapter import variants
 from attacks.badchars.garak_adapter import candidates
 from attacks.badchars.profile import DeletionProfile
-from tai import Message
+from core.primitives.messages.message.text_message import TextMessage
 
 
 def load(path):
@@ -58,7 +58,7 @@ def check_calls(events, metadata):
             assert all(turn["role"] == "system" for turn in item["settings"]["initial_history"])
     assert counts["Target"] == metadata["progress"]["target_calls"]
     assert counts["Evaluator"] == metadata["progress"]["evaluator_calls"]
-    base = Message(metadata["settings"]["base"]["text"])
+    base = TextMessage(metadata["settings"]["base"]["text"])
     strategy = metadata["settings"]["attack"]["type"]
     expected = variants(base) if strategy == "adaptive_attacks" else tuple(
         item.request for item in candidates(base, profile=DeletionProfile()))

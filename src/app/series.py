@@ -1,6 +1,7 @@
 """Compose parallel ALERT experiments, direct observation, and owned resources."""
 
 import platform
+from collections.abc import Callable
 from dataclasses import replace
 from functools import partial
 from importlib.metadata import version
@@ -63,12 +64,17 @@ def _backend(profile: RoleProfile) -> str:
     return " · ".join(f"{role}: {backend}" for role, backend in roles.items())
 
 
-def _execute_series(manifest: AlertManifest, profile: RoleProfile, store: SeriesFiles, jobs: int, *, lines_per_attack: int) -> SeriesResult:
-    with Interrupts() as stop, SeriesConsole(len(manifest.records), backend=_backend(profile), lines_per_attack=lines_per_attack) as console:
+def _execute_series(manifest: AlertManifest, profile: RoleProfile, store: SeriesFiles,
+                    limits: tuple[int, int], *,
+                    create_message: Callable[[str], Message]) -> SeriesResult:
+    with Interrupts() as stop, SeriesConsole(
+        len(manifest.records), backend=_backend(profile), lines_per_attack=limits[1],
+    ) as console:
         create = partial(_create, profile, store.directory / "runs", console=console)
-        dependencies = SeriesDependencies(create, store, stop, Clock(utc_now, monotonic), store.redact, console.notify)
+        dependencies = SeriesDependencies(create, store, stop,
+                                          Clock(utc_now, monotonic), store.redact, console.notify)
         try:
-            return SeriesExecution(manifest.records, dependencies, jobs).run()
+            return SeriesExecution(manifest.records, dependencies, create_message, limits[0]).run()
         finally:
             profile.close()
 
@@ -82,13 +88,14 @@ def _series_files(
 
 
 def _prepare_series(
-    manifest_path: Path, profile_path: Path, artifacts_dir: Path, taxonomy_path: Path,
+    manifest_path: Path, profile_path: Path, artifacts_dir: Path, *,
+    taxonomy_path: Path, create: Callable[[str], Message],
 ) -> tuple[AlertManifest, RoleProfile, SeriesFiles]:
     directory = artifacts_dir / str(uuid4())
     paths = {"manifest": manifest_path, "profile": profile_path, "taxonomy": taxonomy_path}
     inputs = {name: path.read_bytes() for name, path in paths.items()}
     manifest = load_alert_manifest(manifest_path, taxonomy_path=taxonomy_path)
-    profile = load_profile(profile_path, alert_series=True, server_log=directory / "vllm.log")
+    profile = load_profile(profile_path, create, alert_series=True, server_log=directory / "vllm.log")
     if any(path.read_bytes() != inputs[name] for name, path in paths.items()):
         raise ValueError("Series input files changed during validation")
     return manifest, profile, _series_files(profile, paths, inputs, directory)
@@ -97,14 +104,16 @@ def _prepare_series(
 def _limits(options: SeriesOptions) -> tuple[int, int]:
     if unknown := options.keys() - {"jobs", "lines_per_attack"}:
         raise TypeError(f"Unexpected series options: {', '.join(sorted(unknown))}")
-    jobs, lines = options.get("jobs", 4), options.get("lines_per_attack", DEFAULT_LINES_PER_ATTACK)
+    jobs = options.get("jobs", 4)
+    lines = options.get("lines_per_attack", DEFAULT_LINES_PER_ATTACK)
     validate_jobs(jobs)
     validate_lines_per_attack(lines)
     return jobs, lines
 
 
 def run_alert_series(
-    manifest_path: Path, profile_path: Path, artifacts_dir: Path, *, taxonomy_path: Path, **options: Unpack[SeriesOptions],
+    manifest_path: Path, profile_path: Path, artifacts_dir: Path, create: Callable[[str], Message],
+    *, taxonomy_path: Path, **options: Unpack[SeriesOptions],
 ) -> SeriesResult:
     """Validate all inputs, then admit independent strategy workers in manifest order.
 
@@ -116,6 +125,7 @@ def run_alert_series(
         manifest_path (Path): Validated saved ALERT selection.
         profile_path (Path): Pinned participant TOML configuration.
         artifacts_dir (Path): Parent of the new unique series directory.
+        create (Callable[[str], Message]): Assembled textual result constructor.
         taxonomy_path (Path): Pinned local taxonomy document.
         **options (Unpack[SeriesOptions]): Positive jobs (default 4) and lines_per_attack (default 5).
 
@@ -123,6 +133,9 @@ def run_alert_series(
         SeriesResult: Saved directory, accounting report, and command exit code.
 
     """
-    jobs, lines = _limits(options)
-    manifest, profile, store = _prepare_series(manifest_path, profile_path, artifacts_dir, taxonomy_path)
-    return _execute_series(manifest, profile, store, jobs, lines_per_attack=lines)
+    limits = _limits(options)
+    manifest, profile, store = _prepare_series(
+        manifest_path, profile_path, artifacts_dir,
+        taxonomy_path=taxonomy_path, create=create,
+    )
+    return _execute_series(manifest, profile, store, limits, create_message=create)

@@ -8,34 +8,36 @@
 
 ```python
 from tai import ContainsTextEvaluator, LLMChat, Message, ModelEvaluator
+from core.primitives.messages.message.text_message import TextMessage
 
-base = Message("Explain the fictional puzzle")
-result = Message("The answer is CONTROL")
+base = TextMessage("Explain the fictional puzzle")
+result = TextMessage("The answer is CONTROL")
 assert ContainsTextEvaluator("CONTROL").evaluate(base, result) is True
 
 judge = LLMChat(
-    lambda turns: '{"success": false}', system="Classify the supplied pair."
+    lambda turns: '{"success": false}', system="Classify the supplied pair.",
+    initial=TextMessage("Classify the supplied pair."),
 )
-evaluator = ModelEvaluator(judge)
+evaluator = ModelEvaluator(judge, TextMessage)
 assert evaluator.evaluate(base, result) is False
 assert (
-    evaluator.evaluate(Message("Another request"), Message("Another result")) is False
+    evaluator.evaluate(TextMessage("Another request"), TextMessage("Another result")) is False
 )
 ```
 
-`ModelEvaluator(chat, rubric_version="alert-safety-v1", rubric=MODEL_RUBRIC)` хранит
+`ModelEvaluator(chat, TextMessage, rubric_version="alert-safety-v1", rubric=MODEL_RUBRIC)` хранит
 чат и рубрику. Перед **каждой** оценкой он сбрасывает разговор, сохраняя явно заданные
 системные инструкции (если они есть) и общие веса. Изменение базового запроса не требует нового оценщика.
 
 ## Сборка зависимостей и собственный оценщик
 
-Для запуска с модельным оценщиком используйте `EvaluatorSetup.model(judge)`:
+Для запуска с модельным оценщиком используйте `EvaluatorSetup.model(judge, TextMessage)`:
 
 ```python
 from tai import EvaluatorSetup, FITDExperiment
 
 # target, attacker и judge — три разных исходных LLMChat.
-experiment = FITDExperiment(target, attacker, base, EvaluatorSetup.model(judge))
+experiment = FITDExperiment(target, attacker, base, EvaluatorSetup.model(judge, TextMessage))
 experiment.start()
 experiment.wait()
 ```
@@ -172,11 +174,12 @@ HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 \
 
 ```python
 from pathlib import Path
-from tai import Message, capture_run, save_run
+from tai import capture_run, save_run
 from app.configuration import load_profile
+from core.primitives.messages.message.text_message import TextMessage
 
-profile = load_profile(Path("examples/fitd-alert-qwen.toml"))
-base = Message("A selected base request")
+profile = load_profile(Path("examples/fitd-alert-qwen.toml"), TextMessage)
+base = TextMessage("A selected base request")
 user = profile.create_experiment(base, journal_dir=Path("runs"))
 user.start()
 user.wait()  # Завершение работы и освобождение участников.

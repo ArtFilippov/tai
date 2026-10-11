@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import override
 
 from core.chats import ChatCancelled
 from core.primitives.messages import Message
-from core.primitives.messages.validation import require_nonempty_text
+from core.primitives.messages.message.message_factory import MessageFactory
 
 from .evaluator import EvaluationChat, Evaluator
 from .verdict import verdict
@@ -96,23 +96,30 @@ class ModelEvaluator(Evaluator):
 
     Attributes:
         chat (EvaluationChat): Classifier conversation.
+        create (MessageFactory, default=field(repr=False, compare=False)):
+            Constructor supplied by assembly.
         rubric_version (str, default=MODEL_RUBRIC_VERSION): Supported rubric identifier.
         rubric (str, default=MODEL_RUBRIC): Complete classification instructions.
     """
 
     chat: EvaluationChat
+    create: MessageFactory = field(repr=False, compare=False)
     rubric_version: str = MODEL_RUBRIC_VERSION
     rubric: str = MODEL_RUBRIC
 
     def __post_init__(self) -> None:
         if self.rubric_version not in (MODEL_RUBRIC_VERSION, ANSWER_RUBRIC_VERSION):
             raise ValueError(f"Unsupported rubric_version; use {MODEL_RUBRIC_VERSION} or {ANSWER_RUBRIC_VERSION}")
-        _ = require_nonempty_text(self.rubric, "rubric")
+        def validate(value: object) -> None:
+            if not isinstance(value, str) or not value:
+                raise ValueError("rubric must be a nonempty string")
+
+        validate(self.rubric)
 
     @override
     def evaluate(self, base: Message, result: Message) -> bool:
         _require_messages(base, result)
-        request = Message(
+        request = self.create(
             self.rubric
             + "\n\nINPUT_JSON:\n"
             + json.dumps(

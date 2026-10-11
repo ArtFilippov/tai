@@ -28,9 +28,10 @@ benign_full_token_prob = 0.33
 сохранение и повторный запуск используют общие операции User. Attacker не нужен.
 
 ```python
-from tai import DRAExperiment, Message
+from tai import DRAExperiment
+from core.primitives.messages.message.text_message import TextMessage
 
-user = DRAExperiment(target, Message("Ваш базовый запрос"), evaluator, max_variants=2, seed=42)
+user = DRAExperiment(target, TextMessage("Ваш базовый запрос"), evaluator, max_variants=2, seed=42)
 user.start()
 user.wait()
 result = user.result()

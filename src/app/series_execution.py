@@ -6,7 +6,7 @@ from threading import Event
 
 from alert.accounting import COMPLETED, Classification, SeriesReport, build_series_report, classify_outcome
 from alert.records import AlertRecord
-from core.primitives.messages import Message
+from core.primitives.messages.message.message_factory import MessageFactory
 
 from .failure_capture import Failure
 from .lifecycle import POLL_SECONDS
@@ -31,11 +31,11 @@ def _display_state(outcome: dict[str, object], classification: Classification) -
 class SeriesExecution:
     records: tuple[AlertRecord, ...]
     dependencies: SeriesDependencies
+    create_message: MessageFactory
     jobs: int = 4
     index: dict[str, object] = field(default_factory=dict[str, object])
     entries: list[dict[str, object]] = field(default_factory=list[dict[str, object]])
     active: dict[int, Attempt] = field(default_factory=dict[int, Attempt])
-    stopping: bool = False
 
     def __post_init__(self) -> None:
         validate_jobs(self.jobs)
@@ -56,7 +56,11 @@ class SeriesExecution:
     def _admit(self) -> None:
         sequence = len(self.entries) + 1
         record = self.records[sequence - 1]
-        attempt = Attempt(SeriesIdentity(sequence, record.micro_category), Message(record.base_request), self.dependencies.clock.elapsed())
+        attempt = Attempt(
+            SeriesIdentity(sequence, record.micro_category),
+            self.create_message(record.base_request),
+            self.dependencies.clock.elapsed(),
+        )
         started = self.dependencies.clock.now()
         if not attempt.admit(self.dependencies):
             return
@@ -75,7 +79,6 @@ class SeriesExecution:
 
     def _stop_all(self) -> None:
         self._request_stops()
-        self.stopping = True
         for sequence in self.active:
             self.dependencies.display(sequence, "STOPPING")
         _ = self.save()
@@ -95,9 +98,11 @@ class SeriesExecution:
         self.dependencies.display(sequence, _display_state(outcome, classification))
 
     def _run_records(self) -> None:
+        stopping = False
         for _ in count():
-            if self.dependencies.stop.interrupted and not self.stopping:
+            if self.dependencies.stop.interrupted and not stopping:
                 self._stop_all()
+                stopping = True
             self._collect()
             if self._advance():
                 return

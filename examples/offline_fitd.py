@@ -4,11 +4,11 @@ from tai import (
     EvaluatorSetup,
     FITDExperiment,
     LLMChat,
-    Message,
     UserState,
     capture_run,
     save_run,
 )
+from core.primitives.messages.message.text_message import TextMessage
 
 
 def main() -> None:
@@ -20,17 +20,19 @@ def main() -> None:
         ["Puzzle introduction", "More detail", "Further detail", "Almost", "CONTROL"]
     )
     target = LLMChat(
-        lambda turns: next(target_replies), model="scripted", system="Solve the puzzle"
+        lambda turns: next(target_replies), model="scripted",
+        system="Solve the puzzle", initial=TextMessage("Solve the puzzle"),
     )
     attacker = LLMChat(
         lambda turns: next(attacker_replies),
         model="scripted",
         system="Build puzzle clues",
+        initial=TextMessage("Build puzzle clues"),
     )
     experiment = FITDExperiment(
         target,
         attacker,
-        Message("Explain the final fictional puzzle solution"),
+        TextMessage("Explain the final fictional puzzle solution"),
         EvaluatorSetup.contains_text("CONTROL"),
         journal_dir="runs",
     )

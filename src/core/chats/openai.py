@@ -6,6 +6,7 @@ from threading import Event
 from typing import Unpack, override
 
 from core.primitives.diagnostics import DiagnosticObject, DiagnosticRedactor
+from core.primitives.messages import Message
 
 from .conversation import ChatCancelled, ChatTurn, LLMChat
 from .openai_config import OpenAIOptions, connection_config, validate_text
@@ -35,16 +36,18 @@ class OpenAIChat(LLMChat):
     Args:
         base_url (str): HTTP(S) API root.
         model (str): Explicit model identifier.
+        initial (Message | None): Prepared system turn, when present.
         **options (Unpack[OpenAIOptions]): Authorization, system, generation,
             timeout and opt-in OpenCode session configuration.
     """
 
     def __init__(
-        self, *, base_url: str, model: str, **options: Unpack[OpenAIOptions],
+        self, *, base_url: str, model: str, initial: Message | None,
+        **options: Unpack[OpenAIOptions],
     ) -> None:
         config = connection_config(base_url, options)
         super().__init__(
-            lambda turns: "", model=validate_text(model, "model", nonempty=True),
+            lambda turns: "", initial=initial, model=validate_text(model, "model", nonempty=True),
             system=validate_text(options.get("system", ""), "system"),
         )
         self._config = config

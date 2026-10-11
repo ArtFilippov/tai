@@ -45,14 +45,19 @@ class LLMChat(LLMChatProtocol):
 
     Args:
         generate (Callable[[tuple[ChatTurn, ...]], str]): Complete text generation.
+        initial (Message | None, default=None): Prepared system turn, when present.
         model (str, default='custom'): Model identifier for reproducibility.
         system (str, default=''): Instructions retained across resets.
+
+    Raises:
+        ValueError: System instructions were not paired with a prepared Message.
     """
 
     def __init__(
         self,
         generate: Callable[[tuple[ChatTurn, ...]], str],
         *,
+        initial: Message | None = None,
         model: str = "custom",
         system: str = "",
     ) -> None:
@@ -61,7 +66,9 @@ class LLMChat(LLMChatProtocol):
         self._generate_callable: Callable[[tuple[ChatTurn, ...], Event], str] = (
             lambda turns, cancellation: generate(turns)
         )
-        turns = (ChatTurn("system", Message(system)),) if system else ()
+        if system and initial is None:
+            raise ValueError("System text requires a prepared Message")
+        turns = (ChatTurn("system", initial),) if initial is not None else ()
         self._history = ConversationState(turns, turns)
         self._execution = ExchangeGate()
         self._redactor = DiagnosticRedactor()
@@ -72,6 +79,7 @@ class LLMChat(LLMChatProtocol):
         cls,
         generate: Callable[[tuple[ChatTurn, ...], Event], str],
         *,
+        create: Callable[[str], Message],
         model: str = "custom",
         system: str = "",
     ) -> Self:
@@ -82,13 +90,17 @@ class LLMChat(LLMChatProtocol):
 
         Args:
             generate (Callable[[tuple[ChatTurn, ...], Event], str]): Cancellable model call.
+            create (Callable[[str], Message]): Assembled textual result constructor.
             model (str, default='custom'): Model identifier.
             system (str, default=''): Instructions retained across resets.
 
         Returns:
             Self: Independent conversation using the supplied callable.
         """
-        chat = cls(lambda turns: "", model=model, system=system)
+        chat = cls(
+            lambda turns: "", initial=create(system) if system else None,
+            model=model, system=system,
+        )
         chat._generate_callable = generate
         return chat
 

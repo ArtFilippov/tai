@@ -134,20 +134,24 @@ def _read_config(config: Path) -> dict[str, object]:
             raise ValueError("Некорректный TOML; проверьте синтаксис конфигурации") from None
 
 
-def _model_setup(value: object, server: QwenServer | None, rubric: str) -> Callable[[], EvaluatorSetup]:
+def _model_setup(value: object, server: QwenServer | None, rubric: str,
+                 create: Callable[[str], Message]) -> Callable[[], EvaluatorSetup]:
     evaluation = table(value, "evaluator", {"type", "rubric_version", "chat"})
     if string(evaluation.get("rubric_version"), "evaluator.rubric_version") != rubric:
         raise ValueError(f"evaluator.rubric_version: требуется {rubric}")
-    factory = chat_factory(evaluation.get("chat"), "evaluator.chat", server)
+    factory = chat_factory(evaluation.get("chat"), "evaluator.chat", create, server)
     def answer() -> EvaluatorSetup:
         chat = factory()
-        setup = EvaluatorSetup.answer(chat)
+        setup = EvaluatorSetup.answer(chat, create)
         return EvaluatorSetup(JSONAnswerEvaluator(setup.evaluator), chat, setup.configuration)
 
-    return answer if rubric == ANSWER_RUBRIC_VERSION else (lambda: EvaluatorSetup.model(factory()))
+    if rubric == ANSWER_RUBRIC_VERSION:
+        return answer
+    return lambda: EvaluatorSetup.model(factory(), create)
 
 
-def _evaluator(value: object, server: QwenServer | None, *, alert_series: bool, attack_type: AttackType) -> Callable[[], EvaluatorSetup]:
+def _evaluator(value: object, server: QwenServer | None, create: Callable[[str], Message],
+               *, alert_series: bool, attack_type: AttackType) -> Callable[[], EvaluatorSetup]:
     evaluation = table(value, "evaluator")
     kind = evaluation.get("type")
     if (alert_series or attack_type == THREATEN_JSON) and kind != MODEL_EVALUATOR:
@@ -157,15 +161,21 @@ def _evaluator(value: object, server: QwenServer | None, *, alert_series: bool, 
         evaluation = table(evaluation, "evaluator", {"type", "criterion"})
         return partial(EvaluatorSetup.contains_text, string(evaluation.get("criterion"), "evaluator.criterion"))
     if kind == MODEL_EVALUATOR:
-        return _model_setup(evaluation, server, ANSWER_RUBRIC_VERSION if attack_type == THREATEN_JSON else MODEL_RUBRIC_VERSION)
+        return _model_setup(
+            evaluation, server,
+            ANSWER_RUBRIC_VERSION if attack_type == THREATEN_JSON else MODEL_RUBRIC_VERSION,
+            create,
+        )
     raise ValueError("evaluator.type: поддерживается contains_text или model")
 
 
-def load_profile(config: Path, *, alert_series: bool = False, server_log: Path = DEFAULT_SERVER_LOG) -> RoleProfile:
+def load_profile(config: Path, create: Callable[[str], Message], *, alert_series: bool = False,
+                 server_log: Path = DEFAULT_SERVER_LOG) -> RoleProfile:
     """Build one validated profile shared by readiness and terminal experiments.
 
     Args:
         config (Path): Complete TOML experiment configuration.
+        create (Callable[[str], Message]): Assembled textual result constructor.
         alert_series (bool, default=False): Require the pinned ALERT model evaluator.
         server_log (Path, default=DEFAULT_SERVER_LOG): Separate server process output.
 
@@ -176,8 +186,12 @@ def load_profile(config: Path, *, alert_series: bool = False, server_log: Path =
     strategy = attack_configuration(data)
     server = create_server(data.get("server"), server_log)
     return ProfileAssembly(
-        chat_factory(data.get("target"), "target", server),
-        chat_factory(data.get("attacker"), "attacker", server) if strategy.attack_type in (FITD, GOAT, AUTODAN) else None,
-        _evaluator(data.get("evaluator"), server, alert_series=alert_series, attack_type=strategy.attack_type),
+        chat_factory(data.get("target"), "target", create, server),
+        chat_factory(data.get("attacker"), "attacker", create, server)
+        if strategy.attack_type in (FITD, GOAT, AUTODAN) else None,
+        _evaluator(
+            data.get("evaluator"), server, create,
+            alert_series=alert_series, attack_type=strategy.attack_type,
+        ),
         strategy, server,
     ).create()

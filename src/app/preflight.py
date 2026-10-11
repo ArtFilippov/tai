@@ -7,6 +7,7 @@ from pathlib import Path
 from time import monotonic
 
 from core.evaluation.observation import observe_evaluation
+from core.primitives.messages import Message
 from core.runs.journal import RunJournal
 
 from .contracts import Clock, ReadinessServices
@@ -16,11 +17,12 @@ from .runtime import utc_now
 
 
 def run_preflight(
-    profile: ParticipantProfile, report: Path | None = None, *,
+    profile: ParticipantProfile, create: Callable[[str], Message], report: Path | None = None, *,
     journal_factory: Callable[..., RunJournal] = RunJournal,
 ) -> int:
     journal = journal_factory(redactor=profile.redactor())
-    services = ReadinessServices(journal, partial(observe_evaluation, journal), Clock(utc_now, monotonic), version("tai"))
+    services = ReadinessServices(journal, partial(observe_evaluation, journal), create,
+                                 Clock(utc_now, monotonic), version("tai"))
     data, rendered = ReadinessSession(profile, services).run(report)
     print(rendered, end="")
     return 0 if data["ready"] else 1
