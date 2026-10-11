@@ -6,7 +6,7 @@ from socket import AF_INET, SOCK_STREAM, socket
 from threading import Thread
 from unittest import TestCase
 
-from core.chats.openai import OpenAIChat, OpenAITransportError
+from core.chats.envelopes.openai import OpenAIChat, OpenAIHTTPError, OpenAITransportError
 from core.primitives.diagnostics.diagnostic_redactor.redaction import Redaction
 from core.primitives.messages.message.text_message import TextMessage
 
@@ -19,6 +19,7 @@ class TestOpenAIChat(TestCase):
         server = socket(AF_INET, SOCK_STREAM)
         server.bind(("127.0.0.1", 0))
         server.listen()
+        server.settimeout(5.0)
 
         def serve() -> None:
             for payload in responses:
@@ -31,15 +32,18 @@ class TestOpenAIChat(TestCase):
                         headers[key.lower()] = value.strip()
                     body = json.loads(stream.read(int(headers["content-length"])))
                     requests.put(body["messages"])
-                    connection.sendall(
-                        b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
-                        + f"Content-Length: {len(payload) + (10 if not payload else 0)}\r\n"
-                        .encode() + b"Connection: close\r\n\r\n" + payload
-                    )
+                    if payload.startswith(b"HTTP/1.1"):
+                        connection.sendall(payload)
+                    else:
+                        connection.sendall(
+                            b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+                            + f"Content-Length: {len(payload) + (10 if not payload else 0)}\r\n"
+                            .encode() + b"Connection: close\r\n\r\n" + payload
+                        )
 
-        thread = Thread(target=serve)
+        thread = Thread(target=serve, daemon=True)
         thread.start()
-        self.addCleanup(thread.join, 5)
+        self.addCleanup(thread.join, 6)
         self.addCleanup(server.close)
         return f"http://127.0.0.1:{server.getsockname()[1]}/v1", requests
 
@@ -52,6 +56,11 @@ class TestOpenAIChat(TestCase):
     def fixture(self, responses: list[bytes]) -> tuple[OpenAIChat, Queue[list[dict[str, str]]]]:
         url, requests = self.endpoint(responses)
         return self.chat(url), requests
+
+    def started(self, responses: list[bytes]) -> tuple[OpenAIChat, Queue[list[dict[str, str]]]]:
+        chat, requests = self.fixture(responses)
+        _ = chat.send(TextMessage("accepted"))
+        return chat, requests
 
     def clean(self, requests: Queue[list[dict[str, str]]], text: str) -> bool:
         requests.get_nowait()
@@ -69,15 +78,25 @@ class TestOpenAIChat(TestCase):
         ), "OpenAI exchange lost its response or committed the wrong dialogue"
 
     def test_reset_sends_only_system_and_new_request(self) -> None:
-        chat, requests = self.fixture([self.reply(), self.reply()])
-        chat.send(TextMessage("old"))
+        chat, requests = self.started([self.reply(), self.reply()])
         chat.reset()
         chat.send(TextMessage("new"))
         assert self.clean(requests, "new"), "OpenAI reset leaked the previous exchange"
 
     def test_truncated_transport_does_not_commit_request(self) -> None:
-        chat, requests = self.fixture([b"", self.reply()])
+        chat, requests = self.started([self.reply(), b"", self.reply()])
         with self.assertRaises(OpenAITransportError):
             chat.send(TextMessage("failed"))
         chat.send(TextMessage("retry"))
-        assert self.clean(requests, "retry"), "Transport failure leaked unfinished dialogue"
+        requests.get_nowait()
+        requests.get_nowait()
+        assert tuple(turn["content"] for turn in requests.get_nowait()) == (
+            "policy", "accepted", "answer", "retry",
+        ), "Transport failure leaked unfinished dialogue or discarded completed turns"
+
+    def test_redirect_is_rejected_without_forwarding(self) -> None:
+        chat, _ = self.fixture([
+            b"HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:1/v1/chat/completions\r\n"
+            + b"Content-Length: 0\r\nConnection: close\r\n\r\n",
+        ])
+        self.assertRaises(OpenAIHTTPError, chat.send, TextMessage("question"))

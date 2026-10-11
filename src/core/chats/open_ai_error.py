@@ -1,7 +1,9 @@
 """Secret-safe failures from the Chat Completions transport."""
 
+from abc import ABC, abstractmethod
 
-class OpenAIError(RuntimeError):
+
+class OpenAIError(RuntimeError, ABC):
     """Secret-safe failure diagnostics, suitable for a run's journal.
 
     Args:
@@ -21,7 +23,7 @@ class OpenAIError(RuntimeError):
     ) -> None:
         self.status_code = status_code
         self.response_bytes = response_bytes
-        self.diagnostic = (
+        self.diagnostic: dict[str, object] | None = (
             {
                 "status_code": status_code,
                 "response_bytes": response_bytes,
@@ -32,34 +34,10 @@ class OpenAIError(RuntimeError):
         detail = f" (HTTP {status_code})" if status_code is not None else ""
         super().__init__(f"Chat Completions {reason}{detail}; response_bytes={response_bytes}")
 
+    @abstractmethod
+    def category(self) -> str:
+        """Identify the failure kind while preserving the exception hierarchy.
 
-class OpenAIHTTPError(OpenAIError):
-    """A non-success HTTP status; redirects are not followed."""
-
-
-class OpenAIAuthenticationError(OpenAIHTTPError):
-    """The endpoint rejected authentication or access (401/403)."""
-
-
-class OpenAIRateLimitError(OpenAIHTTPError):
-    """The endpoint limited the request (429); no implicit retry is made."""
-
-
-class OpenAITransportError(OpenAIError):
-    """Connection, TLS, HTTP framing, or worker failure."""
-
-
-class OpenAITimeoutError(OpenAITransportError, TimeoutError):
-    """The configured whole-exchange deadline expired."""
-
-
-class OpenAIResponseError(OpenAIError):
-    """A successful HTTP response did not contain a usable text completion."""
-
-
-class OpenAIJSONError(OpenAIResponseError):
-    """The response was not valid JSON text."""
-
-
-class OpenAIContentError(OpenAIResponseError):
-    """The response did not contain exactly one assistant text completion."""
+        Returns:
+            str: Failure category.
+        """

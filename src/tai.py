@@ -19,7 +19,7 @@ from core.chats import ChatTurn
 from core.chats.envelopes.cancellable_chat import CancellableChat
 from core.chats.envelopes.cancelled import Cancelled as ChatCancelled
 from core.chats.envelopes.conversation import LLMChat
-from core.chats.openai import (
+from core.chats.envelopes.openai import (
     OpenAIAuthenticationError,
     OpenAIChat,
     OpenAIContentError,

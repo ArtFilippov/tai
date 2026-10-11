@@ -257,7 +257,7 @@ src/
 ```python
 from attacks.fitd import FITDExperiment, FITDUser
 from core.chats import LLMChat
-from core.chats.openai import OpenAIChat
+from core.chats.envelopes.openai import OpenAIChat
 from core.primitives.messages import Message
 ```
 
@@ -265,8 +265,9 @@ from core.primitives.messages import Message
 и операции; конкретные адаптеры, сборка и хранение импортируются из именованных
 модулей. Общий API `from tai import ...` находится в `src/tai.py`.
 Пакеты импортируются напрямую из `src/`; entry point команды `tai` — `app.cli:main`.
-HTTP-worker находится рядом с `openai.py`; транспорт `openai_transport.py` запускает
-его по имени файла `http_worker.py`. Эта связь исполнения дополняет граф Python-импортов.
+HTTP-worker находится в `core/chats/main/http_worker.py`; транспорт
+`openai_transport_engine_utils.py` запускает его по пути файла. Эта связь
+исполнения дополняет граф Python-импортов.
 
 Выбранная в `.quard/architecture.generated.json` политика Quard строит
 `tach.toml` из обнаруженных исходных файлов, локальных контрактов и владения

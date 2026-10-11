@@ -13,7 +13,7 @@ from core.primitives.diagnostics import DiagnosticRedactor, RedactionFactory
 
 from .envelopes.cancelled import Cancelled
 from .chat_turn_contract import ChatTurn
-from .openai_transport import completion, exchange
+from .envelopes.openai_transport_utils import completion, exchange
 from .server_config import ServerConfig, http_generation, positive_number
 from .server_process import QwenServerError, ServerProcess
 from .server_ports import Server, ServerProcessPort

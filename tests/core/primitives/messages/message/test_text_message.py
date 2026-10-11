@@ -6,7 +6,7 @@ from unittest import TestCase
 
 import pytest
 
-from core.chats.openai import OpenAIChat
+from core.chats.envelopes.openai import OpenAIChat
 from core.primitives.diagnostics.diagnostic_redactor.redaction import Redaction
 from core.primitives.messages.message.text_message import TextMessage
 from core.runs.journal import RunJournal

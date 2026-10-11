@@ -2,16 +2,17 @@
 
 from abc import abstractmethod
 from threading import Event
-from typing import Protocol
+from typing import Protocol, override
 
 from core.primitives.diagnostics import DiagnosticRedactor
 from core.primitives.messages import Message
 
+from .chat_settings_contract import ChatSettings
 from .chat_turn_contract import ChatTurn
 from .exchange_gate_contract import ExchangeGate
 
 
-class LLMChat(Protocol):
+class LLMChat(ChatSettings, Protocol):
     """Own one model conversation, including its opaque checkpoints.
 
     Attributes:
@@ -51,10 +52,8 @@ class LLMChat(Protocol):
     @abstractmethod
     def conversation_id(self) -> str: ...
 
-    @abstractmethod
-    def settings(self) -> dict[str, object] | list[object]: ...
-
     @property
+    @override
     def redactor(self) -> DiagnosticRedactor:
         """Return the policy for detached diagnostic values.
 
@@ -62,11 +61,6 @@ class LLMChat(Protocol):
             DiagnosticRedactor: Redaction policy of this conversation.
         """
         return self.policy
-
-    @abstractmethod
-    def diagnostic_settings(
-        self, redactor: DiagnosticRedactor,
-    ) -> dict[str, object] | list[object]: ...
 
     @abstractmethod
     def checkpoint(self) -> object: ...

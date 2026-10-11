@@ -73,17 +73,6 @@ class LLMChat(LLMChatProtocol):
             return self.dialogue.identity()
 
     @override
-    def settings(self) -> dict[str, object] | list[object]:
-        """Return a detached, JSON-serializable snapshot for run reproducibility.
-
-        Transport subclasses include their configuration without credential
-        values. The run records this snapshot before its first exchange.
-
-        Returns:
-            dict[str, object] | list[object]: Current model and completed conversation.
-        """
-        return self.redactor.structured(self.settings_data())
-
     def settings_data(self) -> dict[str, object]:
         with self.gate.guard():
             conversation_id, turns = self.dialogue.identity(), self.dialogue.history()
@@ -95,12 +84,6 @@ class LLMChat(LLMChatProtocol):
                 for turn in turns
             ],
         }
-
-    @override
-    def diagnostic_settings(
-        self, redactor: DiagnosticRedactor,
-    ) -> dict[str, object] | list[object]:
-        return redactor.structured(self.settings())
 
     @override
     def checkpoint(self) -> object:
