@@ -5,6 +5,8 @@ from pathlib import Path
 from threading import Event
 from typing import Protocol
 
+from core.primitives.diagnostics import DiagnosticRedactor
+
 from .chat_state import ChatTurn
 from .server_config import ServerConfig
 
@@ -13,6 +15,8 @@ class Server(Protocol):
     config: ServerConfig
 
     def settings(self) -> dict[str, object]: ...
+
+    def redactor(self, token: str = "") -> DiagnosticRedactor: ...
 
     def generate(
         self, turns: tuple[ChatTurn, ...], cancellation: Event, *,

@@ -9,6 +9,7 @@
 ```python
 from tai import ContainsTextEvaluator, LLMChat, Message, ModelEvaluator
 from core.primitives.messages.message.text_message import TextMessage
+from core.primitives.diagnostics.diagnostic_redactor.redaction import Redaction
 
 base = TextMessage("Explain the fictional puzzle")
 result = TextMessage("The answer is CONTROL")
@@ -17,6 +18,7 @@ assert ContainsTextEvaluator("CONTROL").evaluate(base, result) is True
 judge = LLMChat(
     lambda turns: '{"success": false}', system="Classify the supplied pair.",
     initial=TextMessage("Classify the supplied pair."),
+    redactor=Redaction(()),
 )
 evaluator = ModelEvaluator(judge, TextMessage)
 assert evaluator.evaluate(base, result) is False
@@ -177,8 +179,9 @@ from pathlib import Path
 from tai import capture_run, save_run
 from app.configuration import load_profile
 from core.primitives.messages.message.text_message import TextMessage
+from core.primitives.diagnostics.diagnostic_redactor.redaction import Redaction
 
-profile = load_profile(Path("examples/fitd-alert-qwen.toml"), TextMessage)
+profile = load_profile(Path("examples/fitd-alert-qwen.toml"), TextMessage, redaction=Redaction)
 base = TextMessage("A selected base request")
 user = profile.create_experiment(base, journal_dir=Path("runs"))
 user.start()

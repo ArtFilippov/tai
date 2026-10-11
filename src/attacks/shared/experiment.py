@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import TypedDict, Unpack, override
 
 from core.evaluation.configuration import EvaluatorSetup
-from core.primitives.diagnostics import DiagnosticRedactor
 from core.runs.journal import RunJournal
 from core.runs.journal_ports import Journal
 
@@ -86,7 +85,7 @@ class Experiment(ExecutionUser):
         chats = self._settings.chats
         configuration = self._settings.configuration
         setup = self._observation.setup
-        redactor = DiagnosticRedactor.combine(*(chat.redactor for chat in chats.values()))
+        redactor = chats["Target"].redactor.combine(*(chat.redactor for chat in chats.values()))
 
         def participants() -> dict[str, object]:
             return {role: chat.diagnostic_settings(redactor) for role, chat in chats.items()}

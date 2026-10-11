@@ -55,9 +55,11 @@ from tai import (
     capture_run, save_run,
 )
 from core.primitives.messages.message.text_message import TextMessage
+from core.primitives.diagnostics.diagnostic_redactor.redaction import Redaction
 
 experiment = BadCharactersDeletionExperiment(
-    LLMChat(lambda turns: "Complete example answer"), TextMessage("Explain π\ncompletely."),
+    LLMChat(lambda turns: "Complete example answer", redactor=Redaction(())),
+    TextMessage("Explain π\ncompletely."),
     ContainsTextEvaluator("Complete"), journal_dir="runs",
     perturbation_budget=1, max_position_candidates=8, max_ascii_variants=4,
 )

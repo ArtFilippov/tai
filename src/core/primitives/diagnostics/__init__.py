@@ -1,5 +1,6 @@
 """Detached diagnostic values and their redaction policy."""
 
-from .redaction import DiagnosticObject, DiagnosticRedactor
+from .diagnostic_redactor.diagnostic_redactor import DiagnosticRedactor
+from .redaction_factory.redaction_factory import RedactionFactory
 
-__all__ = ["DiagnosticObject", "DiagnosticRedactor"]
+__all__ = ["DiagnosticRedactor", "RedactionFactory"]

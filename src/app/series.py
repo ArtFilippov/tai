@@ -14,6 +14,7 @@ from alert.manifest import load_alert_manifest
 from alert.records import AlertManifest
 from attacks.shared.contracts import GARAK_REVISION
 from core.primitives.messages import Message
+from core.primitives.diagnostics import RedactionFactory
 from core.runs.console_journal import ConsoleRunJournal
 
 from .configuration import RoleProfile, load_profile
@@ -88,14 +89,16 @@ def _series_files(
 
 
 def _prepare_series(
-    manifest_path: Path, profile_path: Path, artifacts_dir: Path, *,
-    taxonomy_path: Path, create: Callable[[str], Message],
+    paths: dict[str, Path], artifacts_dir: Path, *, create: Callable[[str], Message],
+    redaction: RedactionFactory,
 ) -> tuple[AlertManifest, RoleProfile, SeriesFiles]:
     directory = artifacts_dir / str(uuid4())
-    paths = {"manifest": manifest_path, "profile": profile_path, "taxonomy": taxonomy_path}
     inputs = {name: path.read_bytes() for name, path in paths.items()}
-    manifest = load_alert_manifest(manifest_path, taxonomy_path=taxonomy_path)
-    profile = load_profile(profile_path, create, alert_series=True, server_log=directory / "vllm.log")
+    manifest = load_alert_manifest(paths["manifest"], taxonomy_path=paths["taxonomy"])
+    profile = load_profile(
+        paths["profile"], create, alert_series=True, server_log=directory / "vllm.log",
+        redaction=redaction,
+    )
     if any(path.read_bytes() != inputs[name] for name, path in paths.items()):
         raise ValueError("Series input files changed during validation")
     return manifest, profile, _series_files(profile, paths, inputs, directory)
@@ -112,8 +115,10 @@ def _limits(options: SeriesOptions) -> tuple[int, int]:
 
 
 def run_alert_series(
-    manifest_path: Path, profile_path: Path, artifacts_dir: Path, create: Callable[[str], Message],
-    *, taxonomy_path: Path, **options: Unpack[SeriesOptions],
+    manifest_path: Path, profile_path: Path, artifacts_dir: Path,
+    creators: tuple[Callable[[str], Message], RedactionFactory],
+    *, taxonomy_path: Path,
+    **options: Unpack[SeriesOptions],
 ) -> SeriesResult:
     """Validate all inputs, then admit independent strategy workers in manifest order.
 
@@ -125,7 +130,7 @@ def run_alert_series(
         manifest_path (Path): Validated saved ALERT selection.
         profile_path (Path): Pinned participant TOML configuration.
         artifacts_dir (Path): Parent of the new unique series directory.
-        create (Callable[[str], Message]): Assembled textual result constructor.
+        creators (tuple[Callable[[str], Message], RedactionFactory]): Message and diagnostic assembly.
         taxonomy_path (Path): Pinned local taxonomy document.
         **options (Unpack[SeriesOptions]): Positive jobs (default 4) and lines_per_attack (default 5).
 
@@ -135,7 +140,7 @@ def run_alert_series(
     """
     limits = _limits(options)
     manifest, profile, store = _prepare_series(
-        manifest_path, profile_path, artifacts_dir,
-        taxonomy_path=taxonomy_path, create=create,
+        {"manifest": manifest_path, "profile": profile_path, "taxonomy": taxonomy_path},
+        artifacts_dir, create=creators[0], redaction=creators[1],
     )
-    return _execute_series(manifest, profile, store, limits, create_message=create)
+    return _execute_series(manifest, profile, store, limits, create_message=creators[0])

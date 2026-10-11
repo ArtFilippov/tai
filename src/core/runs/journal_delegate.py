@@ -3,7 +3,6 @@
 from typing import override
 
 from core.primitives.diagnostics import DiagnosticRedactor
-from core.primitives.diagnostics.json_values import JSONValue
 
 from .journal_ports import Journal
 from .status import UserStatus
@@ -42,11 +41,11 @@ class JournalDelegate(Journal):
         self._journal.check()
 
     @override
-    def settings(self) -> JSONValue:
+    def settings(self) -> object:
         return self._journal.settings()
 
     @override
-    def final_settings(self) -> JSONValue:
+    def final_settings(self) -> object:
         return self._journal.final_settings()
 
     @override

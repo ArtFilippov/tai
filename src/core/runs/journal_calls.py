@@ -3,7 +3,6 @@
 from typing import TypedDict
 
 from core.chats import ChatCancelled
-from core.primitives.diagnostics import DiagnosticObject
 from core.primitives.messages import Message
 
 from .journal_values import context_data, operation_value
@@ -23,7 +22,7 @@ class CallInputs(TypedDict, total=False):
     base: Message | None
     result: Message | None
     evaluation_id: str | None
-    settings: DiagnosticObject | None
+    settings: object
 
 
 def call_data(operation: str, inputs: CallInputs) -> dict[str, object]:

@@ -7,7 +7,7 @@ from pathlib import Path
 from threading import Event
 from typing import Unpack, override
 
-from core.primitives.diagnostics import DiagnosticObject
+from core.primitives.diagnostics import DiagnosticRedactor
 from core.primitives.messages import Message
 
 from .conversation import ChatTurn, LLMChat
@@ -39,36 +39,37 @@ class QwenChat(LLMChat, ContinuationScorer):
     Matching model/revision/device/dtype share weights while any chat retains them.
 
     Args:
-        model (str): Hugging Face owner/model identity.
-        revision (str): Full pinned commit hash.
+        model (tuple[str, str]): Hugging Face model identity and full pinned revision.
         cache_dir (str | Path): Prepared local Hub cache.
         device (str): Explicit CUDA device.
         initial (Message | None): Prepared system turn, when present.
-        **options (Unpack[QwenOptions]): Dtype, system instructions and generation parameters.
+        redactor (DiagnosticRedactor): Policy for detached diagnostics.
+        **options (Unpack[QwenOptions]): Dtype, system and generation.
 
     Raises:
         TypeError: An unknown constructor option was supplied.
     """
 
     def __init__(
-        self, *, model: str, revision: str, cache_dir: str | Path,
-        device: str, initial: Message | None, **options: Unpack[QwenOptions],
+        self, *, model: tuple[str, str], cache_dir: str | Path, device: str,
+        initial: Message | None, redactor: DiagnosticRedactor, **options: Unpack[QwenOptions],
     ) -> None:
         if unknown := options.keys() - {"dtype", "system", "generation"}:
             raise TypeError(f"Unexpected QwenChat options: {', '.join(sorted(unknown))}")
-        checkpoint = local_checkpoint(model, revision, cache_dir, device)
+        checkpoint = local_checkpoint(model[0], model[1], cache_dir, device)
         self._checkpoint = replace(checkpoint, cache=checkpoint.cache.expanduser().resolve())
         dtype = validate_dtype(options.get("dtype", "float16"))
         self._generation = generation_config(options.get("generation"))
         self._system = validate_system(options.get("system", ""))
         super().__init__(
-            lambda turns: "", initial=initial, model=model, system=self._system,
+            lambda turns: "", initial=initial, model=model[0], system=self._system,
+            redactor=redactor,
         )
         self._executor = shared_executor(self._checkpoint, dtype)
 
     @override
-    def settings(self) -> DiagnosticObject:
-        return self._redactor.snapshot({
+    def settings(self) -> dict[str, object] | list[object]:
+        return self._redactor.structured({
             **super()._settings(), "backend": "qwen",
             "revision": self._checkpoint.revision, "cache_dir": str(self._checkpoint.cache),
             "device": self._executor.device, "dtype": self._executor.dtype,

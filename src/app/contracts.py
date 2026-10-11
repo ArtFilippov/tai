@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, TypedDict, Unpack, override
 
-from core.primitives.diagnostics import DiagnosticObject, DiagnosticRedactor
+from core.primitives.diagnostics import DiagnosticRedactor
 from core.primitives.messages import Message
 from core.primitives.messages.message.message_factory import MessageFactory
 from core.runs import RunSnapshot, UserStatus
@@ -22,7 +22,7 @@ class EventView(Protocol):
     def kind(self) -> str: ...
 
     @property
-    def data(self) -> DiagnosticObject: ...
+    def data(self) -> dict[str, object] | list[object]: ...
 
 
 class JournalView(Protocol):
@@ -55,7 +55,7 @@ class ObservationInputs(TypedDict, total=False):
     result: Message | None
     evaluation_id: str | None
     checkpoint_id: str | None
-    settings: DiagnosticObject | None
+    settings: object
 
 
 class ReadinessJournal(JournalView, Protocol):

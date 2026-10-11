@@ -9,6 +9,7 @@ from tai import (
     save_run,
 )
 from core.primitives.messages.message.text_message import TextMessage
+from core.primitives.diagnostics.diagnostic_redactor.redaction import Redaction
 
 
 def main() -> None:
@@ -22,12 +23,14 @@ def main() -> None:
     target = LLMChat(
         lambda turns: next(target_replies), model="scripted",
         system="Solve the puzzle", initial=TextMessage("Solve the puzzle"),
+        redactor=Redaction(()),
     )
     attacker = LLMChat(
         lambda turns: next(attacker_replies),
         model="scripted",
         system="Build puzzle clues",
         initial=TextMessage("Build puzzle clues"),
+        redactor=Redaction(()),
     )
     experiment = FITDExperiment(
         target,

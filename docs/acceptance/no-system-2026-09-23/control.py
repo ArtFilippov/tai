@@ -30,6 +30,7 @@ from attacks.fitd.native_configuration import configure, prepare_goal
 from attacks.fitd.profile import EnglishLanguage, FITDProfile
 from attacks.shared.contracts import GARAK_REVISION
 from core.primitives.messages.message.text_message import TextMessage
+from core.primitives.diagnostics.diagnostic_redactor.redaction import Redaction
 
 
 ENVIRONMENT = (
@@ -244,7 +245,7 @@ def main():
                               "--query-gpu=uuid,name,memory.free,driver_version", "--format=csv"),
         "attacker_calls": [], "model_inputs": [], "completed": False,
     }
-    with closing(load_profile(args.profile, TextMessage)) as profile:
+    with closing(load_profile(args.profile, TextMessage, redaction=Redaction)) as profile:
         chats = (profile.target, profile.attacker, profile.evaluator.chat)
         assert all(chat is not None and chat.history() == () for chat in chats)
         assert all(chat.settings()["backend"] == "qwen" for chat in chats)

@@ -5,11 +5,14 @@ from pathlib import Path
 from core.chats.qwen_config import local_checkpoint
 from core.chats.qwen_server import QwenServer
 from core.chats.server_config import ServerConfig, ServerLimits, positive_integer, positive_number
+from core.primitives.diagnostics import RedactionFactory
 
 from .configuration_values import string, table
 
 
-def create_server(value: object, log_path: Path) -> QwenServer | None:
+def create_server(
+    value: object, log_path: Path, redaction: RedactionFactory,
+) -> QwenServer | None:
     if value is None:
         return None
     data = table(value, "server", {
@@ -31,4 +34,4 @@ def create_server(value: object, log_path: Path) -> QwenServer | None:
     return QwenServer(ServerConfig(
         checkpoint, Path(string(data.get("python"), "server.python")).expanduser(), limits,
         string(data.get("dtype", "float16"), "server.dtype"),
-    ), log_path)
+    ), log_path, redaction)

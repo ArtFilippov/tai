@@ -630,16 +630,17 @@ backend независимо. Общий `RoleProfile` содержит `LLMChat
 
 ```python
 from tai import QwenChat
+from core.primitives.diagnostics.diagnostic_redactor.redaction import Redaction
 from core.primitives.messages.message.text_message import TextMessage
 
 chat = QwenChat(
-    model="Qwen/Qwen2.5-0.5B-Instruct",
-    revision="7ae557604adf67be50417f59c2c2f167def9a775",
+    model=("Qwen/Qwen2.5-0.5B-Instruct", "7ae557604adf67be50417f59c2c2f167def9a775"),
     cache_dir="~/.cache/tai/huggingface",
     device="cuda:0",
     dtype="float16",
     system="Help solve fictional puzzles.",
     initial=TextMessage("Help solve fictional puzzles."),
+    redactor=Redaction(()),
     generation={"max_new_tokens": 512, "do_sample": False},
 )
 response = chat.send(TextMessage("Reply with exactly READY."))
@@ -853,7 +854,7 @@ CLI обрабатывает Ctrl+C: обработчик только выст�
 - `Message` — контракт неизменяемого текста; `TextMessage(text)` из
   `core.primitives.messages.message.text_message` создаёт результат с уникальным `id`, методами `base()`,
   `to_string()`, `transform()`, `revert()`, `spawn()` и JSON-снимком `dump()`.
-- `LLMChat(generate, model="…", system="…", initial=TextMessage(system))` — владелец истории.
+- `LLMChat(generate, model="…", system="…", initial=TextMessage(system), redactor=Redaction(()))` — владелец истории.
   При непустой системной инструкции требуется отдельное подготовленное Message. Синхронный
   `send(Message)` передаёт функции `generate` неизменяемый кортеж `ChatTurn`
   с ролями и полным контекстом; функция возвращает строку. В историю попадает
@@ -861,7 +862,7 @@ CLI обрабатывает Ctrl+C: обработчик только выст�
   `checkpoint()`, `restore(point)` и `reset()` управляют активным разговором;
   `settings()` возвращает отдельный JSON-совместимый снимок настроек и истории.
   Свойство `conversation_id` — UUID актуального разговора, также включённый в снимок.
-- `LLMChat.cancellable(generate, create=TextMessage, model="…", system="…")` — та же история,
+- `LLMChat.cancellable(generate, create=TextMessage, model="…", system="…", redactor=Redaction(()))` — та же история,
   но `generate(turns, cancellation)` получает также `threading.Event` отмены.
   `cancel()` выставляет сигнал активного обмена и возвращает `None`; без активного
   обмена ничего не меняет. Генератор завершает своё выполнение и очистку ресурсов
@@ -1017,11 +1018,14 @@ LLMChat. Сам garak выбирает продолжение, перефраз�
 
 ```python
 from tai import OpenAIChat
+from core.primitives.diagnostics.diagnostic_redactor.redaction import Redaction
+from core.primitives.messages.message.text_message import TextMessage
 
 target = OpenAIChat(
     base_url="http://127.0.0.1:8000/v1",
     model="your-model",
     system="Solve the fictional puzzle",
+    initial=TextMessage("Solve the fictional puzzle"), redaction=Redaction,
     generation={"temperature": 0.25, "max_tokens": 256},
     timeout=120.0,
 )
@@ -1029,6 +1033,7 @@ attacker = OpenAIChat(
     base_url="http://127.0.0.1:8000/v1",
     model="your-model",
     system="Build fictional puzzle clues",
+    initial=TextMessage("Build fictional puzzle clues"), redaction=Redaction,
     generation={"temperature": 0.75},
 )
 ```

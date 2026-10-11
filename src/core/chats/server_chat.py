@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from threading import Event
 from typing import override
 
-from core.primitives.diagnostics import DiagnosticObject, DiagnosticRedactor
+from core.primitives.diagnostics import DiagnosticRedactor
 from core.primitives.messages import Message
 
 from .conversation import ChatTurn, LLMChat
@@ -19,7 +19,7 @@ class QwenServerChat(LLMChat):
     ) -> None:
         super().__init__(
             lambda turns: "", initial=initial,
-            model=server.config.checkpoint.model, system=system,
+            model=server.config.checkpoint.model, system=system, redactor=server.redactor(),
         )
         self._server = server
         self._generation = dict(generation or {})
@@ -31,12 +31,14 @@ class QwenServerChat(LLMChat):
         return self._server.generate(turns, cancellation, generation=self._generation, timeout=self._timeout)
 
     @override
-    def settings(self) -> DiagnosticObject:
+    def settings(self) -> dict[str, object] | list[object]:
         return self._diagnostic_settings(self.redactor)
 
     @override
-    def _diagnostic_settings(self, redactor: DiagnosticRedactor) -> DiagnosticObject:
-        return redactor.snapshot({
+    def _diagnostic_settings(
+        self, redactor: DiagnosticRedactor,
+    ) -> dict[str, object] | list[object]:
+        return redactor.structured({
             **super()._settings(), "backend": "vllm", "server": self._server.settings(),
             "timeout": self._timeout, "generation": http_generation(self._generation),
         })

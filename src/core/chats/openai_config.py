@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import TypedDict
 from urllib.parse import urlsplit
 
-from core.primitives.diagnostics import DiagnosticRedactor
+from core.primitives.diagnostics import DiagnosticRedactor, RedactionFactory
 
 
 class OpenAIOptions(TypedDict, total=False):
@@ -87,7 +87,9 @@ class Authorization:
     redactor: DiagnosticRedactor
 
 
-def _authorization(options: OpenAIOptions) -> Authorization:
+def _authorization(
+    options: OpenAIOptions, redaction: RedactionFactory,
+) -> Authorization:
     api_key = _credential(options.get("api_key"))
     authorization = _credential(options.get("authorization"))
     if api_key is not None and authorization is not None:
@@ -96,7 +98,7 @@ def _authorization(options: OpenAIOptions) -> Authorization:
     return Authorization(
         f"Bearer {api_key}" if api_key is not None else authorization,
         "api_key" if api_key is not None else "explicit" if authorization is not None else "none",
-        DiagnosticRedactor(value for value in values if value),
+        redaction(tuple(value for value in values if value)),
     )
 
 
@@ -109,7 +111,10 @@ class OpenAIConfig:
     session: bool
 
 
-def connection_config(base_url: str, options: OpenAIOptions) -> OpenAIConfig:
+def connection_config(
+    base_url: str, options: OpenAIOptions,
+    redaction: RedactionFactory,
+) -> OpenAIConfig:
     if unknown := options.keys() - {
         "api_key", "authorization", "system", "generation", "timeout", "opencode_session",
     }:
@@ -118,7 +123,7 @@ def connection_config(base_url: str, options: OpenAIOptions) -> OpenAIConfig:
     if not math.isfinite(timeout) or timeout <= 0:
         raise ValueError("timeout must be positive and finite")
     return OpenAIConfig(
-        _base_url(base_url), _authorization(options),
+        _base_url(base_url), _authorization(options, redaction),
         _generation(options.get("generation")), timeout,
         _session(options.get("opencode_session", False)),
     )

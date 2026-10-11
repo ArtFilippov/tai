@@ -12,6 +12,7 @@ from alert.preparation import prepare_alert
 from alert.report import reconstruct_report
 from attacks.shared.contracts import FITD, THREATEN_JSON
 from core.primitives.messages import Message
+from core.primitives.diagnostics import RedactionFactory
 
 from .arguments import parse_arguments
 from .configuration import load_profile
@@ -22,10 +23,13 @@ from .terminal import run_profile
 THREATEN_COMMAND = "threaten-json"
 
 
-def _series(args: argparse.Namespace, create: Callable[[str], Message]) -> int:
-    result = run_alert_series(args.manifest, args.profile, args.artifacts_dir, create,
-                              taxonomy_path=args.taxonomy,
-                              jobs=args.jobs, lines_per_attack=args.lines_per_attack)
+def _series(
+    args: argparse.Namespace, create: Callable[[str], Message],
+    redaction: RedactionFactory,
+) -> int:
+    result = run_alert_series(args.manifest, args.profile, args.artifacts_dir, (create, redaction),
+                               taxonomy_path=args.taxonomy,
+                               jobs=args.jobs, lines_per_attack=args.lines_per_attack)
     print(f"Серия: {result.directory}", file=sys.stderr)
     if result.exit_code == 1:
         print(f"Ошибки запуска или сохранения: {result.directory / 'index.json'}", file=sys.stderr)
@@ -45,9 +49,12 @@ def _prepare(args: argparse.Namespace) -> int:
     return 0
 
 
-def _preflight(args: argparse.Namespace, create: Callable[[str], Message]) -> int:
+def _preflight(
+    args: argparse.Namespace, create: Callable[[str], Message],
+    redaction: RedactionFactory,
+) -> int:
     with closing(load_profile(
-        args.config, create,
+        args.config, create, redaction=redaction,
         server_log=(args.report or Path("runs/preflight.json")).with_suffix(".vllm.log"),
     )) as profile:
         return run_preflight(profile, create, args.report)
@@ -60,9 +67,14 @@ def _base_request(text: str | None, path: Path | None, create: Callable[[str], M
     return create(text)
 
 
-def _attack(args: argparse.Namespace, create: Callable[[str], Message]) -> int:
+def _attack(
+    args: argparse.Namespace, create: Callable[[str], Message],
+    redaction: RedactionFactory,
+) -> int:
     base = _base_request(args.text, args.text_file, create)
-    with closing(load_profile(args.config, create, server_log=args.artifacts_dir / "vllm.log")) as profile:
+    with closing(load_profile(
+        args.config, create, server_log=args.artifacts_dir / "vllm.log", redaction=redaction,
+    )) as profile:
         if args.command == FITD and profile.attack_type != FITD:
             raise ValueError("tai fitd требует attack.type=fitd; используйте tai attack")
         if args.command == THREATEN_COMMAND and profile.attack_type != THREATEN_JSON:
@@ -70,13 +82,18 @@ def _attack(args: argparse.Namespace, create: Callable[[str], Message]) -> int:
         return run_profile(profile, base, args.artifacts_dir)
 
 
-def main(argv: list[str] | None = None, *, create: Callable[[str], Message]) -> int:
+def main(
+    argv: list[str] | None = None, *, create: Callable[[str], Message],
+    redaction: RedactionFactory,
+) -> int:
     args = parse_arguments(argv)
     commands = {
-        "attack": partial(_attack, create=create), "fitd": partial(_attack, create=create),
-        THREATEN_COMMAND: partial(_attack, create=create),
-        "preflight": partial(_preflight, create=create),
-        "prepare-alert": _prepare, "alert-series": partial(_series, create=create),
+        "attack": partial(_attack, create=create, redaction=redaction),
+        "fitd": partial(_attack, create=create, redaction=redaction),
+        THREATEN_COMMAND: partial(_attack, create=create, redaction=redaction),
+        "preflight": partial(_preflight, create=create, redaction=redaction),
+        "prepare-alert": _prepare,
+        "alert-series": partial(_series, create=create, redaction=redaction),
         "alert-report": _report,
     }
     try:

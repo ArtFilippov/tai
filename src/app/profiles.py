@@ -33,7 +33,7 @@ class ParticipantProfile:
         return chats
 
     def redactor(self) -> DiagnosticRedactor:
-        return DiagnosticRedactor.combine(*(chat.redactor for chat in self.chats().values()))
+        return self.target.redactor.combine(*(chat.redactor for chat in self.chats().values()))
 
     def settings(self) -> dict[str, object]:
         redactor = self.redactor()

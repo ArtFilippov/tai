@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from typing import override
 
 from core.primitives.diagnostics import DiagnosticRedactor
-from core.primitives.diagnostics.json_values import JSONValue
 
 from .journal_configuration import JournalConfiguration, JournalOptions
 from .journal_output import JournalOutput
@@ -23,19 +22,19 @@ __all__ = ["JournalConfiguration", "JournalLifecycle", "JournalOptions"]
 
 @dataclass
 class _ConfigurationSnapshots:
-    initial: JSONValue = None
-    final: JSONValue = None
+    initial: object = None
+    final: object = None
 
 
 class JournalLifecycle(JournalLifecyclePort):
     def __init__(
-        self, *, redactor: DiagnosticRedactor | None = None,
+        self, *, redactor: DiagnosticRedactor,
         max_calls_per_conv: int | None = None,
         settings: Callable[[], Mapping[str, object]] = dict,
         final_settings: Callable[[], Mapping[str, object]] = dict,
     ) -> None:
         super().__init__()
-        self.redactor = redactor or DiagnosticRedactor()
+        self.redactor: DiagnosticRedactor = redactor
         self._configuration = JournalConfiguration(settings, final_settings)
         self._snapshots = _ConfigurationSnapshots()
         self._output: JournalOutputPort = JournalOutput()
@@ -92,26 +91,26 @@ class JournalLifecycle(JournalLifecyclePort):
             raise
 
     @override
-    def settings(self) -> JSONValue:
+    def settings(self) -> object:
         """Return detached settings observed at initialization, if available.
 
         Returns:
-            JSONValue: Detached initial configuration, or None before capture.
+            object: Detached initial configuration, or None before capture.
         """
         with self._state.lock:
             return deepcopy(self._snapshots.initial)
 
     @override
-    def final_settings(self) -> JSONValue:
+    def final_settings(self) -> object:
         """Return participant settings captured before ownership release.
 
         Returns:
-            JSONValue: Detached final configuration, or None before capture.
+            object: Detached final configuration, or None before capture.
         """
         with self._state.lock:
             return deepcopy(self._snapshots.final)
 
-    def _capture_initial_settings(self) -> JSONValue:
+    def _capture_initial_settings(self) -> object:
         snapshot = self.redactor.snapshot(operation_value(self._configuration.source()))
         with self._state.lock:
             self._snapshots.initial = snapshot

@@ -5,7 +5,7 @@ from importlib.metadata import version
 from threading import Event
 from typing import Unpack, override
 
-from core.primitives.diagnostics import DiagnosticObject, DiagnosticRedactor
+from core.primitives.diagnostics import DiagnosticRedactor, RedactionFactory
 from core.primitives.messages import Message
 
 from .conversation import ChatCancelled, ChatTurn, LLMChat
@@ -37,28 +37,32 @@ class OpenAIChat(LLMChat):
         base_url (str): HTTP(S) API root.
         model (str): Explicit model identifier.
         initial (Message | None): Prepared system turn, when present.
+        redaction (RedactionFactory): Credential-aware diagnostic policy factory.
         **options (Unpack[OpenAIOptions]): Authorization, system, generation,
             timeout and opt-in OpenCode session configuration.
     """
 
     def __init__(
         self, *, base_url: str, model: str, initial: Message | None,
+        redaction: RedactionFactory,
         **options: Unpack[OpenAIOptions],
     ) -> None:
-        config = connection_config(base_url, options)
+        config = connection_config(base_url, options, redaction)
         super().__init__(
             lambda turns: "", initial=initial, model=validate_text(model, "model", nonempty=True),
             system=validate_text(options.get("system", ""), "system"),
+            redactor=config.authorization.redactor,
         )
         self._config = config
-        self._redactor = config.authorization.redactor
 
     @override
-    def settings(self) -> DiagnosticObject:
-        return self._diagnostic_settings(self._redactor)
+    def settings(self) -> dict[str, object] | list[object]:
+        return self._diagnostic_settings(self.redactor)
 
     @override
-    def _diagnostic_settings(self, redactor: DiagnosticRedactor) -> DiagnosticObject:
+    def _diagnostic_settings(
+        self, redactor: DiagnosticRedactor,
+    ) -> dict[str, object] | list[object]:
         # A run supplies all roles' credentials before any replacement, ensuring
         # overlapping credentials and resulting key collisions share one policy.
         settings = {
@@ -69,9 +73,11 @@ class OpenAIChat(LLMChat):
             "authorization": self._config.authorization.mode,
             "timeout": self._config.timeout,
             "opencode_session": self._config.session,
-            "generation": redactor.snapshot(json.loads(self._config.generation), mask_fields=True),
+            "generation": redactor.structured(
+                json.loads(self._config.generation), mask_fields=True,
+            ),
         }
-        return redactor.snapshot(settings)
+        return redactor.structured(settings)
 
     def _request(self, turns: tuple[ChatTurn, ...]) -> bytes:
         headers = {
@@ -97,4 +103,4 @@ class OpenAIChat(LLMChat):
         if cancellation.is_set():
             raise ChatCancelled()
         result = exchange(self._request(turns), cancellation, self._config.timeout)
-        return completion(result, self._redactor)
+        return completion(result, self.redactor)

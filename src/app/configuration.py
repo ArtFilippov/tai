@@ -22,12 +22,16 @@ from attacks.autodan.genetic import require_hga_resources
 from attacks.autodan.profile import HGA
 from attacks.badchars.profile import deletion_profile
 from attacks.dra.profile import dra_profile
-from attacks.shared.contracts import ADAPTIVE_ATTACKS, AUTODAN, BADCHARS_DELETION, DRA, FITD, GOAT, THREATEN_JSON, StrategyConfiguration, AttackType
+from attacks.shared.contracts import (
+    ADAPTIVE_ATTACKS, AUTODAN, BADCHARS_DELETION, DRA, FITD, GOAT, THREATEN_JSON,
+    StrategyConfiguration,
+)
 from attacks.shared.experiment import Experiment
 from core.evaluation.assembly import EvaluatorSetup
 from core.evaluation.model_evaluator import ANSWER_RUBRIC_VERSION, MODEL_RUBRIC_VERSION
 from core.chats import LLMChat
 from core.chats.qwen_server import QwenServer
+from core.primitives.diagnostics import RedactionFactory
 from core.primitives.messages import Message
 from core.runs.journal import RunJournal
 from core.runs.journal_ports import Journal
@@ -135,11 +139,14 @@ def _read_config(config: Path) -> dict[str, object]:
 
 
 def _model_setup(value: object, server: QwenServer | None, rubric: str,
-                 create: Callable[[str], Message]) -> Callable[[], EvaluatorSetup]:
+                 create: Callable[[str], Message],
+                 *, redaction: RedactionFactory) -> Callable[[], EvaluatorSetup]:
     evaluation = table(value, "evaluator", {"type", "rubric_version", "chat"})
     if string(evaluation.get("rubric_version"), "evaluator.rubric_version") != rubric:
         raise ValueError(f"evaluator.rubric_version: требуется {rubric}")
-    factory = chat_factory(evaluation.get("chat"), "evaluator.chat", create, server)
+    factory = chat_factory(
+        evaluation.get("chat"), "evaluator.chat", create, server, redaction=redaction,
+    )
     def answer() -> EvaluatorSetup:
         chat = factory()
         setup = EvaluatorSetup.answer(chat, create)
@@ -151,9 +158,11 @@ def _model_setup(value: object, server: QwenServer | None, rubric: str,
 
 
 def _evaluator(value: object, server: QwenServer | None, create: Callable[[str], Message],
-               *, alert_series: bool, attack_type: AttackType) -> Callable[[], EvaluatorSetup]:
+               profile: tuple[bool, str], *,
+               redaction: RedactionFactory) -> Callable[[], EvaluatorSetup]:
     evaluation = table(value, "evaluator")
     kind = evaluation.get("type")
+    alert_series, attack_type = profile
     if (alert_series or attack_type == THREATEN_JSON) and kind != MODEL_EVALUATOR:
         raise ValueError("ThreatenJSON requires evaluator.type=model" if attack_type == THREATEN_JSON
                          else "ALERT series requires evaluator.type=model")
@@ -164,13 +173,14 @@ def _evaluator(value: object, server: QwenServer | None, create: Callable[[str],
         return _model_setup(
             evaluation, server,
             ANSWER_RUBRIC_VERSION if attack_type == THREATEN_JSON else MODEL_RUBRIC_VERSION,
-            create,
+            create, redaction=redaction,
         )
     raise ValueError("evaluator.type: поддерживается contains_text или model")
 
 
 def load_profile(config: Path, create: Callable[[str], Message], *, alert_series: bool = False,
-                 server_log: Path = DEFAULT_SERVER_LOG) -> RoleProfile:
+                 server_log: Path = DEFAULT_SERVER_LOG,
+                 redaction: RedactionFactory) -> RoleProfile:
     """Build one validated profile shared by readiness and terminal experiments.
 
     Args:
@@ -178,20 +188,21 @@ def load_profile(config: Path, create: Callable[[str], Message], *, alert_series
         create (Callable[[str], Message]): Assembled textual result constructor.
         alert_series (bool, default=False): Require the pinned ALERT model evaluator.
         server_log (Path, default=DEFAULT_SERVER_LOG): Separate server process output.
+        redaction (RedactionFactory): Assembly of independent diagnostic policies.
 
     Returns:
         RoleProfile: Independent chats and a reusable evaluator, without inference.
     """
     data = table(_read_config(config), "config", {"attack", "target", "attacker", "evaluator", "run", "server"})
     strategy = attack_configuration(data)
-    server = create_server(data.get("server"), server_log)
+    server = create_server(data.get("server"), server_log, redaction)
     return ProfileAssembly(
-        chat_factory(data.get("target"), "target", create, server),
-        chat_factory(data.get("attacker"), "attacker", create, server)
+        chat_factory(data.get("target"), "target", create, server, redaction=redaction),
+        chat_factory(data.get("attacker"), "attacker", create, server, redaction=redaction)
         if strategy.attack_type in (FITD, GOAT, AUTODAN) else None,
         _evaluator(
-            data.get("evaluator"), server, create,
-            alert_series=alert_series, attack_type=strategy.attack_type,
+            data.get("evaluator"), server, create, (alert_series, strategy.attack_type),
+            redaction=redaction,
         ),
         strategy, server,
     ).create()

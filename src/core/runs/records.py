@@ -3,8 +3,7 @@
 import json
 from dataclasses import dataclass, field
 
-from core.primitives.diagnostics import DiagnosticObject, DiagnosticRedactor
-from core.primitives.diagnostics.json_values import json_object
+from core.primitives.diagnostics import DiagnosticRedactor
 
 from .status import RunSnapshot
 
@@ -16,14 +15,17 @@ class RunRecord:
     Attributes:
         snapshot (RunSnapshot): Actual finished run state and original result.
         _metadata_json (str, default=field(repr=False)): Detached metadata serialized at capture.
+        redactor (DiagnosticRedactor, default=field(repr=False, compare=False)):
+            Policy for detached metadata.
     """
 
     snapshot: RunSnapshot
     _metadata_json: str = field(repr=False)
+    redactor: DiagnosticRedactor = field(repr=False, compare=False)
 
     @property
-    def metadata(self) -> DiagnosticObject:
-        return json_object(self._metadata_json)
+    def metadata(self) -> dict[str, object] | list[object]:
+        return self.redactor.decode(self._metadata_json)
 
     def dump_metadata(self) -> str:
         return self._metadata_json
@@ -36,18 +38,16 @@ class RunEvent:
     kind: str
     timestamp: str
     _data_json: str = field(repr=False)
-    _redactor: DiagnosticRedactor = field(
-        default_factory=DiagnosticRedactor, repr=False, compare=False
-    )
+    _redactor: DiagnosticRedactor = field(repr=False, compare=False)
 
     @property
-    def data(self) -> DiagnosticObject:
+    def data(self) -> dict[str, object] | list[object]:
         """Return detached diagnostics, never a source for a live Message.
 
         Returns:
-            DiagnosticObject: A freshly decoded event snapshot.
+            dict[str, object] | list[object]: A freshly decoded event snapshot.
         """
-        return json_object(self._data_json)
+        return self._redactor.decode(self._data_json)
 
     def dump(self) -> str:
         return json.dumps(self._redactor.snapshot({

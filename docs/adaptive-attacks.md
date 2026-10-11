@@ -27,9 +27,10 @@ from tai import (
     capture_run, save_run,
 )
 from core.primitives.messages.message.text_message import TextMessage
+from core.primitives.diagnostics.diagnostic_redactor.redaction import Redaction
 
 # Офлайн-пример с управляемой моделью; вместо неё можно передать OpenAIChat/QwenChat.
-target = LLMChat(lambda turns: "Complete example answer")
+target = LLMChat(lambda turns: "Complete example answer", redactor=Redaction(()))
 experiment = AdaptiveAttacksExperiment(
     target, TextMessage("Explain {this} fictional puzzle\ncompletely."),
     ContainsTextEvaluator("Complete"), journal_dir="runs",

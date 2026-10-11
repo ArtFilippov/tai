@@ -7,7 +7,7 @@ from unittest import TestCase
 import pytest
 
 from core.chats.openai import OpenAIChat
-from core.primitives.diagnostics import DiagnosticRedactor
+from core.primitives.diagnostics.diagnostic_redactor.redaction import Redaction
 from core.primitives.messages.message.text_message import TextMessage
 from core.runs.journal import RunJournal
 
@@ -44,7 +44,7 @@ class TestTextMessage(TestCase):
         )
 
     def test_journal_redacts_escaped_message_history(self) -> None:
-        journal = RunJournal(redactor=DiagnosticRedactor(("café",)))
+        journal = RunJournal(redactor=Redaction(("café",)))
         journal.bind("run")
         journal.record("exchange", response=self.message().spawn("café").spawn('"caf\\u00e9"'))
         assert "\\u00e9" not in journal.events()[-1].dump(), (
@@ -55,8 +55,9 @@ class TestTextMessage(TestCase):
         chat = OpenAIChat(
             base_url="https://example.test/v1", model="model", initial=self.message().spawn("café"),
             api_key="key-123", generation={"note": "caf\\u00e9", "temperature": 0.5},
+            redaction=Redaction,
         )
-        redactor = DiagnosticRedactor.combine(chat.redactor, DiagnosticRedactor(("café",)))
+        redactor = Redaction(("café",)).combine(chat.redactor)
         settings = json.dumps(chat.diagnostic_settings(redactor), ensure_ascii=False)
         assert all((
             "café" not in settings, "caf\\u00e9" not in settings,

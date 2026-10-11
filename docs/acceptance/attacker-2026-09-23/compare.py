@@ -18,6 +18,7 @@ from importlib.resources import files
 from pathlib import Path
 
 from core.chats.qwen import QwenChat
+from core.primitives.diagnostics.diagnostic_redactor.redaction import Redaction
 from core.primitives.messages.message.text_message import TextMessage
 
 
@@ -142,8 +143,10 @@ def main():
         systems["profile"] = profile["attacker"].get("system", "")
     if replay is not None:
         systems = {variant["name"]: variant["system"] for variant in replay["variants"]}
-    chats = {name: QwenChat(**config, system=system,
-                            initial=TextMessage(system) if system else None)
+    chats = {name: QwenChat(
+                 **{key: value for key, value in config.items() if key not in ("model", "revision")},
+                 model=(config["model"], config["revision"]), redactor=Redaction(()), system=system,
+                 initial=TextMessage(system) if system else None)
              for name, system in systems.items()}
     for name, chat in chats.items():
         variant = {"name": name, "system": systems[name], "responses": []}

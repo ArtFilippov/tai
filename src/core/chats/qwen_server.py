@@ -9,7 +9,7 @@ from threading import Condition, Event, Lock, Thread
 from types import TracebackType
 from typing import Self, override
 
-from core.primitives.diagnostics import DiagnosticRedactor
+from core.primitives.diagnostics import DiagnosticRedactor, RedactionFactory
 
 from .conversation import ChatCancelled, ChatTurn
 from .openai_transport import completion, exchange
@@ -66,12 +66,16 @@ class _Lifecycle:
 
 
 class QwenServer(Server):
-    def __init__(self, config: ServerConfig, log_path: Path) -> None:
+    def __init__(
+        self, config: ServerConfig, log_path: Path,
+        redaction: RedactionFactory,
+    ) -> None:
         super().__init__()
         self.config = config
         self._process: ServerProcessPort = ServerProcess(config, log_path)
         self._lifecycle = _Lifecycle()
         self._close_lock = Lock()
+        self.redaction: RedactionFactory = redaction
 
     def __enter__(self) -> Self:
         return self
@@ -90,6 +94,10 @@ class QwenServer(Server):
                 "version": self._process.version, "log_path": str(self._process.log_path),
                 "pid": self._process.pid,
             }
+
+    @override
+    def redactor(self, token: str = "") -> DiagnosticRedactor:
+        return self.redaction((token,))
 
     def _start(self) -> None:
         try:
@@ -157,7 +165,7 @@ class QwenServer(Server):
                 raise ChatCancelled()
             response = exchange(self._request(turns, parameters, timeout), cancellation, timeout)
             self._check_alive()
-            return completion(response, DiagnosticRedactor((self._process.token,)))
+            return completion(response, self.redactor(self._process.token))
 
     @override
     def close(self) -> None:

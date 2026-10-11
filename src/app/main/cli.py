@@ -1,8 +1,9 @@
 """Wire a concrete textual result into the installed command."""
 
 from app.cli import main as run
+from core.primitives.diagnostics.diagnostic_redactor.redaction import Redaction
 from core.primitives.messages.message.text_message import TextMessage
 
 
 def main() -> int:
-    return run(create=TextMessage)
+    return run(create=TextMessage, redaction=Redaction)

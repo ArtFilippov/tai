@@ -6,6 +6,8 @@ from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Unpack, override
 
+from core.primitives.diagnostics import DiagnosticRedactor
+
 from .console_ports import ConsoleRow, DisplayExchange, RowChange
 from .journal import RunJournal
 from .journal_calls import EXCHANGE, CallInputs
@@ -15,8 +17,11 @@ from .operations import Exchange, WorkerOutcome
 
 
 class ConsoleRunJournal(JournalDelegate):
-    def __init__(self, row: ConsoleRow, **options: Unpack[JournalOptions]) -> None:
-        super().__init__(RunJournal(**options))
+    def __init__(
+        self, row: ConsoleRow, *, redactor: DiagnosticRedactor,
+        **options: Unpack[JournalOptions],
+    ) -> None:
+        super().__init__(RunJournal(redactor=redactor, **options))
         self._row = row
         self._methods: list[str] = []
 

@@ -7,7 +7,7 @@ from collections.abc import Callable
 from threading import Event
 from typing import Literal, Self, override
 
-from core.primitives.diagnostics import DiagnosticObject, DiagnosticRedactor
+from core.primitives.diagnostics import DiagnosticRedactor
 from core.primitives.messages import Message
 
 from .chat_state import ChatTurn, ConversationState, ExchangeGate
@@ -48,6 +48,7 @@ class LLMChat(LLMChatProtocol):
         initial (Message | None, default=None): Prepared system turn, when present.
         model (str, default='custom'): Model identifier for reproducibility.
         system (str, default=''): Instructions retained across resets.
+        redactor (DiagnosticRedactor): Policy for detached diagnostics.
 
     Raises:
         ValueError: System instructions were not paired with a prepared Message.
@@ -60,6 +61,7 @@ class LLMChat(LLMChatProtocol):
         initial: Message | None = None,
         model: str = "custom",
         system: str = "",
+        redactor: DiagnosticRedactor,
     ) -> None:
         super().__init__()
         self.model = model
@@ -71,7 +73,7 @@ class LLMChat(LLMChatProtocol):
         turns = (ChatTurn("system", initial),) if initial is not None else ()
         self._history = ConversationState(turns, turns)
         self._execution = ExchangeGate()
-        self._redactor = DiagnosticRedactor()
+        self._redactor: DiagnosticRedactor = redactor
 
     @classmethod
     @override
@@ -82,6 +84,7 @@ class LLMChat(LLMChatProtocol):
         create: Callable[[str], Message],
         model: str = "custom",
         system: str = "",
+        redactor: DiagnosticRedactor,
     ) -> Self:
         """Use a generator that observes a per-exchange cancellation Event.
 
@@ -93,13 +96,14 @@ class LLMChat(LLMChatProtocol):
             create (Callable[[str], Message]): Assembled textual result constructor.
             model (str, default='custom'): Model identifier.
             system (str, default=''): Instructions retained across resets.
+            redactor (DiagnosticRedactor): Policy for detached diagnostics.
 
         Returns:
             Self: Independent conversation using the supplied callable.
         """
         chat = cls(
             lambda turns: "", initial=create(system) if system else None,
-            model=model, system=system,
+            model=model, system=system, redactor=redactor,
         )
         chat._generate_callable = generate
         return chat
@@ -127,16 +131,16 @@ class LLMChat(LLMChatProtocol):
             return self._history.identity
 
     @override
-    def settings(self) -> DiagnosticObject:
+    def settings(self) -> dict[str, object] | list[object]:
         """Return a detached, JSON-serializable snapshot for run reproducibility.
 
         Transport subclasses include their configuration without credential
         values. The run records this snapshot before its first exchange.
 
         Returns:
-            DiagnosticObject: Current model and completed conversation.
+            dict[str, object] | list[object]: Current model and completed conversation.
         """
-        return self._redactor.snapshot(self._settings())
+        return self._redactor.structured(self._settings())
 
     def _settings(self) -> dict[str, object]:
         with self._execution.lock:
@@ -150,10 +154,10 @@ class LLMChat(LLMChatProtocol):
             ],
         }
 
-    def _diagnostic_settings(self, redactor: DiagnosticRedactor) -> DiagnosticObject:
-        result = redactor.snapshot(self.settings())
-        assert isinstance(result, (dict, list))
-        return result
+    def _diagnostic_settings(
+        self, redactor: DiagnosticRedactor,
+    ) -> dict[str, object] | list[object]:
+        return redactor.structured(self.settings())
 
     @property
     @override
@@ -161,7 +165,9 @@ class LLMChat(LLMChatProtocol):
         return self._redactor
 
     @override
-    def diagnostic_settings(self, redactor: DiagnosticRedactor) -> DiagnosticObject:
+    def diagnostic_settings(
+        self, redactor: DiagnosticRedactor,
+    ) -> dict[str, object] | list[object]:
         return self._diagnostic_settings(redactor)
 
     @override

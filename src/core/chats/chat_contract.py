@@ -5,7 +5,7 @@ from collections.abc import Callable
 from threading import Event
 from typing import Protocol, Self
 
-from core.primitives.diagnostics import DiagnosticObject, DiagnosticRedactor
+from core.primitives.diagnostics import DiagnosticRedactor
 from core.primitives.messages import Message
 
 from .chat_state import ChatTurn, ExchangeGate
@@ -19,6 +19,7 @@ class LLMChatProtocol(Protocol):
     def cancellable(
         cls, generate: Callable[[tuple[ChatTurn, ...], Event], str], *,
         create: Callable[[str], Message],
+        redactor: DiagnosticRedactor,
         model: str = "custom", system: str = "",
     ) -> Self: ...
 
@@ -33,14 +34,16 @@ class LLMChatProtocol(Protocol):
     def conversation_id(self) -> str: ...
 
     @abstractmethod
-    def settings(self) -> DiagnosticObject: ...
+    def settings(self) -> dict[str, object] | list[object]: ...
 
     @property
     @abstractmethod
     def redactor(self) -> DiagnosticRedactor: ...
 
     @abstractmethod
-    def diagnostic_settings(self, redactor: DiagnosticRedactor) -> DiagnosticObject: ...
+    def diagnostic_settings(
+        self, redactor: DiagnosticRedactor,
+    ) -> dict[str, object] | list[object]: ...
 
     @abstractmethod
     def checkpoint(self) -> object: ...

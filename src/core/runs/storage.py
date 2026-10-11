@@ -70,7 +70,9 @@ def capture_run(
         settings = journal.settings()
         final_settings = journal.final_settings()
         redactor = journal.redactor
-    policy = redactor or DiagnosticRedactor()
+    if redactor is None:
+        raise ValueError("A diagnostic redactor is required for a bare User")
+    policy = redactor
     metadata = policy.snapshot(
         {
             **asdict(status),
@@ -79,7 +81,7 @@ def capture_run(
             "final_settings": final_settings,
         }
     )
-    return RunRecord(snapshot, render_json(metadata))
+    return RunRecord(snapshot, render_json(metadata), policy)
 
 
 def save_run(record: RunRecord, artifacts_dir: str | Path) -> Path:

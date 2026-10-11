@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Protocol, Unpack
 
 from core.primitives.diagnostics import DiagnosticRedactor
-from core.primitives.diagnostics.json_values import JSONValue
 
 from .journal_calls import CallInputs
 from .operations import WorkerOutcome
@@ -33,9 +32,9 @@ class JournalLifecyclePort(Protocol):
 
     def check(self) -> None: ...
 
-    def settings(self) -> JSONValue: ...
+    def settings(self) -> object: ...
 
-    def final_settings(self) -> JSONValue: ...
+    def final_settings(self) -> object: ...
 
     def capture_final_settings(self) -> None: ...
 

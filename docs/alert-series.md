@@ -319,11 +319,14 @@ uv run --locked tai alert-report \
 from pathlib import Path
 from app.series import run_alert_series
 from alert.report import build_series_report, classify_outcome, reconstruct_report
+from core.primitives.diagnostics.diagnostic_redactor.redaction import Redaction
+from core.primitives.messages.message.text_message import TextMessage
 
 series = run_alert_series(
     Path("examples/alert-manifest.json"),
     Path("examples/fitd-alert-vllm.toml"),
     Path("runs/alert"),
+    (TextMessage, Redaction),
     taxonomy_path=Path("ALERT_taxonomy.md"),
     jobs=4,
 )
