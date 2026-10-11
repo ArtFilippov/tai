@@ -8,24 +8,23 @@ from dataclasses import dataclass, field
 from typing import Concatenate
 from uuid import uuid4
 
-type MessageLink = Message | None
-
-
 def _new_id() -> str:
     return str(uuid4())
 
 
 @dataclass(frozen=True, slots=True)
 class Message:
-    """One immutable text version, with separate transformation and origin links.
+    """One immutable text version with separate transformation and origin links.
 
     Attributes:
         text (str): Current computed text.
         id (str, default=field(default_factory=_new_id, init=False)):
             Unique identity of this version.
-        _previous (MessageLink, default=field(default=None, init=False, repr=False, compare=False)):
+        _previous (Message | None, default=field(
+            default=None, init=False, repr=False, compare=False)):
             Previous transformation version.
-        _origin (MessageLink, default=field(default=None, init=False, repr=False, compare=False)):
+        _origin (Message | None, default=field(
+            default=None, init=False, repr=False, compare=False)):
             Source of a spawned root.
         _depth (int, default=field(default=0, init=False, repr=False, compare=False)):
             Number of transformations since the root.
@@ -33,10 +32,10 @@ class Message:
 
     text: str
     id: str = field(default_factory=_new_id, init=False)
-    _previous: MessageLink = field(
+    _previous: Message | None = field(
         default=None, init=False, repr=False, compare=False
     )
-    _origin: MessageLink = field(default=None, init=False, repr=False, compare=False)
+    _origin: Message | None = field(default=None, init=False, repr=False, compare=False)
     _depth: int = field(default=0, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
