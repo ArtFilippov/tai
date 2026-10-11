@@ -558,21 +558,6 @@ wheels = [
 ]
 
 [[package]]
-name = "jscpd"
-version = "5.4.0"
-source = { registry = "https://pypi.org/simple" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/c0/76/e852018433a600a36d28b977078cb01458077120bafe70faa4a6a6d758e0/jscpd-5.4.0-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:b69fe5e68f1ddb00ed966af93dba2238cc5a773e53fa03d5e51175c19250c019", size = 15064166, upload-time = "2026-09-30T18:11:47.429Z" },
-    { url = "https://files.pythonhosted.org/packages/b1/0d/f7df119a36a447d5ed1d2af1717eca62b0260dfc786c105619c8c057bf30/jscpd-5.4.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:a6551874b2a2eecd80642673cb5675a290144daa6e847dd80e2d78ce9a8e4b94", size = 14455131, upload-time = "2026-09-30T18:11:49.861Z" },
-    { url = "https://files.pythonhosted.org/packages/66/89/b30a749a9b0f56931e1176a7397e8878cd7bdc7f9132e5d8bb6eec42a80b/jscpd-5.4.0-py3-none-manylinux_2_34_aarch64.whl", hash = "sha256:ee6ff9142d50ac869845b16647441b5ba2877fe5440ec16c23673353536ac467", size = 16032228, upload-time = "2026-09-30T18:11:52.383Z" },
-    { url = "https://files.pythonhosted.org/packages/d9/9e/3049d1d7af74e08c3fcc301aba553c59fddd79e68f5d5ba57386418a2b4c/jscpd-5.4.0-py3-none-manylinux_2_34_x86_64.whl", hash = "sha256:5a227f4045e1f4d595a107c04cc7613e83ba49b2000f61ae71654434f9b51c49", size = 16861778, upload-time = "2026-09-30T18:11:55.196Z" },
-    { url = "https://files.pythonhosted.org/packages/8a/a9/90fe7978ec0fafea61229104b4c5e4482d927c0556ce8b20b038bfb1bf71/jscpd-5.4.0-py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:53a84dab8bab239aa7a14a24917aeefdd3e9f6a791d34b298228e0975e4b5423", size = 15932849, upload-time = "2026-09-30T18:11:57.776Z" },
-    { url = "https://files.pythonhosted.org/packages/89/85/4969878199c15e3159581f97b97965971c60cb05d17d157e71612033ff34/jscpd-5.4.0-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:7f6f7d7f53695e5d428f844200bdd98599f80dfc34a04e5f9f9782461172d08d", size = 17187397, upload-time = "2026-09-30T18:12:00.441Z" },
-    { url = "https://files.pythonhosted.org/packages/fb/48/584d5ea0c0e738bacf034e1f5eb556652b4883379685592e4eb52a7a67a9/jscpd-5.4.0-py3-none-win_amd64.whl", hash = "sha256:48bb57c7f4ae7f3ebbcd777976a678c3c72384d171a778611ce4653d03ccc911", size = 15022184, upload-time = "2026-09-30T18:12:02.874Z" },
-    { url = "https://files.pythonhosted.org/packages/37/f8/a5e28d9c85062e2ef6ff912d3e0de9edff01efd505f43dab54215edd8345/jscpd-5.4.0-py3-none-win_arm64.whl", hash = "sha256:8e2dd77c278dfaa2b09afad33e70b8ab3f0f129916b5387ed8474cc0cec0be3f", size = 14326319, upload-time = "2026-09-30T18:12:05.305Z" },
-]
-
-[[package]]
 name = "jsonschema"
 version = "4.26.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1411,6 +1396,11 @@ wheels = [
 ]
 
 [[package]]
+name = "quard-clones"
+version = "0.1.0"
+source = { git = "ssh://git@github.com/ArtFilippov/quard.git?subdirectory=rust%2Fquard-clones&rev=c6b475f7cf2092edc680a1c28a6ff1d461a69d14#c6b475f7cf2092edc680a1c28a6ff1d461a69d14" }
+
+[[package]]
 name = "ray"
 version = "2.58.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1683,13 +1673,13 @@ vllm = [
 [package.dev-dependencies]
 dev = [
     { name = "clean-architecture-linter-plugin" },
-    { name = "jscpd" },
     { name = "jsonschema" },
     { name = "packaging" },
     { name = "pydoclint" },
     { name = "pylint" },
     { name = "pyright", extra = ["nodejs"] },
     { name = "pytest" },
+    { name = "quard-clones" },
     { name = "tach" },
     { name = "tomlkit" },
 ]
@@ -1712,13 +1702,13 @@ provides-extras = ["qwen", "vllm"]
 [package.metadata.requires-dev]
 dev = [
     { name = "clean-architecture-linter-plugin", marker = "python_full_version >= '3.12'", specifier = "==1.2.2" },
-    { name = "jscpd", marker = "python_full_version >= '3.12'", specifier = "==5.4.0" },
     { name = "jsonschema", marker = "python_full_version >= '3.12'", specifier = "==4.26.0" },
     { name = "packaging", marker = "python_full_version >= '3.12'", specifier = "==25.0" },
     { name = "pydoclint", marker = "python_full_version >= '3.12'", specifier = "==0.9.1" },
     { name = "pylint", marker = "python_full_version >= '3.12'", specifier = "==4.0.8" },
     { name = "pyright", extras = ["nodejs"], marker = "python_full_version >= '3.12'", specifier = "==1.1.414" },
     { name = "pytest", marker = "python_full_version >= '3.12'", specifier = ">=8" },
+    { name = "quard-clones", marker = "python_full_version >= '3.12'", git = "ssh://git@github.com/ArtFilippov/quard.git?subdirectory=rust%2Fquard-clones&rev=c6b475f7cf2092edc680a1c28a6ff1d461a69d14" },
     { name = "tach", marker = "python_full_version >= '3.12'", specifier = "==0.35.1" },
     { name = "tomlkit", marker = "python_full_version >= '3.12'", specifier = "==0.13.3" },
 ]

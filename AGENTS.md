@@ -35,12 +35,13 @@ For a Qwen environment include `--extra qwen` in uv commands; for a shared
 Qwen/vLLM environment include both `--extra qwen --extra vllm`.
 
 Edit readability, scope and optional checks in `.quard/config.toml`, then run
-`uv run --locked --group dev python quard/apply.py --json`. This project uses
-reviewed, consumer-owned `tach.toml` boundaries. Review modules, layers,
-dependencies and exports before accepting changed layers with
-`uv run --locked --group dev python quard/init_architecture.py --accept --json`.
-Keep the gitlink, `.gitmodules`, `.quard/` settings and native configs in Git;
-only `.quard/reports/`, `.quard/logs/`, `.quard/cache/` and native caches are ignored.
+`uv run --locked --group dev python quard/apply.py --json`. This project selects
+generated contract-only architecture version 2 in `.quard/architecture.generated.json`.
+Quard regenerates the ignored `tach.toml` from source on install, apply and check;
+review its diagnostics when changing modules and exports. Keep the gitlink,
+`.gitmodules`, `.quard/` settings and consumer-owned native configs in Git;
+generated `tach.toml`, `.quard/reports/`, `.quard/logs/`, `.quard/cache/` and
+native caches are ignored.
 Run `bash quard/install.sh --project . --extra qwen` to update this environment;
 include `--extra vllm` when provisioning a shared environment. All Quard
 commands accept `--project`.

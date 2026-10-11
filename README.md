@@ -170,8 +170,8 @@ uv run --locked python examples/offline_fitd.py
 анализаторов — в `pyproject.toml` и `uv.lock`. На свежем клоне выполните
 `git submodule update --init --recursive`, затем `uv sync --locked --group dev`.
 Можно сразу клонировать `tai` с `--recurse-submodules`; нужен доступ к Quard.
-Настройки проекта находятся в `.quard/config.toml`. Принятая архитектура:
-`.quard/architecture.ready.json` и проектный `tach.toml`.
+Настройки проекта находятся в `.quard/config.toml`. Генерируемая архитектура
+версии 2 выбрана в `.quard/architecture.generated.json`; `tach.toml` создаёт Quard.
 
 Единая команда проверяет `src/` и `tests/`:
 
@@ -181,9 +181,9 @@ uv run --locked --group dev python quard/check.py
 uv run --locked --group dev python quard/check.py --json
 ```
 
-Quard запускает Pylint, Pyright, Tach, pydoclint, jscpd и независимые проверки
+Quard запускает Pylint, Pyright, Tach, pydoclint, quard-clones и независимые проверки
 структуры классов и модулей. Отдельные задания выбираются через `[checks]` в
-`.quard/config.toml`; проверка чистоты конструкторов по умолчанию выключена.
+`.quard/config.toml`; все применимые проверки включены по умолчанию.
 Все включённые анализаторы выполняются до конца. Код выхода: **0** — всё прошло,
 **1** — найдены нарушения, **2** — ошибка конфигурации или инструмента.
 Полный отчёт: `.quard/reports/latest.json`; подробные логи находятся рядом с
@@ -197,7 +197,8 @@ Quard запускает Pylint, Pyright, Tach, pydoclint, jscpd и незави
 uv run --locked --group dev python quard/apply.py --json
 ```
 
-Настройки типов находятся в `pyrightconfig.json`, архитектуры — в `tach.toml`.
+Настройки типов находятся в `pyrightconfig.json`, политика архитектуры — в
+`.quard/architecture.generated.json`; генерируемый `tach.toml` игнорируется Git.
 Runtime-тесты pytest и офлайн-пример запускаются отдельно. Регрессии инструмента:
 
 ```bash
@@ -217,8 +218,9 @@ bash quard/install.sh --project . --extra qwen
 ```
 
 В общем окружении Qwen/vLLM добавьте к обеим командам `--extra vllm`.
-Установщик сохраняет лимиты, принятую архитектуру, native `ignored-parents`
-для garak, `stubPath` и uv source/index/metadata.
+Установщик сохраняет лимиты, выбранную архитектуру, native `ignored-parents`
+для garak, `stubPath` и uv source/index/metadata. Для сборки quard-clones нужны
+Rust/Cargo и компилятор C; Git-источник закреплён в `pyproject.toml` и `uv.lock`.
 Для отдельного клона инструмента используйте `python /path/to/quard/check.py --project .`
 в подготовленном окружении проекта.
 
@@ -266,43 +268,13 @@ from core.primitives.messages import Message
 HTTP-worker находится рядом с `openai.py`; транспорт `openai_transport.py` запускает
 его по имени файла `http_worker.py`. Эта связь исполнения дополняет граф Python-импортов.
 
-[`tach.toml`](tach.toml) фиксирует файловые границы, включая `__init__.py`, и
-зависимости внутри и между компонентами. Публичные экспорты пакетов соответствуют
-их `__all__`; интерфейсы остальных модулей открывают символы без начального
-подчёркивания. Проверка учитывает импорты под `TYPE_CHECKING`;
-`exact = true` выявляет как неразрешённые зависимости, так и неиспользуемые разрешения.
-Проверки циклов и явных межслойных зависимостей включены.
-
-Карта содержит явные файловые границы. Слои назначены по ответственности:
-контракты, конфигурационные значения, разговор, валидация и учёт ALERT, записи и
-форматирование журнала, его конфигурация и порты — Domain; выполнение FITD, readiness
-и серий через внедрённые контракты, захват ошибок выполнения — UseCase;
-garak/HTTP/Qwen, наблюдение оценивания, журнал, хранение и
-файловые фасады ALERT — Infrastructure; разбор аргументов и `terminal_control` —
-Interface. Сборка конкретных зависимостей в `app` (включая `preflight`, `series`,
-`terminal` и CLI), сборка/наблюдение FITD и публичные фасады FITD/`tai` — Bootstrap.
-Этот отдельный слой сохраняется и в карте clean-architecture-плагина.
-`QwenServer` и его процесс — Infrastructure, конфигурация/порты сервера — Domain;
-параллельный координатор — UseCase. `ConsoleRunJournal` — Infrastructure,
-`ConsoleRow` — Domain, общий Rich-дисплей — Interface. `app.series` соединяет их
-через фабрику экспериментов с независимыми участниками.
-Дополнительные `cannot_depend_on` запрещают связи
-Interface → Infrastructure и Infrastructure → UseCase, которые разрешил бы один
-лишь линейный порядок слоёв. Текущие импорты остаются видимыми для диагностики:
-принятие конфигурации не подавляет нарушения границ или слоёв.
-
-Проверки модульных и внешних зависимостей выполняются через `quard/check.py`.
-
-При добавлении модуля задайте в `tach.toml` его слой, зависимости и публичный интерфейс.
-После намеренного изменения зависимостей можно выполнить
-`uv run --locked --group dev tach sync`, затем обязательно просмотреть diff:
-sync записывает фактические импорты, в том числе нежелательные. Для обычной проверки
-sync не нужен. После изменения слоёв синхронизируйте clean-architecture-плагин:
-
-```bash
-uv run --locked --group dev python quard/init_architecture.py --accept --json
-uv run --locked --group dev python quard/check.py
-```
+Выбранная в `.quard/architecture.generated.json` политика Quard строит
+`tach.toml` из обнаруженных исходных файлов, локальных контрактов и владения
+папками. Проверки Tach отслеживают модули, публичные границы, точные зависимости
+и циклы; Quard дополнительно проверяет роли папок и типы зависимостей.
+При добавлении модуля проверяйте диагностики полного `quard/check.py`:
+исправление исходников под генерируемые границы выполняется отдельно.
+Прежняя принятая конфигурация `tach.toml` сохранена в истории Git.
 
 ### Закрепление garak
 

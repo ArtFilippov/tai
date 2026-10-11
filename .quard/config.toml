@@ -1,6 +1,8 @@
-# Project policy. Apply changes with quard/apply.py.
+# Editable consumer settings. Run quard/apply.py after changing readability or scope.
+# The required Pylint profile always runs; checks below select optional independent jobs.
 [checks]
-constructor_purity = false
+constructor_purity = true
+lambda_injection = true
 lcom4 = true
 method_decorators = true
 instance_fields = true
@@ -9,20 +11,26 @@ contract_folders = true
 test_placement = true
 outer_classes = true
 free_function_placement = true
+leading_underscores = true
 encapsulated_only = true
 pyright = true
 pydoclint = true
-duplicate_detection = false
+duplicate_detection = true
 tach = true
-dependency_types = false
+dependency_types = true
 
+# Shared minimum for exact, renamed and gap-similar Python clone jobs.
+[duplication]
+min_lines = 3
+
+# Pylint's own metrics, not an AST-independent line count.
 [readability.production]
-max_line_length = 160
-max_module_lines = 300
-max_statements = 20
-max_complexity = 6
-max_branches = 4
-max_nested_blocks = 3
+max_line_length = 100
+max_module_lines = 400
+max_statements = 30
+max_complexity = 8
+max_branches = 8
+max_nested_blocks = 4
 max_locals = 10
 max_returns = 4
 max_bool_expr = 4
@@ -35,10 +43,11 @@ min_public_methods = 2
 min_similarity_lines = 4
 max_try_statements = 1
 
+# Unspecified test limits inherit production values.
 [readability.tests]
-max_module_lines = 500
-max_statements = 30
-max_complexity = 6
+max_module_lines = 800
+max_statements = 60
+max_complexity = 10
 max_branches = 10
 max_nested_blocks = 4
 max_locals = 20
@@ -49,6 +58,7 @@ max_public_methods = 30
 min_public_methods = 0
 max_try_statements = 3
 
+# Source scope: exact directory basenames, not regexes or substrings.
 [scope]
 exclude_directory_names = [
   ".git", ".venv", "venv", "__pycache__", ".mypy_cache", ".pytest_cache",

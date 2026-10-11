@@ -13,3 +13,4 @@ OPENCODE_ZEN_KEY.json
 /.quard/logs/
 /.quard/cache/
 /.tach/
+/tach.toml
