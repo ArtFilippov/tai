@@ -1,11 +1,11 @@
 """Compose independent participants and a local scoring capability."""
 
-from typing import Unpack
+from typing import Literal, Unpack
 
 from attacks.shared.assembly import participants, validate_options
 from attacks.shared.execution_state import ExecutionSettings
 from attacks.shared.user import ExecutionUser
-from core.chats import LLMChat, ModelRole
+from core.chats import LLMChat
 from core.chats.scoring import require_scorer
 from core.evaluation import Evaluator
 from core.evaluation.configuration import EvaluatorSetup, evaluator_setup
@@ -13,6 +13,8 @@ from core.primitives.messages import Message
 
 from .garak_adapter import AutoDANRuntime
 from .profile import PARAMETERS, AutoDANOptions, autodan_profile
+
+type ModelRole = Literal["Target", "Attacker", "Evaluator"]
 
 
 def execution_settings(chats: dict[ModelRole, LLMChat], base: Message, setup: EvaluatorSetup, options: AutoDANOptions) -> ExecutionSettings:

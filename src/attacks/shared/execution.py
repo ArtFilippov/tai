@@ -5,7 +5,7 @@ from threading import Thread
 from types import TracebackType
 from uuid import uuid4
 
-from core.chats.conversation import acquire_chats, release_chats
+from core.chats.reservation_utils import acquire_chats, release_chats
 from core.primitives.messages import Message
 from core.runs import RunSnapshot, UserState, UserStatus
 from core.runs.operations import Cause, ResourcesReleased, RunStarted, WorkerOutcome

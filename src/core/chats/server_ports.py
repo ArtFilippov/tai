@@ -7,7 +7,7 @@ from typing import Protocol
 
 from core.primitives.diagnostics import DiagnosticRedactor
 
-from .chat_state import ChatTurn
+from .chat_turn_contract import ChatTurn
 from .server_config import ServerConfig
 
 

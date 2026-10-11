@@ -862,7 +862,7 @@ CLI обрабатывает Ctrl+C: обработчик только выст�
   `checkpoint()`, `restore(point)` и `reset()` управляют активным разговором;
   `settings()` возвращает отдельный JSON-совместимый снимок настроек и истории.
   Свойство `conversation_id` — UUID актуального разговора, также включённый в снимок.
-- `LLMChat.cancellable(generate, create=TextMessage, model="…", system="…", redactor=Redaction(()))` — та же история,
+- `CancellableChat(generate, model="…", system="…", initial=TextMessage(system), redactor=Redaction(()))` — та же история,
   но `generate(turns, cancellation)` получает также `threading.Event` отмены.
   `cancel()` выставляет сигнал активного обмена и возвращает `None`; без активного
   обмена ничего не меняет. Генератор завершает своё выполнение и очистку ресурсов

@@ -2,9 +2,9 @@
 
 from dataclasses import replace
 from threading import Lock
+from typing import Literal
 from uuid import uuid4
 
-from core.chats import ModelRole
 from core.evaluation import evaluate
 from core.primitives.messages import Message
 from core.runs import Evaluation, Progress, UserStatus
@@ -13,6 +13,8 @@ from core.runs.operations import (
 )
 
 from .execution_state import ExecutionSettings, ExecutionState, RunStopped
+
+type ModelRole = Literal["Target", "Attacker", "Evaluator"]
 
 
 class ExecutionOperations:

@@ -3,9 +3,10 @@
 import json
 import math
 from functools import partial
+from typing import Literal
 from uuid import uuid4
 
-from core.chats import LLMChat, ModelRole
+from core.chats import LLMChat
 from core.chats.scoring import require_scorer
 from core.evaluation import Evaluator, evaluate
 from core.evaluation.configuration import EvaluatorSetup
@@ -21,6 +22,8 @@ from .contracts import ReadinessServices
 from .failure_capture import Failure
 from .failures import error_data
 from .profiles import ParticipantProfile
+
+type ModelRole = Literal["Target", "Attacker", "Evaluator"]
 
 PROMPT = "Reply with exactly READY."
 CALL_STARTED = "call_started"

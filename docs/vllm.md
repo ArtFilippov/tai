@@ -98,8 +98,8 @@ uv run --locked --extra qwen --extra vllm tai alert-report --index runs/alert-vl
 с preflight-отчётом либо в каталоге одиночного fitd.
 
 Python API: `QwenServer(ServerConfig(...), log_path)` — контекстный менеджер с
-идемпотентным `close()`. `LLMChat.cancellable(partial(server.generate,
-generation=...), ...)` создаёт самостоятельный разговор; штатная сборка использует
+идемпотентным `close()`. `CancellableChat(partial(server.generate,
+generation=...), initial=TextMessage(system), system=system, redactor=...)` создаёт самостоятельный разговор; штатная сборка использует
 `QwenServerChat`, добавляющий в диагностические настройки сервер и параметры роли.
 `settings()` показывает `not_started/starting/ready/failed/closed` без загрузки.
 При закрытии ресурс ждёт допущенные запросы и очищает группу процессов.

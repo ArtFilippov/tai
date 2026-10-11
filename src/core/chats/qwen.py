@@ -10,7 +10,8 @@ from typing import Unpack, override
 from core.primitives.diagnostics import DiagnosticRedactor
 from core.primitives.messages import Message
 
-from .conversation import ChatTurn, LLMChat
+from .chat_turn_contract import ChatTurn
+from .envelopes.conversation import LLMChat
 from .qwen_config import (
     QwenContextError, QwenError,
     QwenOptions, generation_config, local_checkpoint, validate_dtype, validate_system,
@@ -69,8 +70,8 @@ class QwenChat(LLMChat, ContinuationScorer):
 
     @override
     def settings(self) -> dict[str, object] | list[object]:
-        return self._redactor.structured({
-            **super()._settings(), "backend": "qwen",
+        return self.redactor.structured({
+            **super().settings_data(), "backend": "qwen",
             "revision": self._checkpoint.revision, "cache_dir": str(self._checkpoint.cache),
             "device": self._executor.device, "dtype": self._executor.dtype,
             "actual_dtype": self._executor.actual_dtype(),
@@ -80,7 +81,7 @@ class QwenChat(LLMChat, ContinuationScorer):
         })
 
     @override
-    def _generate(self, turns: tuple[ChatTurn, ...], cancellation: Event) -> str:
+    def __call__(self, turns: tuple[ChatTurn, ...], cancellation: Event) -> str:
         return self._executor.generate(
             turns, cancellation, self._generation,
             checkpoint=self._checkpoint, importer=import_module,

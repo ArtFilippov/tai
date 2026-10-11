@@ -12,7 +12,7 @@ from typing import cast
 
 from core.primitives.diagnostics import DiagnosticRedactor
 
-from .conversation import ChatCancelled
+from .envelopes.cancelled import Cancelled
 from .http_contracts import Interruption, WorkerResult
 from .openai_errors import (
     OpenAIAuthenticationError, OpenAIContentError, OpenAIHTTPError,
@@ -108,7 +108,7 @@ def _check_transport(
     status = status if isinstance(status, int) else None
     fragment = redactor.text(result.text(errors="replace")) if result.raw else None
     if result.interrupted is Interruption.CANCEL:
-        raise ChatCancelled(diagnostic={
+        raise Cancelled(diagnostic={
             "status_code": status, "response_bytes": len(result.raw),
             "response_fragment": fragment,
         } if result.raw else None)

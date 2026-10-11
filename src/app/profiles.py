@@ -2,11 +2,14 @@
 
 from dataclasses import dataclass, field
 from collections.abc import Callable
+from typing import Literal
 
 from attacks.shared.contracts import AttackType
-from core.chats import LLMChat, ModelRole
+from core.chats import LLMChat
 from core.evaluation.configuration import EvaluatorSetup
 from core.primitives.diagnostics import DiagnosticRedactor
+
+type ModelRole = Literal["Target", "Attacker", "Evaluator"]
 
 
 @dataclass(frozen=True)

@@ -1,9 +1,9 @@
 """Construct the public FITD User with its pinned native runtime."""
 
 from dataclasses import replace
-from typing import TypedDict, Unpack
+from typing import Literal, TypedDict, Unpack
 
-from core.chats import LLMChat, ModelRole
+from core.chats import LLMChat
 from core.evaluation import Evaluator
 from core.evaluation.configuration import EvaluatorSetup, evaluator_setup
 from core.primitives.messages import Message
@@ -14,6 +14,8 @@ from attacks.shared.user import ExecutionUser
 
 from .garak_adapter import GarakRuntime
 from .profile import FITD_PROFILE
+
+type ModelRole = Literal["Target", "Attacker", "Evaluator"]
 
 
 class UserOptions(TypedDict, total=False):

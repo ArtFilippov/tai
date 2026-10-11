@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from threading import Event
 from typing import cast, override
 
-from .conversation import ChatCancelled, ChatTurn
+from .envelopes.cancelled import Cancelled
+from .chat_turn_contract import ChatTurn
 from .qwen_config import Generation, LocalCheckpoint, QwenContextError, QwenError
 from .qwen_contracts import (
     InputBatch, LocalRuntimeProtocol, Model, Tensor, Tokenizer, Torch, Transformers,
@@ -17,7 +18,7 @@ _BFLOAT16 = "bfloat16"
 
 def check_cancelled(cancellation: Event) -> None:
     if cancellation.is_set():
-        raise ChatCancelled()
+        raise Cancelled()
 
 
 @dataclass(frozen=True)

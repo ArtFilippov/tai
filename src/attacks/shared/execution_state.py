@@ -2,13 +2,16 @@
 
 from dataclasses import dataclass, field
 from threading import Event, Thread
+from typing import Literal
 
-from core.chats import LLMChat, ModelRole
+from core.chats import LLMChat
 from core.evaluation import Evaluator
 from core.primitives.messages import Message
 from core.runs import UserStatus
 
 from .contracts import StrategyConfiguration, StrategyRuntime
+
+type ModelRole = Literal["Target", "Attacker", "Evaluator"]
 
 
 @dataclass(frozen=True)

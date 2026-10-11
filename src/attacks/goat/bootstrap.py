@@ -1,17 +1,19 @@
 """Compose independent Attacker and Target for a GOAT run."""
 
-from typing import Unpack
+from typing import Literal, Unpack
 
 from attacks.shared.assembly import participants, validate_options
 from attacks.shared.execution_state import ExecutionSettings
 from attacks.shared.user import ExecutionUser
-from core.chats import LLMChat, ModelRole
+from core.chats import LLMChat
 from core.evaluation import Evaluator
 from core.evaluation.configuration import EvaluatorSetup, evaluator_setup
 from core.primitives.messages import Message
 
 from .garak_adapter import GOATRuntime
 from .profile import PARAMETERS, GOATOptions, goat_profile
+
+type ModelRole = Literal["Target", "Attacker", "Evaluator"]
 
 
 def execution_settings(chats: dict[ModelRole, LLMChat], base: Message, setup: EvaluatorSetup, options: GOATOptions) -> ExecutionSettings:

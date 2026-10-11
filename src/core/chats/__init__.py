@@ -1,5 +1,7 @@
 """Conversation contracts shared by strategies and model adapters."""
 
-from .conversation import ChatCancelled, ChatTurn, LLMChat, ModelRole
+from .chat_cancelled import ChatCancelled
+from .chat_contract import LLMChat
+from .chat_turn_contract import ChatTurn
 
-__all__ = ["ChatCancelled", "ChatTurn", "LLMChat", "ModelRole"]
+__all__ = ["ChatCancelled", "ChatTurn", "LLMChat"]

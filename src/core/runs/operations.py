@@ -7,10 +7,11 @@ checkpoint tokens remain opaque and are only interpreted by their LLMChat.
 from dataclasses import dataclass, field
 from typing import Literal
 
-from core.chats import ModelRole
 from core.primitives.messages import Message
 
 from .status import Evaluation, UserStatus
+
+type ModelRole = Literal["Target", "Attacker", "Evaluator"]
 
 
 @dataclass(frozen=True, slots=True)

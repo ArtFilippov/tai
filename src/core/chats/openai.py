@@ -8,7 +8,9 @@ from typing import Unpack, override
 from core.primitives.diagnostics import DiagnosticRedactor, RedactionFactory
 from core.primitives.messages import Message
 
-from .conversation import ChatCancelled, ChatTurn, LLMChat
+from .envelopes.cancelled import Cancelled
+from .chat_turn_contract import ChatTurn
+from .envelopes.conversation import LLMChat
 from .openai_config import OpenAIOptions, connection_config, validate_text
 from .openai_errors import (
     OpenAIError, OpenAIHTTPError, OpenAIAuthenticationError, OpenAIRateLimitError,
@@ -57,16 +59,16 @@ class OpenAIChat(LLMChat):
 
     @override
     def settings(self) -> dict[str, object] | list[object]:
-        return self._diagnostic_settings(self.redactor)
+        return self.diagnostic_settings(self.redactor)
 
     @override
-    def _diagnostic_settings(
+    def diagnostic_settings(
         self, redactor: DiagnosticRedactor,
     ) -> dict[str, object] | list[object]:
         # A run supplies all roles' credentials before any replacement, ensuring
         # overlapping credentials and resulting key collisions share one policy.
         settings = {
-            **super()._settings(),
+            **super().settings_data(),
             "backend": "openai",
             "transport": "openai_chat_completions",
             "base_url": self._config.base_url,
@@ -99,8 +101,8 @@ class OpenAIChat(LLMChat):
         }).encode()
 
     @override
-    def _generate(self, turns: tuple[ChatTurn, ...], cancellation: Event) -> str:
+    def __call__(self, turns: tuple[ChatTurn, ...], cancellation: Event) -> str:
         if cancellation.is_set():
-            raise ChatCancelled()
+            raise Cancelled()
         result = exchange(self._request(turns), cancellation, self._config.timeout)
         return completion(result, self.redactor)

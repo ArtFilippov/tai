@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from threading import Event
 from typing import Protocol, Self, cast
 
-from .chat_state import ChatTurn
+from .chat_turn_contract import ChatTurn
 from .qwen_config import Generation, LocalCheckpoint
 
 

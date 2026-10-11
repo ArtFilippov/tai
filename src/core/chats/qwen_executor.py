@@ -7,7 +7,7 @@ from threading import Event, Lock
 from typing import override
 from weakref import WeakValueDictionary
 
-from .conversation import ChatTurn
+from .chat_turn_contract import ChatTurn
 from .qwen_config import Generation, LocalCheckpoint
 from .qwen_contracts import LocalRuntimeProtocol, QwenExecutorProtocol
 from .qwen_runtime import check_cancelled, load_runtime

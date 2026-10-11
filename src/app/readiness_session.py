@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from uuid import uuid4
 
-from core.chats.conversation import acquire_chats, release_chats
+from core.chats.reservation_utils import acquire_chats, release_chats
 from core.runs import UserState, UserStatus
 from core.runs.operations import ResourcesReleased, WorkerOutcome
 

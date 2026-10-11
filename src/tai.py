@@ -1,5 +1,7 @@
 """Public contracts for textual LLM robustness experiments."""
 
+from typing import Literal
+
 from alert import (
     AlertManifest,
     AlertRecord,
@@ -13,7 +15,10 @@ from attacks.dra import DRAExperiment, DRAUser
 from attacks.goat import GOATExperiment, GOATUser
 from attacks.autodan import AutoDANExperiment, AutoDANUser
 from attacks.threaten_json import ThreatenJSONExperiment, ThreatenJSONUser
-from core.chats import ChatCancelled, ChatTurn, LLMChat, ModelRole
+from core.chats import ChatTurn
+from core.chats.envelopes.cancellable_chat import CancellableChat
+from core.chats.envelopes.cancelled import Cancelled as ChatCancelled
+from core.chats.envelopes.conversation import LLMChat
 from core.chats.openai import (
     OpenAIAuthenticationError,
     OpenAIChat,
@@ -40,6 +45,8 @@ from core.runs import Evaluation, Progress, RunSnapshot, User, UserState, UserSt
 from core.runs.journal import RunEvent, RunJournal
 from core.runs.storage import RunRecord, capture_run, save_run
 
+type ModelRole = Literal["Target", "Attacker", "Evaluator"]
+
 __all__ = [
     "AutoDANExperiment",
     "AutoDANUser",
@@ -51,6 +58,7 @@ __all__ = [
     "BadCharactersDeletionUser",
     "ChatCancelled",
     "ChatTurn",
+    "CancellableChat",
     "ContainsTextEvaluator",
     "DRAExperiment",
     "DRAUser",

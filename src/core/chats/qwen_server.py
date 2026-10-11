@@ -11,7 +11,8 @@ from typing import Self, override
 
 from core.primitives.diagnostics import DiagnosticRedactor, RedactionFactory
 
-from .conversation import ChatCancelled, ChatTurn
+from .envelopes.cancelled import Cancelled
+from .chat_turn_contract import ChatTurn
 from .openai_transport import completion, exchange
 from .server_config import ServerConfig, http_generation, positive_number
 from .server_process import QwenServerError, ServerProcess
@@ -120,7 +121,7 @@ class QwenServer(Server):
         self._lifecycle.start(self._start)
         for _ in iter(self._lifecycle.wait_ready, True):
             if cancellation.is_set():
-                raise ChatCancelled()
+                raise Cancelled()
         if self._lifecycle.error is not None:
             raise self._lifecycle.error
         self._check_alive()
@@ -158,11 +159,11 @@ class QwenServer(Server):
         parameters = http_generation(generation)
         _ = positive_number(timeout, "request timeout")
         if cancellation.is_set():
-            raise ChatCancelled()
+            raise Cancelled()
         with self._admitted():
             self._ensure_ready(cancellation)
             if cancellation.is_set():
-                raise ChatCancelled()
+                raise Cancelled()
             response = exchange(self._request(turns, parameters, timeout), cancellation, timeout)
             self._check_alive()
             return completion(response, self.redactor(self._process.token))

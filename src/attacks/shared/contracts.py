@@ -5,9 +5,10 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Final, Literal, Protocol
 
-from core.chats import ModelRole
 from core.primitives.messages import Message
 from core.runs.operations import Cause, Checkpoint, Context, ConversationChange, EvaluationResult, Exchange, ResultChange
+
+type ModelRole = Literal["Target", "Attacker", "Evaluator"]
 
 GARAK_REVISION = "3f50ea5ff9cd7050099940647c15c39b07a93392"
 type CompletionReason = Literal["evaluator_success", "round_limit", "strategy_exhausted", "judge_stop"]
