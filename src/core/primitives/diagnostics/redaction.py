@@ -27,11 +27,13 @@ class DiagnosticRedactor:
         )
         # Model-evaluator Messages contain JSON *inside* their text. Normalizing
         # the outer snapshot does not unescape that payload. Match the canonical
-        # JSON-string spelling as well, including in response origins/history.
+        # JSON-string spellings (including ASCII Unicode escapes) as well, in
+        # response origins/history and chat generation settings.
         # Keep original secrets for combine(), so composing policies never adds
-        # more encoding layers. Both spellings share the same one-pass rules.
+        # more encoding layers. Every spelling shares the same one-pass rules.
         encoded = {
-            json.dumps(secret, ensure_ascii=False)[1:-1] for secret in self._secrets
+            json.dumps(secret, ensure_ascii=ascii_only)[1:-1]
+            for secret in self._secrets for ascii_only in (False, True)
         }
         spellings = sorted(set(self._secrets) | encoded, key=lambda s: (-len(s), s))
         self._pattern = (
