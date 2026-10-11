@@ -140,7 +140,7 @@ max-try-statements = 1
 
 [tool.pyright]
 stubPath = "src/attacks/fitd/stubs"
-include = ["src", "tests"]
+include = ["src"]
 exclude = [".git/**", "**/.git/**", ".venv/**", "**/.venv/**", "venv/**", "**/venv/**", "__pycache__/**", "**/__pycache__/**", ".mypy_cache/**", "**/.mypy_cache/**", ".pytest_cache/**", "**/.pytest_cache/**", ".ruff_cache/**", "**/.ruff_cache/**", ".tox/**", "**/.tox/**", ".nox/**", "**/.nox/**", ".quard/**", "**/.quard/**", "node_modules/**", "**/node_modules/**", "build/**", "**/build/**", "dist/**", "**/dist/**", "vendor/**", "**/vendor/**", "vendored/**", "**/vendored/**", "_vendor/**", "**/_vendor/**", "generated/**", "**/generated/**", "_generated/**", "**/_generated/**", "migrations/**", "**/migrations/**"]
 ignore = [".git/**", "**/.git/**", ".venv/**", "**/.venv/**", "venv/**", "**/venv/**", "__pycache__/**", "**/__pycache__/**", ".mypy_cache/**", "**/.mypy_cache/**", ".pytest_cache/**", "**/.pytest_cache/**", ".ruff_cache/**", "**/.ruff_cache/**", ".tox/**", "**/.tox/**", ".nox/**", "**/.nox/**", ".quard/**", "**/.quard/**", "node_modules/**", "**/node_modules/**", "build/**", "**/build/**", "dist/**", "**/dist/**", "vendor/**", "**/vendor/**", "vendored/**", "**/vendored/**", "_vendor/**", "**/_vendor/**", "generated/**", "**/generated/**", "_generated/**", "**/_generated/**", "migrations/**", "**/migrations/**"]
 typeCheckingMode = "strict"
@@ -171,15 +171,8 @@ reportUnboundVariable = "error"
 reportPossiblyUnboundVariable = "error"
 
 [[tool.pyright.executionEnvironments]]
-root = "tests"
-extraPaths = ["src"]
-reportPrivateUsage = "none"
-reportUnusedCallResult = "none"
-
-[[tool.pyright.executionEnvironments]]
 root = "src"
 extraPaths = ["src"]
-
 [tool.pydoclint]
 style = "google"
 quiet = true

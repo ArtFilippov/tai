@@ -27,7 +27,9 @@ class CommandLine:
 
 def _attack(parser: argparse.ArgumentParser) -> None:
     _ = parser.add_argument("--config", type=Path, required=True, help="TOML-конфигурация")
-    _ = parser.add_argument("--artifacts-dir", type=Path, required=True, help="Каталог артефактов запусков")
+    _ = parser.add_argument(
+        "--artifacts-dir", type=Path, required=True, help="Каталог артефактов запусков"
+    )
     source = parser.add_mutually_exclusive_group(required=True)
     _ = source.add_argument("--text", help="Базовый текст непосредственно")
     _ = source.add_argument("--text-file", type=Path, help="Файл базового текста в UTF-8")
@@ -40,7 +42,9 @@ def _preflight(parser: argparse.ArgumentParser) -> None:
 
 def _prepare(parser: argparse.ArgumentParser) -> None:
     _ = parser.add_argument("--source-file", type=Path, required=True, help="Локальный alert.jsonl")
-    _ = parser.add_argument("--download", action="store_true", help="Скачать закреплённый источник в --source-file")
+    _ = parser.add_argument(
+        "--download", action="store_true", help="Скачать закреплённый источник в --source-file"
+    )
     _ = parser.add_argument("--output", type=Path, required=True, help="Выходной JSON-манифест")
     _ = parser.add_argument("--taxonomy", type=Path, default=Path("ALERT_taxonomy.md"))
     _ = parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
@@ -51,9 +55,13 @@ def _series(parser: argparse.ArgumentParser) -> None:
     for name in ("manifest", "profile", "artifacts-dir"):
         _ = parser.add_argument(f"--{name}", type=Path, required=True)
     _ = parser.add_argument("--taxonomy", type=Path, default=Path("ALERT_taxonomy.md"))
-    _ = parser.add_argument("--jobs", type=_positive_jobs, default=4, help="Лимит активных запусков (по умолчанию 4)")
-    _ = parser.add_argument("--lines-per-attack", type=_positive_lines, default=DEFAULT_LINES_PER_ATTACK,
-                            help=f"Фиксированное число строк на атаку (по умолчанию {DEFAULT_LINES_PER_ATTACK})")
+    _ = parser.add_argument(
+        "--jobs", type=_positive_jobs, default=4, help="Лимит активных запусков (по умолчанию 4)"
+    )
+    _ = parser.add_argument(
+        "--lines-per-attack", type=_positive_lines, default=DEFAULT_LINES_PER_ATTACK,
+        help=f"Фиксированное число строк на атаку (по умолчанию {DEFAULT_LINES_PER_ATTACK})"
+    )
 
 
 def _positive_jobs(value: str) -> int:
@@ -76,13 +84,25 @@ def _report(parser: argparse.ArgumentParser) -> None:
 def parse_arguments(argv: list[str] | None) -> argparse.Namespace:
     commands = CommandLine()
     commands.add_command("attack", _attack, help_text="Запустить выбранную в TOML стратегию атаки")
-    commands.add_command("fitd", _attack, help_text="Запустить FITD через локальный Qwen или OpenAI-совместимый API",
-                         description="Один базовый запрос, generations=1. max_calls_per_conv (по умолчанию 10) "
-                         + "— библиотечный лимит раундов FITD, а не общий бюджет обращений. "
-                         + "HTTP-таймаут каждой роли по умолчанию 120 секунд.")
-    commands.add_command("threaten-json", _attack, help_text="Запустить ThreatenJSON с контрольным JSON-ответом")
-    commands.add_command("preflight", _preflight, help_text="Проверить настроенные роли без запуска атаки")
-    commands.add_command("prepare-alert", _prepare, help_text="Подготовить локальный манифест ALERT")
-    commands.add_command("alert-series", _series, help_text="Параллельно выполнить выбранную стратегию по ALERT")
-    commands.add_command("alert-report", _report, help_text="Пересчитать JSON по сохранённому индексу без инференса")
+    commands.add_command(
+        "fitd", _attack, help_text="Запустить FITD через локальный Qwen или OpenAI-совместимый API",
+        description="Один базовый запрос, generations=1. max_calls_per_conv (по умолчанию 10) "
+        + "— библиотечный лимит раундов FITD, а не общий бюджет обращений. "
+        + "HTTP-таймаут каждой роли по умолчанию 120 секунд."
+    )
+    commands.add_command(
+        "threaten-json", _attack, help_text="Запустить ThreatenJSON с контрольным JSON-ответом"
+    )
+    commands.add_command(
+        "preflight", _preflight, help_text="Проверить настроенные роли без запуска атаки"
+    )
+    commands.add_command(
+        "prepare-alert", _prepare, help_text="Подготовить локальный манифест ALERT"
+    )
+    commands.add_command(
+        "alert-series", _series, help_text="Параллельно выполнить выбранную стратегию по ALERT"
+    )
+    commands.add_command(
+        "alert-report", _report, help_text="Пересчитать JSON по сохранённому индексу без инференса"
+    )
     return commands.parse(argv)
