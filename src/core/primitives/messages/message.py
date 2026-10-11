@@ -8,8 +8,6 @@ from dataclasses import dataclass, field
 from typing import Concatenate
 from uuid import uuid4
 
-from .validation import require_text
-
 type MessageLink = Message | None
 
 
@@ -42,7 +40,11 @@ class Message:
     _depth: int = field(default=0, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        _ = require_text(self.text)
+        def validate(value: object) -> None:
+            if not isinstance(value, str):
+                raise TypeError("Message text must be a string")
+
+        validate(self.text)
 
     @property
     def previous(self) -> Message | None:
