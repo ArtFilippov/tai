@@ -30,7 +30,7 @@ from attacks.shared.experiment import Experiment
 from core.evaluation.assembly import EvaluatorSetup
 from core.evaluation.model_evaluator import ANSWER_RUBRIC_VERSION, MODEL_RUBRIC_VERSION
 from core.chats import LLMChat
-from core.chats.qwen_server import QwenServer
+from core.chats.envelopes.qwen_server import QwenServer
 from core.primitives.diagnostics import RedactionFactory
 from core.primitives.messages import Message
 from core.runs.journal import RunJournal

@@ -1,42 +1,15 @@
-"""Shared generation and owned-process lifecycle contracts, without GPU imports."""
+"""Lifecycle and authenticated identity of one owned model process."""
 
-from collections.abc import Mapping
-from pathlib import Path
 from threading import Event
 from typing import Protocol
 
-from core.primitives.diagnostics import DiagnosticRedactor
-
-from .chat_turn_contract import ChatTurn
-from .server_config import ServerConfig
-
-
-class Server(Protocol):
-    config: ServerConfig
-
-    def settings(self) -> dict[str, object]: ...
-
-    def redactor(self, token: str = "") -> DiagnosticRedactor: ...
-
-    def generate(
-        self, turns: tuple[ChatTurn, ...], cancellation: Event, *,
-        generation: Mapping[str, object] | None = None, timeout: float = 120.0,
-    ) -> str: ...
-
-    def close(self) -> None: ...
-
 
 class ServerProcessPort(Protocol):
-    log_path: Path
-    model: str
-    token: str
-    version: str | None
+    """Expose process readiness and identity without sharing conversation state."""
 
-    @property
-    def url(self) -> str: ...
+    def identity(self) -> tuple[str, str, str]: ...
 
-    @property
-    def pid(self) -> int | None: ...
+    def status(self) -> dict[str, object]: ...
 
     def launch(self) -> None: ...
 

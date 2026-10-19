@@ -7,8 +7,9 @@ from functools import partial
 from core.chats import LLMChat
 from core.chats.envelopes.openai import OpenAIChat
 from core.chats.envelopes.qwen_chat import QwenChat
-from core.chats.qwen_server import QwenServer
-from core.chats.server_chat import QwenServerChat
+from core.chats.envelopes.qwen_server import QwenServer
+from core.chats.envelopes.server_chat import QwenServerChat
+from core.chats.envelopes.server_validation_utils import http_generation, positive_number
 from core.primitives.diagnostics import RedactionFactory
 from core.primitives.messages import Message
 
@@ -82,10 +83,12 @@ def _server_chat(value: object, role: str, create: Callable[[str], Message],
         raise ValueError(f"{role}: backend=vllm requires [server]")
     data = table(value, role, {"backend", "system", "generation", "timeout"})
     system = string(data.get("system", ""), f"{role}.system")
+    generation = table(data.get("generation", {}), f"{role}.generation")
+    _ = http_generation(generation)
+    timeout = positive_number(timeout_seconds(data.get("timeout", 120.0), role), "request timeout")
     constructor = partial(
-        QwenServerChat, server, system=system,
-        generation=table(data.get("generation", {}), f"{role}.generation"),
-        timeout=timeout_seconds(data.get("timeout", 120.0), role),
+        QwenServerChat, server,
+        role=(server.model(), server.redactor(), system, generation, timeout),
     )
     return lambda: constructor(initial=create(system) if system else None)
 

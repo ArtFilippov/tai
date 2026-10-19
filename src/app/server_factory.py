@@ -3,8 +3,12 @@
 from pathlib import Path
 
 from core.chats.envelopes.qwen_checkpoint_utils import local_checkpoint
-from core.chats.qwen_server import QwenServer
-from core.chats.server_config import ServerConfig, ServerLimits, positive_integer, positive_number
+from core.chats.envelopes.qwen_server import QwenServer
+from core.chats.envelopes.server_config import ServerConfig
+from core.chats.envelopes.server_limits import ServerLimits
+from core.chats.envelopes.server_failures import ServerFailures
+from core.chats.envelopes.server_validation_utils import positive_integer, positive_number
+from core.chats.server_process import ServerProcess
 from core.primitives.diagnostics import RedactionFactory
 
 from .configuration_values import string, table
@@ -31,7 +35,8 @@ def create_server(
         positive_number(data.get("startup_timeout", 300.0), "startup_timeout"),
         positive_number(data.get("shutdown_timeout", 10.0), "shutdown_timeout"),
     )
-    return QwenServer(ServerConfig(
+    config = ServerConfig(
         checkpoint, Path(string(data.get("python"), "server.python")).expanduser(), limits,
         string(data.get("dtype", "float16"), "server.dtype"),
-    ), log_path, redaction)
+    )
+    return QwenServer(config, redaction, ServerProcess(config, log_path, ServerFailures()))
