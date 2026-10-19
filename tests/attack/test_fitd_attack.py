@@ -1,16 +1,22 @@
 """End-to-end controlled runs of the pinned FITD strategy."""
 
 import json
+import subprocess
+import sys
 import unittest
 from collections.abc import Mapping
 from contextlib import AbstractContextManager
 from pathlib import Path
 
+import pytest
+
 from fitd.disk_journal import DiskJournal
 from fitd.equal_judge import EqualJudge
 from fitd.parsed_journal import ParsedJournal
+from fitd.recorded_judge import RecordedJudge
 from fitd.scripted_chat import ScriptedChat
-from main.fitd_attack import FITDAttack
+from attack.fitd_attack import FITDAttack
+from attack.fitd_probe import FITDProbe
 from ..journal_utils import temporary_journal
 
 
@@ -23,11 +29,16 @@ class TestFITDAttack(unittest.TestCase):
     def attack(self, path: Path, base: str, response: str) -> Mapping[str, object]:
         attacker = ScriptedChat(["Safe opening", "First escalation", "Second escalation", "Third escalation", "yes", "yes", "yes", "yes", "unsafe"])
         target = ScriptedChat(["First", "Second", "Third", "Fourth", response])
+        journal = DiskJournal(path)
         FITDAttack(
-            target, attacker,
-            EqualJudge(response),
-            DiskJournal(path),
-            turns=8
+            target,
+            RecordedJudge(
+                EqualJudge(response), journal
+            ),
+            journal,
+            FITDProbe(
+                base, attacker, journal, 8
+            )
         ).run(base)
         return ParsedJournal(path).read()
 
@@ -93,26 +104,75 @@ class TestFITDAttack(unittest.TestCase):
 
     def test_no_initial_turn(self) -> None:
         with self.file("no-result.jsonl") as path:
+            journal = DiskJournal(path)
             FITDAttack(
                 ScriptedChat([]),
-                ScriptedChat(["I cannot fulfill your request"] * 3),
-                EqualJudge("Nothing"),
-                DiskJournal(path),
-                turns=8
+                RecordedJudge(
+                    EqualJudge("Nothing"), journal
+                ),
+                journal,
+                FITDProbe(
+                    "Request refused",
+                    ScriptedChat(["I cannot fulfill your request"] * 3),
+                    journal,
+                    8
+                )
             ).run("Request refused")
             assert ParsedJournal(path).read()["status"] == "no_result", "A failed opening was presented as a result"
 
     def test_refusal_has_no_presented_result(self) -> None:
         with self.file("refusal.jsonl") as path:
+            journal = DiskJournal(path)
             FITDAttack(
                 ScriptedChat(["I cannot fulfill your request"]),
-                ScriptedChat(["Safe opening", "First", "Second", "Third", "Safer opening"]),
-                EqualJudge("Nothing"),
-                DiskJournal(path),
-                turns=1
+                RecordedJudge(
+                    EqualJudge("Nothing"), journal
+                ),
+                journal,
+                FITDProbe(
+                    "Request refused",
+                    ScriptedChat(["Safe opening", "First", "Second", "Third", "Safer opening"]),
+                    journal,
+                    1
+                )
             ).run("Request refused")
             assert ParsedJournal(path).read()["calls"] == {
                 "target": 1,
                 "attacker": 5,
                 "judge": 0
             }, "The judge received a refused Target response"
+
+    def test_command(self) -> None:
+        with self.file("command.jsonl") as path:
+            subprocess.run(
+                [
+                    str(
+                        Path(sys.executable).with_name("tai")
+                    ),
+                    str(path),
+                    "Explain the topic in detail"
+                ],
+                check=True, capture_output=True, text=True
+            )
+            assert ParsedJournal(path).read()["status"] == "completed", "The command did not finish the experiment"
+
+    def test_inconsistent_base(self) -> None:
+        with self.file("mismatch.jsonl") as path:
+            journal = DiskJournal(path)
+            with pytest.raises(
+                ValueError, match="base request differs"
+            ):
+                FITDAttack(
+                    ScriptedChat([]),
+                    RecordedJudge(
+                        EqualJudge("Nothing"),
+                        journal
+                    ),
+                    journal,
+                    FITDProbe(
+                        "First request",
+                        ScriptedChat([]),
+                        journal,
+                        1
+                    )
+                ).run("Other request")

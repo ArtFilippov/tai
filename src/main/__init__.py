@@ -1,1 +1,1 @@
-"""Assembly of controlled attack runs."""
+"""Command entry point and assembly of controlled attack runs."""

@@ -3,49 +3,44 @@
 from dataclasses import dataclass
 from typing import override
 
-from fitd.attack import Attack
+from attack.attack import FITDAttackRun
+from attack.probe import Probe
 from fitd.chat import Chat
-from fitd.fitd_probe import FITDProbe
 from fitd.journal import Journal
 from fitd.judge import Judge
-from fitd.recorded_judge import RecordedJudge
 
 
 @dataclass(eq=False)
-class FITDAttack(Attack):
+class FITDAttack(FITDAttackRun):
     """One attack run that owns selection before requesting judgment.
 
     Attributes:
         target (Chat): Conversation being attacked.
-        attacker (Chat): Conversation constructing FITD turns.
         judge (Judge): Assessment of the presented result.
         journal (Journal): Destination for all run events.
-        turns (int): Maximum target exchanges.
+        probe (Probe): Configured FITD strategy.
     """
 
     target: Chat
-    attacker: Chat
     judge: Judge
     journal: Journal
-    turns: int
+    probe: Probe
 
-    def __init__(self, target: Chat, attacker: Chat, judge: Judge,
-                 journal: Journal, *, turns: int = 10) -> None:
+    def __init__(self, target: Chat, judge: Judge, journal: Journal,
+                 probe: Probe) -> None:
         """Keep the independently injected participants and journal.
 
         Args:
             target (Chat): Conversation being attacked.
-            attacker (Chat): Conversation constructing FITD turns.
             judge (Judge): Assessment of the presented result.
             journal (Journal): Destination for all run events.
-            turns (int, default=10): Maximum target exchanges.
+            probe (Probe): Configured FITD strategy.
         """
         super().__init__()
         self.target = target
-        self.attacker = attacker
         self.judge = judge
         self.journal = journal
-        self.turns = turns
+        self.probe = probe
 
     @override
     def run(self, base: str) -> str | None:
@@ -55,13 +50,7 @@ class FITDAttack(Attack):
                 "base": base
             }
         )
-        probe = FITDProbe(
-            base, self.attacker, self.journal, self.turns
-        )
-        text = probe.present(
-            probe.probe(self.target)
-        )
-        if text is None:
+        if (text := self.probe.execute(base, self.target)) is None:
             self.journal.record(
                 {
                     "event": "end",
@@ -75,9 +64,7 @@ class FITDAttack(Attack):
                 "text": text
             }
         )
-        _ = RecordedJudge(
-            self.judge, self.journal
-        ).assess(text)
+        _ = self.judge.assess(text)
         self.journal.record(
             {
                 "event": "end",

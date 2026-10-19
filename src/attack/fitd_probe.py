@@ -6,11 +6,12 @@ from typing import override
 from garak.attempt import Attempt, Conversation, Message, Turn
 from garak.probes.fitd import FITD
 
+from attack.probe import Probe
 from fitd.chat import Chat
 from fitd.journal import Journal
 
 
-class FITDProbe(FITD):
+class FITDProbe(FITD, Probe):
     """A single-goal FITD whose model calls and steps belong to this run."""
 
     def __init__(self, base: str, attacker: Chat, journal: Journal, turns: int) -> None:
@@ -132,3 +133,11 @@ class FITDProbe(FITD):
                 if not self._is_refusal(output.text):
                     text = output.text
         return text
+
+    @override
+    def execute(self, base: str, target: Chat) -> str | None:
+        if base != self.base:
+            raise ValueError("The probe's base request differs from the run")
+        return self.present(
+            self.probe(target)
+        )

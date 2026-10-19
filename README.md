@@ -10,17 +10,19 @@
 
 Проект переписывается с нуля. Доступен первый автономный срез: настоящий FITD из
 закреплённого garak, управляемые собеседники, оценка предъявленного текста и
-построчный журнал JSON. Прежняя точка входа `tai` пока не восстановлена.
+построчный журнал JSON. Команда `tai` запускает автономный FITD.
 
 Пример без сети и GPU (укажите новый путь к файлу журнала):
 
 ```bash
-uv run --locked --group dev python examples/fitd_demo.py /tmp/fitd-demo.jsonl "Explain the topic in detail"
+uv run --locked --group dev tai /tmp/fitd-demo.jsonl "Explain the topic in detail"
 ```
 
-`FITDAttack` из `main.fitd_attack` принимает отдельные Target и Attacker с методом
-`reply(Conversation) -> str`, оценщика с `assess(str) -> bool` и журнал с
-`record(dict)`. `run(base)` записывает выбор результата и его оценку;
+`FITDAttack` из `attack.fitd_attack` принимает Target с методом
+`reply(Conversation) -> str`, стратегию через контракт `Probe`, оценщика с
+`assess(str) -> bool` и журнал с `record(dict)`. `main()` собирает отдельного
+Attacker для `FITDProbe` и оценщика с записью вердикта в журнал;
+`run(base)` записывает выбор результата и передаёт его оценщику;
 `ParsedJournal(path).read()` восстанавливает их после завершения процесса.
 Передавайте новый файл журнала и новых собеседников для каждого запуска.
 
