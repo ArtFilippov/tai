@@ -2,7 +2,7 @@
 
 from typing import Protocol
 
-from fitd.chat import Chat
+from target.chat import Chat
 
 
 class Probe(Protocol):

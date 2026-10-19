@@ -3,8 +3,8 @@
 from dataclasses import dataclass
 from typing import override
 
-from fitd.journal import Journal
-from fitd.judge import Judge
+from journal.journal import Journal
+from judge.judge import Judge
 
 
 @dataclass(eq=False)

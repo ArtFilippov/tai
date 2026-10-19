@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import override
 
-from fitd.judge import Judge
+from judge.judge import Judge
 
 
 @dataclass(frozen=True)

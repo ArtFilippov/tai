@@ -1,1 +1,1 @@
-"""FITD attack strategy and its probe."""
+"""Attack boundary and FITD strategy."""

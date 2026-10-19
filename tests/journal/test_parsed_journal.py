@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from fitd.disk_journal import DiskJournal
-from fitd.parsed_journal import ParsedJournal
+from journal.disk_journal import DiskJournal
+from journal.parsed_journal import ParsedJournal
 from ..journal_utils import temporary_journal
 
 
@@ -147,7 +147,7 @@ class TestParsedJournal(unittest.TestCase):
             )
             process = subprocess.run(
                 [
-                    sys.executable, "-c", "from fitd.parsed_journal import ParsedJournal; from pathlib import Path; import sys; print(repr(ParsedJournal(Path(sys.argv[1])).read()))",
+                    sys.executable, "-c", "from journal.parsed_journal import ParsedJournal; from pathlib import Path; import sys; print(repr(ParsedJournal(Path(sys.argv[1])).read()))",
                     str(path)
                 ],
                 check=True, capture_output=True, text=True

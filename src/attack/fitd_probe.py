@@ -7,8 +7,8 @@ from garak.attempt import Attempt, Conversation, Message, Turn
 from garak.probes.fitd import FITD
 
 from attack.probe import Probe
-from fitd.chat import Chat
-from fitd.journal import Journal
+from journal.journal import Journal
+from target.chat import Chat
 
 
 class FITDProbe(FITD, Probe):

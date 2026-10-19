@@ -3,15 +3,15 @@
 from dataclasses import dataclass
 from typing import override
 
-from attack.attack import FITDAttackRun
+from attack.attack import Attack
 from attack.probe import Probe
-from fitd.chat import Chat
-from fitd.journal import Journal
-from fitd.judge import Judge
+from journal.journal import Journal
+from judge.judge import Judge
+from target.chat import Chat
 
 
 @dataclass(eq=False)
-class FITDAttack(FITDAttackRun):
+class FITDAttack(Attack):
     """One attack run that owns selection before requesting judgment.
 
     Attributes:

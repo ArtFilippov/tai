@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import override
 
-from fitd.journal import Journal
+from journal.journal import Journal
 
 
 @dataclass(eq=False)

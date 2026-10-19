@@ -5,7 +5,7 @@ from typing import override
 
 from garak.attempt import Conversation
 
-from fitd.chat import Chat
+from target.chat import Chat
 
 
 @dataclass(eq=False)

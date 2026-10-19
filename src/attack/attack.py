@@ -1,9 +1,10 @@
-"""Contract for a FITD run assembled from independently supplied roles."""
+"""Public attack run boundary."""
 
 from typing import Protocol
 
-from fitd.attack import Attack
 
+class Attack(Protocol):
+    """Selects a presented text from a supplied base request."""
 
-class FITDAttackRun(Attack, Protocol):
-    """Selects a result and requests its assessment for one FITD run."""
+    def run(self, base: str) -> str | None:
+        ...

@@ -5,11 +5,11 @@ from pathlib import Path
 
 from attack.fitd_attack import FITDAttack
 from attack.fitd_probe import FITDProbe
-from fitd.disk_journal import DiskJournal
-from fitd.equal_judge import EqualJudge
-from fitd.parsed_journal import ParsedJournal
-from fitd.recorded_judge import RecordedJudge
-from fitd.scripted_chat import ScriptedChat
+from journal.disk_journal import DiskJournal
+from journal.parsed_journal import ParsedJournal
+from judge.equal_judge import EqualJudge
+from judge.recorded_judge import RecordedJudge
+from target.scripted_chat import ScriptedChat
 
 
 def main() -> None:
