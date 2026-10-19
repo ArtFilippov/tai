@@ -50,6 +50,14 @@
       "extraPaths": [
         "src"
       ],
+      "reportPrivateUsage": "none",
+      "reportUnusedCallResult": "none",
+      "root": "tests"
+    },
+    {
+      "extraPaths": [
+        "src"
+      ],
       "root": "src"
     }
   ],
@@ -99,7 +107,8 @@
     "**/.ipynb_checkpoints/**"
   ],
   "include": [
-    "src"
+    "src",
+    "tests"
   ],
   "pythonPlatform": "Linux",
   "pythonVersion": "3.12",
@@ -121,6 +130,6 @@
   "strictDictionaryInference": true,
   "strictListInference": true,
   "strictSetInference": true,
-  "stubPath": "src/attacks/fitd/stubs",
+  "stubPath": "typings",
   "typeCheckingMode": "strict"
 }

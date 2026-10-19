@@ -14,7 +14,7 @@ resolution-markers = [
 [[manifest.dependency-metadata]]
 name = "garak"
 version = "0.17.1rc1"
-requires-dist = ["colorama>=0.4.3", "tqdm>=4.67.1", "pyyaml>=6", "xdg-base-dirs>=6.0.1"]
+requires-dist = ["colorama>=0.4.3", "tqdm>=4.67.1", "pyyaml>=6", "xdg-base-dirs>=6.0.1", "langdetect==1.0.9", "nltk==3.9.1", "rich==15.0.0"]
 requires-python = ">=3.11"
 
 [[package]]
@@ -340,7 +340,10 @@ version = "0.17.1rc1"
 source = { git = "https://github.com/NVIDIA/garak.git?rev=3f50ea5ff9cd7050099940647c15c39b07a93392#3f50ea5ff9cd7050099940647c15c39b07a93392" }
 dependencies = [
     { name = "colorama" },
+    { name = "langdetect" },
+    { name = "nltk" },
     { name = "pyyaml" },
+    { name = "rich" },
     { name = "tqdm" },
     { name = "xdg-base-dirs" },
 ]
@@ -583,6 +586,15 @@ sdist = { url = "https://files.pythonhosted.org/packages/19/74/a633ee74eb36c44aa
 wheels = [
     { url = "https://files.pythonhosted.org/packages/41/45/1a4ed80516f02155c51f51e8cedb3c1902296743db0bbc66608a0db2814f/jsonschema_specifications-2025.9.1-py3-none-any.whl", hash = "sha256:98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe", size = 18437, upload-time = "2025-09-08T01:34:57.871Z" },
 ]
+
+[[package]]
+name = "langdetect"
+version = "1.0.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "six" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0e/72/a3add0e4eec4eb9e2569554f7c70f4a3c27712f40e3284d483e88094cc0e/langdetect-1.0.9.tar.gz", hash = "sha256:cbc1fef89f8d062739774bd51eda3da3274006b3661d199c2655f6b3f6d605a0", size = 981474, upload-time = "2021-05-07T07:54:13.562Z" }
 
 [[package]]
 name = "lark"
@@ -1653,8 +1665,6 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "garak" },
-    { name = "nltk" },
-    { name = "rich" },
 ]
 
 [package.optional-dependencies]
@@ -1688,9 +1698,7 @@ dev = [
 requires-dist = [
     { name = "garak", git = "https://github.com/NVIDIA/garak.git?rev=3f50ea5ff9cd7050099940647c15c39b07a93392" },
     { name = "huggingface-hub", extras = ["cli"], marker = "extra == 'qwen'", specifier = "==0.30.2" },
-    { name = "nltk", specifier = "==3.9.1" },
     { name = "numpy", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'vllm'", specifier = "==1.26.4" },
-    { name = "rich", specifier = "==15.0.0" },
     { name = "torch", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'qwen'", specifier = "==2.5.1+cu121", index = "https://download.pytorch.org/whl/cu121", conflict = { package = "tai", extra = "qwen" } },
     { name = "torchvision", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'vllm'", specifier = "==0.20.1+cu121", index = "https://download.pytorch.org/whl/cu121", conflict = { package = "tai", extra = "vllm" } },
     { name = "transformers", marker = "extra == 'qwen'", specifier = "==4.51.3" },

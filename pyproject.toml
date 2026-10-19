@@ -10,8 +10,6 @@ readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "garak",
-    "nltk==3.9.1",
-    "rich==15.0.0",
 ]
 
 [project.optional-dependencies]
@@ -75,7 +73,7 @@ explicit = true
 name = "garak"
 version = "0.17.1.pre1"
 requires-python = ">=3.11"
-requires-dist = ["colorama>=0.4.3", "tqdm>=4.67.1", "PyYAML>=6", "xdg-base-dirs>=6.0.1"]
+requires-dist = ["colorama>=0.4.3", "tqdm>=4.67.1", "PyYAML>=6", "xdg-base-dirs>=6.0.1", "langdetect==1.0.9", "nltk==3.9.1", "rich==15.0.0"]
 
 
 [tool.uv.dependency-groups.dev]
@@ -138,8 +136,8 @@ max-nested-blocks = 4
 max-try-statements = 1
 
 [tool.pyright]
-stubPath = "src/attacks/fitd/stubs"
-include = ["src"]
+stubPath = "typings"
+include = ["src", "tests"]
 exclude = [".git/**", "**/.git/**", ".venv/**", "**/.venv/**", "venv/**", "**/venv/**", "__pycache__/**", "**/__pycache__/**", ".mypy_cache/**", "**/.mypy_cache/**", ".pytest_cache/**", "**/.pytest_cache/**", ".ruff_cache/**", "**/.ruff_cache/**", ".tox/**", "**/.tox/**", ".nox/**", "**/.nox/**", ".quard/**", "**/.quard/**", "node_modules/**", "**/node_modules/**", "build/**", "**/build/**", "dist/**", "**/dist/**", "vendor/**", "**/vendor/**", "vendored/**", "**/vendored/**", "_vendor/**", "**/_vendor/**", "generated/**", "**/generated/**", "_generated/**", "**/_generated/**", "migrations/**", "**/migrations/**", ".ipynb_checkpoints/**", "**/.ipynb_checkpoints/**"]
 ignore = [".git/**", "**/.git/**", ".venv/**", "**/.venv/**", "venv/**", "**/venv/**", "__pycache__/**", "**/__pycache__/**", ".mypy_cache/**", "**/.mypy_cache/**", ".pytest_cache/**", "**/.pytest_cache/**", ".ruff_cache/**", "**/.ruff_cache/**", ".tox/**", "**/.tox/**", ".nox/**", "**/.nox/**", ".quard/**", "**/.quard/**", "node_modules/**", "**/node_modules/**", "build/**", "**/build/**", "dist/**", "**/dist/**", "vendor/**", "**/vendor/**", "vendored/**", "**/vendored/**", "_vendor/**", "**/_vendor/**", "generated/**", "**/generated/**", "_generated/**", "**/_generated/**", "migrations/**", "**/migrations/**", ".ipynb_checkpoints/**", "**/.ipynb_checkpoints/**"]
 typeCheckingMode = "strict"
@@ -168,6 +166,12 @@ reportDuplicateImport = "error"
 reportUndefinedVariable = "error"
 reportUnboundVariable = "error"
 reportPossiblyUnboundVariable = "error"
+
+[[tool.pyright.executionEnvironments]]
+root = "tests"
+extraPaths = ["src"]
+reportPrivateUsage = "none"
+reportUnusedCallResult = "none"
 
 [[tool.pyright.executionEnvironments]]
 root = "src"
