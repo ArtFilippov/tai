@@ -1410,7 +1410,7 @@ wheels = [
 [[package]]
 name = "quard-clones"
 version = "0.1.0"
-source = { git = "ssh://git@github.com/ArtFilippov/quard.git?subdirectory=rust%2Fquard-clones&rev=d9bc68229057b15dd6e726be4780281f9050a9b8#d9bc68229057b15dd6e726be4780281f9050a9b8" }
+source = { git = "ssh://git@github.com/ArtFilippov/quard.git?subdirectory=rust%2Fquard-clones&rev=9c4a9d3c4f93a137eb7add701a30cca830310d1d#9c4a9d3c4f93a137eb7add701a30cca830310d1d" }
 
 [[package]]
 name = "ray"
@@ -1716,7 +1716,7 @@ dev = [
     { name = "pylint", marker = "python_full_version >= '3.12'", specifier = "==4.0.8" },
     { name = "pyright", extras = ["nodejs"], marker = "python_full_version >= '3.12'", specifier = "==1.1.414" },
     { name = "pytest", marker = "python_full_version >= '3.12'", specifier = ">=8" },
-    { name = "quard-clones", marker = "python_full_version >= '3.12'", git = "ssh://git@github.com/ArtFilippov/quard.git?subdirectory=rust%2Fquard-clones&rev=d9bc68229057b15dd6e726be4780281f9050a9b8" },
+    { name = "quard-clones", marker = "python_full_version >= '3.12'", git = "ssh://git@github.com/ArtFilippov/quard.git?subdirectory=rust%2Fquard-clones&rev=9c4a9d3c4f93a137eb7add701a30cca830310d1d" },
     { name = "tach", marker = "python_full_version >= '3.12'", specifier = "==0.35.1" },
     { name = "tomlkit", marker = "python_full_version >= '3.12'", specifier = "==0.13.3" },
 ]

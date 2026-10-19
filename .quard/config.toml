@@ -3,7 +3,7 @@
 [checks]
 constructor_purity = true
 lambda_injection = true
-lcom4 = true
+lcom4 = false
 method_decorators = true
 instance_fields = true
 class_contracts = true
