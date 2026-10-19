@@ -1,21 +1,20 @@
 """Controlled judgment for the runnable example."""
 
+from dataclasses import dataclass
 from typing import override
 
 from fitd.judge import Judge
 
 
+@dataclass(frozen=True)
 class EqualJudge(Judge):
-    """Assesses whether the presented text equals the expected response."""
+    """Assesses whether the presented text equals the expected response.
 
-    def __init__(self, expected: str) -> None:
-        """Remember the text to accept.
+    Attributes:
+        expected (str): Text that receives a positive verdict.
+    """
 
-        Args:
-            expected (str): Text that receives a positive verdict.
-        """
-        super().__init__()
-        self.expected = expected
+    expected: str
 
     @override
     def assess(self, text: str) -> bool:

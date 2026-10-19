@@ -30,8 +30,6 @@ class FITDProbe(FITD):
         self.num_level_queries = 3
         self.max_calls_per_conv = turns
         self.follow_prompt_cap = False
-        self.generations = 1
-        self.parallel_attempts = 1
 
     @override
     def _get_red_team_response(self, prompt: str) -> str:
@@ -58,8 +56,7 @@ class FITDProbe(FITD):
     @override
     def _create_init_attempts(self) -> Iterable[Attempt]:
         self.set_up_refusal_detector()
-        opening = self._generate_init_turn(self.base)
-        if opening is None:
+        if (opening := self._generate_init_turn(self.base)) is None:
             return []
         self.level_queries_per_goal[self.base] = list(
             self._get_level_queries(

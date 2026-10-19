@@ -2,23 +2,22 @@
 
 import json
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import override
 
 from fitd.journal import Journal
 
 
+@dataclass(eq=False)
 class DiskJournal(Journal):
-    """A run's append-only file, independent of garak's global report."""
+    """A run's append-only file, independent of garak's global report.
 
-    def __init__(self, path: Path) -> None:
-        """Keep the path for this run.
+    Attributes:
+        path (Path): A fresh journal path.
+    """
 
-        Args:
-            path (Path): A fresh journal path.
-        """
-        super().__init__()
-        self.path = path
+    path: Path
 
     @override
     def record(self, event: dict[str, object]) -> None:
