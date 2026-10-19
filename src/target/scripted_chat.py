@@ -34,3 +34,14 @@ class ScriptedChat(Chat):
     def reply(self, conversation: Conversation) -> str:
         self.histories.append(conversation)
         return self.replies.pop(0)
+
+    def transcript(self, index: int) -> Conversation:
+        """Inspect one supplied conversation in a controlled test.
+
+        Args:
+            index (int): Position of the supplied conversation.
+
+        Returns:
+            Conversation: The exact supplied conversation.
+        """
+        return self.histories[index]

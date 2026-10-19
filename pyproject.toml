@@ -10,13 +10,14 @@ readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "garak",
+    "huggingface-hub==0.30.2",
+    "transformers==4.51.3",
+    "torch==2.5.1+cu121; sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
 
 [project.optional-dependencies]
 qwen = [
-    "transformers==4.51.3",
     "torch==2.5.1+cu121; sys_platform == 'linux' and platform_machine == 'x86_64'",
-    "huggingface-hub[cli]==0.30.2",
 ]
 vllm = [
     "vllm==0.6.4.post1; sys_platform == 'linux' and platform_machine == 'x86_64'",
@@ -27,6 +28,7 @@ vllm = [
 
 [project.scripts]
 tai = "main.cli:main"
+tai-qwen = "main.qwen_cli:main"
 
 [tool.hatch.build.targets.wheel]
 only-include = ["src"]

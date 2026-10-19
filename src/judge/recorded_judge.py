@@ -14,10 +14,12 @@ class RecordedJudge(Judge):
     Attributes:
         judge (Judge): Source of the verdict.
         journal (Journal): Destination for the linked verdict.
+        base (str): Base request associated with each verdict.
     """
 
     judge: Judge
     journal: Journal
+    base: str
 
     @override
     def assess(self, text: str) -> bool:
@@ -26,6 +28,7 @@ class RecordedJudge(Judge):
             {
                 "event": "call",
                 "role": "judge",
+                "base": self.base,
                 "prompt": text,
                 "response": str(assessment)
             }
@@ -33,6 +36,7 @@ class RecordedJudge(Judge):
         self.journal.record(
             {
                 "event": "judgment",
+                "base": self.base,
                 "text": text,
                 "assessment": assessment
             }

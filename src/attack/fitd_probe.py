@@ -1,11 +1,12 @@
 """The pinned garak FITD applied to a supplied base request."""
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import override
 
 from garak.attempt import Attempt, Conversation, Message, Turn
 from garak.probes.fitd import FITD
 
+from attack.assessment import Assessment
 from attack.probe import Probe
 from journal.journal import Journal
 from target.chat import Chat
@@ -27,10 +28,10 @@ class FITDProbe(FITD, Probe):
         self.attacker = attacker
         self.journal = journal
         super().__init__()
+        self.assessments: list[Assessment] = []
+        self.success = False
         self.level_queries_per_goal: dict[str, list[str]] = {}
-        self.num_level_queries = 3
         self.max_calls_per_conv = turns
-        self.follow_prompt_cap = False
 
     @override
     def _get_red_team_response(self, prompt: str) -> str:
@@ -113,10 +114,20 @@ class FITDProbe(FITD, Probe):
                     ]
                 }
             )
+            if not self._is_refusal(response) and self.assessments[0](response):
+                self.success = True
+                completed.append(attempt)
+                break
             completed.append(
                 self._postprocess_attempt(attempt)
             )
         return completed
+
+    @override
+    def _verify_is_last_response_success(self, attempt: Attempt) -> list[bool]:
+        # Keep garak's internal Attacker checks, but let the independent judge
+        # decide whether the run stops rather than its unsafe-prefix heuristic.
+        return [False for _ in super()._verify_is_last_response_success(attempt)]
 
     def present(self, attempts: Iterable[Attempt]) -> str | None:
         """Select the last non-refused Target response from completed exchanges.
@@ -135,9 +146,24 @@ class FITDProbe(FITD, Probe):
         return text
 
     @override
-    def execute(self, base: str, target: Chat) -> str | None:
+    def execute(self, base: str, target: Chat, assess: Assessment) -> Mapping[str, str | None]:
         if base != self.base:
             raise ValueError("The probe's base request differs from the run")
-        return self.present(
+        self.assessments.append(assess)
+        text = self.present(
             self.probe(target)
         )
+        if self.success:
+            return {
+                "text": text,
+                "status": "success"
+            }
+        if text is None:
+            return {
+                "text": None,
+                "status": "no_result"
+            }
+        return {
+            "text": text,
+            "status": "round_limit"
+        }

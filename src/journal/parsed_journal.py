@@ -8,6 +8,11 @@ from typing import override
 
 from journal.journal_view import JournalView
 
+COMPLETED = "completed"
+SUCCESS = "success"
+ROUND_LIMIT = "round_limit"
+NO_RESULT = "no_result"
+
 
 @dataclass(eq=False)
 class ParsedJournal(JournalView):
@@ -30,13 +35,16 @@ class ParsedJournal(JournalView):
         status: str | None = None
         for event in events:
             match event:
-                case {"event": "result", "text": str() as value} if text is None:
+                case {"event": "result", "text": str() as value} if assessment is not None or text is None:
                     text = value
+                    assessment = None
                 case {"event": "judgment", "text": str() as value, "assessment": bool() as verdict} if text is not None and value == text and assessment is None:
                     assessment = verdict
                 case {"event": "end", "status": str() as ending} if (
-                    (ending, text is None, assessment is None)
-                    in {("completed", False, False), ("no_result", True, True)}
+                    (ending == COMPLETED and text is not None and assessment is not None)
+                    or (ending == SUCCESS and text is not None and assessment is True)
+                    or (ending == ROUND_LIMIT and text is not None and assessment is False)
+                    or (ending == NO_RESULT and text is None and assessment is None)
                 ):
                     status = ending
                 case {"event": "result" | "judgment" | "end"}:
@@ -83,7 +91,7 @@ class ParsedJournal(JournalView):
                       | {"event": "result", "text": str()}
                       | {"event": "judgment", "text": str(), "assessment": bool()}) if started:
                     pass
-                case {"event": "end", "status": "completed" | "no_result"} if started:
+                case {"event": "end", "status": "completed" | "success" | "round_limit" | "no_result"} if started:
                     finished = True
                 case _:
                     raise ValueError(f"Invalid run journal event in {self.path}")

@@ -50,25 +50,30 @@ class FITDAttack(Attack):
                 "base": base
             }
         )
-        if (text := self.probe.execute(base, self.target)) is None:
-            self.journal.record(
-                {
-                    "event": "end",
-                    "status": "no_result"
-                }
-            )
-            return None
+        outcome = self.probe.execute(
+            base, self.target, self.assess
+        )
+        self.journal.record(
+            {
+                "event": "end",
+                "status": outcome.get("status")
+            }
+        )
+        return outcome.get("text")
+
+    def assess(self, text: str) -> bool:
+        """Select a result before handing that exact text to the judge.
+
+        Args:
+            text (str): Accepted Target response.
+
+        Returns:
+            bool: Whether the judge considers it successful.
+        """
         self.journal.record(
             {
                 "event": "result",
                 "text": text
             }
         )
-        _ = self.judge.assess(text)
-        self.journal.record(
-            {
-                "event": "end",
-                "status": "completed"
-            }
-        )
-        return text
+        return self.judge.assess(text)

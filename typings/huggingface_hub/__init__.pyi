@@ -1,0 +1,3 @@
+"""Pinned snapshot lookup and preparation."""
+
+def snapshot_download(repo_id: str, *, revision: str, local_files_only: bool = ...) -> str: ...

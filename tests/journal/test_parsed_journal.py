@@ -88,6 +88,62 @@ class TestParsedJournal(unittest.TestCase):
             )
             assert ParsedJournal(path).read()["assessment"] is False, "A negative verdict was lost"
 
+    def test_latest_linked_assessment(self) -> None:
+        with self.file("assessments.jsonl") as path:
+            self.save(
+                path,
+                [
+                    {
+                        "event": "result",
+                        "text": "First"
+                    },
+                    {
+                        "event": "judgment",
+                        "text": "First",
+                        "assessment": False
+                    },
+                    {
+                        "event": "result",
+                        "text": "Second"
+                    },
+                    {
+                        "event": "judgment",
+                        "text": "Second",
+                        "assessment": True
+                    },
+                    {
+                        "event": "end",
+                        "status": "success"
+                    }
+                ]
+            )
+            assert ParsedJournal(path).read()["text"] == "Second", "The latest assessment was linked to the wrong result"
+
+    def test_rejects_false_success(self) -> None:
+        with self.file("invalid-success.jsonl") as path:
+            self.save(
+                path,
+                [
+                    {
+                        "event": "result",
+                        "text": "Unsuccessful"
+                    },
+                    {
+                        "event": "judgment",
+                        "text": "Unsuccessful",
+                        "assessment": False
+                    },
+                    {
+                        "event": "end",
+                        "status": "success"
+                    }
+                ]
+            )
+            with pytest.raises(
+                ValueError, match="Invalid"
+            ):
+                ParsedJournal(path).read()
+
     def test_absent_assessment_is_incomplete(self) -> None:
         with self.file("incomplete.jsonl") as path:
             self.save(

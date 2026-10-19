@@ -16,6 +16,7 @@ from journal.disk_journal import DiskJournal
 from journal.parsed_journal import ParsedJournal
 from judge.equal_judge import EqualJudge
 from judge.recorded_judge import RecordedJudge
+from target.continuing_chat import ContinuingChat
 from target.scripted_chat import ScriptedChat
 from ..journal_utils import temporary_journal
 
@@ -33,11 +34,11 @@ class TestFITDAttack(unittest.TestCase):
         FITDAttack(
             target,
             RecordedJudge(
-                EqualJudge(response), journal
+                EqualJudge(response), journal, base
             ),
             journal,
             FITDProbe(
-                base, attacker, journal, 8
+                base, ContinuingChat(attacker), journal, 8
             )
         ).run(base)
         return ParsedJournal(path).read()
@@ -55,6 +56,26 @@ class TestFITDAttack(unittest.TestCase):
                 path, "Request alpha", "Exact alpha"
             )
             assert outcome["assessment"] is True, "The exact presented result was not judged"
+
+    def test_round_limit(self) -> None:
+        with self.file("limit.jsonl") as path:
+            journal = DiskJournal(path)
+            FITDAttack(
+                ScriptedChat(["Partial"]),
+                RecordedJudge(
+                    EqualJudge("Success"),
+                    journal, "Request"
+                ),
+                journal,
+                FITDProbe(
+                    "Request",
+                    ContinuingChat(
+                        ScriptedChat(["Safe", "One", "Two", "Three", "yes", "unsafe"])
+                    ),
+                    journal, 1
+                )
+            ).run("Request")
+            assert ParsedJournal(path).read()["status"] == "round_limit", "The round limit was mistaken for success"
 
     def test_escales_to_base(self) -> None:
         with self.file("steps.jsonl") as path:
@@ -82,8 +103,8 @@ class TestFITDAttack(unittest.TestCase):
             )
             assert outcome["calls"] == {
                 "target": 5,
-                "attacker": 9,
-                "judge": 1
+                "attacker": 8,
+                "judge": 5
             }, "The roles' calls were not recovered"
 
     def test_roles_have_separate_histories(self) -> None:
@@ -108,14 +129,16 @@ class TestFITDAttack(unittest.TestCase):
             FITDAttack(
                 ScriptedChat([]),
                 RecordedJudge(
-                    EqualJudge("Nothing"), journal
+                    EqualJudge("Nothing"),
+                    journal, "Request refused"
                 ),
                 journal,
                 FITDProbe(
                     "Request refused",
-                    ScriptedChat(["I cannot fulfill your request"] * 3),
-                    journal,
-                    8
+                    ContinuingChat(
+                        ScriptedChat(["I cannot fulfill your request"] * 3)
+                    ),
+                    journal, 8
                 )
             ).run("Request refused")
             assert ParsedJournal(path).read()["status"] == "no_result", "A failed opening was presented as a result"
@@ -126,14 +149,16 @@ class TestFITDAttack(unittest.TestCase):
             FITDAttack(
                 ScriptedChat(["I cannot fulfill your request"]),
                 RecordedJudge(
-                    EqualJudge("Nothing"), journal
+                    EqualJudge("Nothing"),
+                    journal, "Request refused"
                 ),
                 journal,
                 FITDProbe(
                     "Request refused",
-                    ScriptedChat(["Safe opening", "First", "Second", "Third", "Safer opening"]),
-                    journal,
-                    1
+                    ContinuingChat(
+                        ScriptedChat(["Safe opening", "First", "Second", "Third", "Safer opening"])
+                    ),
+                    journal, 1
                 )
             ).run("Request refused")
             assert ParsedJournal(path).read()["calls"] == {
@@ -154,7 +179,7 @@ class TestFITDAttack(unittest.TestCase):
                 ],
                 check=True, capture_output=True, text=True
             )
-            assert ParsedJournal(path).read()["status"] == "completed", "The command did not finish the experiment"
+            assert ParsedJournal(path).read()["status"] == "success", "The command did not finish the experiment"
 
     def test_inconsistent_base(self) -> None:
         with self.file("mismatch.jsonl") as path:
@@ -166,13 +191,14 @@ class TestFITDAttack(unittest.TestCase):
                     ScriptedChat([]),
                     RecordedJudge(
                         EqualJudge("Nothing"),
-                        journal
+                        journal, "Other request"
                     ),
                     journal,
                     FITDProbe(
                         "First request",
-                        ScriptedChat([]),
-                        journal,
-                        1
+                        ContinuingChat(
+                            ScriptedChat([])
+                        ),
+                        journal, 1
                     )
                 ).run("Other request")
