@@ -41,17 +41,11 @@
     "_generated/**",
     "**/_generated/**",
     "migrations/**",
-    "**/migrations/**"
+    "**/migrations/**",
+    ".ipynb_checkpoints/**",
+    "**/.ipynb_checkpoints/**"
   ],
   "executionEnvironments": [
-    {
-      "extraPaths": [
-        "src"
-      ],
-      "reportPrivateUsage": "none",
-      "reportUnusedCallResult": "none",
-      "root": "tests"
-    },
     {
       "extraPaths": [
         "src"
@@ -100,18 +94,19 @@
     "_generated/**",
     "**/_generated/**",
     "migrations/**",
-    "**/migrations/**"
+    "**/migrations/**",
+    ".ipynb_checkpoints/**",
+    "**/.ipynb_checkpoints/**"
   ],
   "include": [
-    "src",
-    "tests"
+    "src"
   ],
   "pythonPlatform": "Linux",
   "pythonVersion": "3.12",
   "reportCallInDefaultInitializer": "error",
   "reportDuplicateImport": "error",
   "reportImplicitOverride": "error",
-  "reportImplicitStringConcatenation": "error",
+  "reportImplicitStringConcatenation": "none",
   "reportImportCycles": "none",
   "reportMissingModuleSource": "error",
   "reportMissingSuperCall": "error",

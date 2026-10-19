@@ -1,16 +1,27 @@
+## Project
+
+This project is being rebuilt from scratch. Before planning features or describing
+its domain, read `CONTEXT.md` for goals and vocabulary. Descriptions of the
+previous implementation are not evidence of current behavior. Check the working
+tree before describing or changing an API. The application source and tests have
+not yet been rebuilt.
+
+Issues and specs live in GitHub Issues. Read the relevant issue before working on
+it; inspect the current labels before assigning a triage status.
+
 ## Agent skills
 
 ### Issue tracker
 
-Issues and specs live in GitHub Issues. Before working with them, read `docs/agents/issue-tracker.md`.
+Issues and specs live in GitHub Issues. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-This repo uses the five default triage roles as GitHub labels. Before assigning a triage status, read `docs/agents/triage-labels.md`.
+Use the five default triage labels. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
-Single-context layout: root `CONTEXT.md` and `docs/adr/`. Before exploring the project, read `docs/agents/domain.md`.
+Use the single-context layout. See `docs/agents/domain.md`.
 
 ## Quard
 

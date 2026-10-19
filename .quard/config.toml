@@ -12,20 +12,22 @@ test_placement = true
 outer_classes = true
 free_function_placement = true
 leading_underscores = true
+cached_property_migration = true
 encapsulated_only = true
 pyright = true
 pydoclint = true
 duplicate_detection = true
 tach = true
 dependency_types = true
+tuple_signatures = true
+stairfmt = true
 
 # Shared minimum for exact, renamed and gap-similar Python clone jobs.
 [duplication]
-min_lines = 3
+min_units = 3
 
-# Pylint's own metrics, not an AST-independent line count.
+# Pylint's own metrics; physical line length is not limited.
 [readability.production]
-max_line_length = 100
 max_module_lines = 400
 max_statements = 30
 max_complexity = 8
@@ -65,4 +67,5 @@ exclude_directory_names = [
   ".ruff_cache", ".tox", ".nox", ".quard", "node_modules", "build", "dist",
   "vendor", "vendored", "_vendor", "generated", "_generated", "migrations",
 ]
+# Under src/ these directories use the test profile; root tests/ is always tested.
 test_directory_names = ["tests", "test"]
