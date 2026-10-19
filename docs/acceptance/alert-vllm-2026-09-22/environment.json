@@ -1,1 +1,0 @@
-{"torch": "2.5.1+cu121", "cuda": "12.1", "transformers": "4.45.2", "vllm": "0.6.4.post1"}
