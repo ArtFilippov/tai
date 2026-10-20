@@ -29,6 +29,7 @@ vllm = [
 [project.scripts]
 tai = "main.cli:main"
 tai-qwen = "main.qwen_cli:main"
+tai-qwen-observe = "main.qwen_observe:main"
 
 [tool.hatch.build.targets.wheel]
 only-include = ["src"]
