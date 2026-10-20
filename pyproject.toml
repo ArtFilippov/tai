@@ -31,6 +31,7 @@ vllm = [
 tai = "main.cli:main"
 tai-qwen = "main.qwen_cli:main"
 tai-qwen-observe = "main.qwen_observe:main"
+tai-qwen-search = "main.qwen_observe:search_main"
 
 [tool.hatch.build.targets.wheel]
 only-include = ["src"]
@@ -89,6 +90,8 @@ requires-dist = ["colorama>=0.4.3", "tqdm>=4.67.1", "PyYAML>=6", "xdg-base-dirs>
 requires-python = ">=3.12"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m 'not real_qwen'"
+markers = ["real_qwen: runs FITD against pinned local Qwen weights on CUDA"]
 
 [tool.pylint.main]
 load-plugins = ["pylint.extensions.bad_builtin", "pylint.extensions.broad_try_clause", "pylint.extensions.check_elif", "pylint.extensions.code_style", "pylint.extensions.comparison_placement", "pylint.extensions.confusing_elif", "pylint.extensions.consider_refactoring_into_while_condition", "pylint.extensions.consider_ternary_expression", "pylint.extensions.dict_init_mutate", "pylint.extensions.docstyle", "pylint.extensions.dunder", "pylint.extensions.empty_comment", "pylint.extensions.eq_without_hash", "pylint.extensions.for_any_all", "pylint.extensions.magic_value", "pylint.extensions.mccabe", "pylint.extensions.no_self_use", "pylint.extensions.overlapping_exceptions", "pylint.extensions.private_import", "pylint.extensions.redefined_loop_name", "pylint.extensions.redefined_variable_type", "pylint.extensions.set_membership", "pylint.extensions.typing", "pylint.extensions.while_used"]
