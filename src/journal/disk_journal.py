@@ -2,6 +2,7 @@
 
 import json
 import os
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import override
@@ -26,7 +27,11 @@ class DiskJournal(Journal):
         ) as stream:
             _ = stream.write(
                 json.dumps(
-                    event, ensure_ascii=False
+                    {
+                        **event,
+                        "at": time.time()
+                    },
+                    ensure_ascii=False
                 ) + "\n"
             )
             stream.flush()

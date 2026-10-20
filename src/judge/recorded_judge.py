@@ -23,7 +23,27 @@ class RecordedJudge(Judge):
 
     @override
     def assess(self, text: str) -> bool:
-        assessment = self.judge.assess(text)
+        try:
+            assessment = self.judge.assess(text)
+        except Exception as exc:
+            self.journal.record(
+                {
+                    "event": "call",
+                    "role": "judge",
+                    "base": self.base,
+                    "prompt": text,
+                    "response": None
+                }
+            )
+            self.journal.record(
+                {
+                    "event": "assessment_error",
+                    "base": self.base,
+                    "text": text,
+                    "error": repr(exc)
+                }
+            )
+            raise
         self.journal.record(
             {
                 "event": "call",

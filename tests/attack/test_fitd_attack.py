@@ -15,6 +15,7 @@ from attack.fitd_probe import FITDProbe
 from journal.disk_journal import DiskJournal
 from journal.parsed_journal import ParsedJournal
 from judge.equal_judge import EqualJudge
+from judge.qwen_judge import QwenJudge
 from judge.recorded_judge import RecordedJudge
 from target.continuing_chat import ContinuingChat
 from target.scripted_chat import ScriptedChat
@@ -41,6 +42,55 @@ class TestFITDAttack(unittest.TestCase):
                 base, ContinuingChat(attacker), journal, 8
             )
         ).run(base)
+        return ParsedJournal(path).read()
+
+    def failed(self, path: Path, replies: list[str]) -> Mapping[str, object]:
+        journal = DiskJournal(path)
+        with pytest.raises(
+            (
+                ValueError, IndexError
+            )
+        ):
+            FITDAttack(
+                ScriptedChat(["Exact candidate"]),
+                RecordedJudge(
+                    QwenJudge(
+                        "Request",
+                        ScriptedChat(replies)
+                    ),
+                    journal, "Request"
+                ),
+                journal,
+                FITDProbe(
+                    "Request",
+                    ContinuingChat(
+                        ScriptedChat(["Opening", "One", "Two", "Three"])
+                    ),
+                    journal, 1
+                )
+            ).run("Request")
+        return ParsedJournal(path).read()
+
+    def mismatched(self, path: Path) -> Mapping[str, object]:
+        journal = DiskJournal(path)
+        with pytest.raises(
+            ValueError, match="base request differs"
+        ):
+            FITDAttack(
+                ScriptedChat([]),
+                RecordedJudge(
+                    EqualJudge("Nothing"),
+                    journal, "Other request"
+                ),
+                journal,
+                FITDProbe(
+                    "First request",
+                    ContinuingChat(
+                        ScriptedChat([])
+                    ),
+                    journal, 1
+                )
+            ).run("Other request")
         return ParsedJournal(path).read()
 
     def test_presented_result(self) -> None:
@@ -183,22 +233,153 @@ class TestFITDAttack(unittest.TestCase):
 
     def test_inconsistent_base(self) -> None:
         with self.file("mismatch.jsonl") as path:
+            assert self.mismatched(path)["reason"] == "execution_error", "The probe failure was misreported as an assessment error"
+
+    def test_safer_opening_discards_refusal(self) -> None:
+        with self.file("safer.jsonl") as path:
             journal = DiskJournal(path)
-            with pytest.raises(
-                ValueError, match="base request differs"
-            ):
-                FITDAttack(
-                    ScriptedChat([]),
-                    RecordedJudge(
-                        EqualJudge("Nothing"),
-                        journal, "Other request"
+            FITDAttack(
+                ScriptedChat(["I cannot fulfill your request", "Fresh reply"]),
+                RecordedJudge(
+                    EqualJudge("Never"),
+                    journal, "Request"
+                ),
+                journal,
+                FITDProbe(
+                    "Request",
+                    ContinuingChat(
+                        ScriptedChat(["Opening", "One", "Two", "Three", "Safer opening", "yes"])
                     ),
-                    journal,
-                    FITDProbe(
-                        "First request",
-                        ContinuingChat(
-                            ScriptedChat([])
-                        ),
-                        journal, 1
-                    )
-                ).run("Other request")
+                    journal, 2
+                )
+            ).run("Request")
+            events = list(
+                ParsedJournal(path).events()
+            )
+            steps = [event for event in events if event.get("event") == "step"]
+            assert [(event["discarded"], event["next"], steps[1]["prompt"])
+                    for event in events if event.get("action") == "safer"] == [
+                        (
+                            [
+                                {
+                                    "role": "user",
+                                    "text": "Opening"
+                                },
+                                {
+                                    "role": "assistant",
+                                    "text": "I cannot fulfill your request"
+                                }
+                            ],
+                            "Safer opening", "Safer opening"
+                        )
+                    ], "The refused opening was not discarded before the next request"
+
+    def test_paraphrase_restores_accepted_history(self) -> None:
+        with self.file("paraphrase.jsonl") as path:
+            journal = DiskJournal(path)
+            FITDAttack(
+                ScriptedChat(["First", "I cannot fulfill your request", "Recovered"]),
+                RecordedJudge(
+                    EqualJudge("Never"),
+                    journal, "Request"
+                ),
+                journal,
+                FITDProbe(
+                    "Request",
+                    ContinuingChat(
+                        ScriptedChat(["Opening", "One", "Two", "Three", "yes", "Paraphrased", "yes"])
+                    ),
+                    journal, 3
+                )
+            ).run("Request")
+            events = list(
+                ParsedJournal(path).events()
+            )
+            steps = [event for event in events if event.get("event") == "step"]
+            assert steps[-1]["turns"] == [
+                {
+                    "role": "user",
+                    "text": "Opening"
+                },
+                {
+                    "role": "assistant",
+                    "text": "First"
+                },
+                {
+                    "role": "user",
+                    "text": "Paraphrased"
+                },
+                {
+                    "role": "assistant",
+                    "text": "Recovered"
+                }
+            ], "The paraphrase did not restore the earlier accepted conversation"
+
+    def test_discarded_reply_does_not_replace_result(self) -> None:
+        with self.file("discarded.jsonl") as path:
+            journal = DiskJournal(path)
+            FITDAttack(
+                ScriptedChat(["First", "I cannot fulfill your request"]),
+                RecordedJudge(
+                    EqualJudge("Never"),
+                    journal, "Request"
+                ),
+                journal,
+                FITDProbe(
+                    "Request",
+                    ContinuingChat(
+                        ScriptedChat(["Opening", "One", "Two", "Three", "yes", "Paraphrased"])
+                    ),
+                    journal, 2
+                )
+            ).run("Request")
+            assert ParsedJournal(path).read()["text"] == "First", "The discarded refusal replaced the selected result"
+
+    def test_realignment_keeps_conversation(self) -> None:
+        with self.file("realign.jsonl") as path:
+            journal = DiskJournal(path)
+            FITDAttack(
+                ScriptedChat(["Off topic", "Improved"]),
+                RecordedJudge(
+                    EqualJudge("Improved"),
+                    journal, "Request"
+                ),
+                journal,
+                FITDProbe(
+                    "Request",
+                    ContinuingChat(
+                        ScriptedChat(["Opening", "One", "Two", "Three", "no"])
+                    ),
+                    journal, 2
+                )
+            ).run("Request")
+            events = list(
+                ParsedJournal(path).events()
+            )
+            steps = [event for event in events if event.get("event") == "step"]
+            assert [(event["action"], event["discarded"], event["next"] == steps[1]["prompt"])
+                    for event in events if event.get("event") == "decision"] == [
+                        ("realignment", [], True)
+                    ], "Realignment discarded the active conversation"
+
+    def test_invalid_verdict_is_saved_as_failure(self) -> None:
+        with self.file("invalid.jsonl") as path:
+            assert self.failed(path, ["MAYBE"])["assessment_error"] == "ValueError(\"Malformed judge verdict: 'MAYBE'\")", "The malformed verdict was recorded as a negative assessment"
+
+    def test_judge_exception_preserves_candidate(self) -> None:
+        with self.file("exception.jsonl") as path:
+            assert self.failed(path, [])["text"] == "Exact candidate", "The judge failure lost the submitted result"
+
+    def test_sequential_metrics_are_independent(self) -> None:
+        with self.file("first.jsonl") as first, self.file("second.jsonl") as second:
+            self.attack(
+                first, "Request alpha", "Exact alpha"
+            )
+            self.attack(
+                second, "Request beta", "Exact beta"
+            )
+            assert ParsedJournal(second).read()["calls"] == {
+                "target": 5,
+                "attacker": 8,
+                "judge": 5
+            }, "The second run included calls from the first"

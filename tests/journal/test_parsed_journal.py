@@ -1,5 +1,6 @@
 """Recovery of a run outcome from a saved journal."""
 
+import json
 import subprocess
 import sys
 import unittest
@@ -209,3 +210,68 @@ class TestParsedJournal(unittest.TestCase):
                 check=True, capture_output=True, text=True
             )
             assert "'text': 'Exact\\ntext', 'assessment': False" in process.stdout, "A new process did not recover the exact judgment"
+
+    def test_new_process_recovers_branch_metrics(self) -> None:
+        with self.file("metrics.jsonl") as path:
+            self.save(
+                path,
+                [
+                    {
+                        "event": "call",
+                        "role": "target",
+                        "prompt": "Opening",
+                        "response": "No"
+                    },
+                    {
+                        "event": "step",
+                        "prompt": "Opening",
+                        "response": "No",
+                        "accepted": False
+                    },
+                    {
+                        "event": "decision",
+                        "action": "safer",
+                        "kept": 0,
+                        "discarded": [
+                            {
+                                "role": "user",
+                                "text": "Opening"
+                            },
+                            {
+                                "role": "assistant",
+                                "text": "No"
+                            }
+                        ]
+                    },
+                    {
+                        "event": "end",
+                        "status": "no_result",
+                        "reason": "no_result"
+                    }
+                ]
+            )
+            process = subprocess.run(
+                [
+                    sys.executable, "-c", "from journal.parsed_journal import ParsedJournal; from pathlib import Path; import json,sys; print(json.dumps(ParsedJournal(Path(sys.argv[1])).read()))",
+                    str(path)
+                ],
+                check=True, capture_output=True, text=True
+            )
+            result = json.loads(process.stdout)
+            assert (result["refusals"], result["rollbacks"], result["duration"] >= 0) == (1, 1, True), "A new process could not recover branch counts and duration"
+
+    def test_rejects_failed_run_without_assessment_error(self) -> None:
+        with self.file("false-failure.jsonl") as path:
+            self.save(
+                path,
+                [
+                    {
+                        "event": "end",
+                        "status": "failure"
+                    }
+                ]
+            )
+            with pytest.raises(
+                ValueError, match="Invalid"
+            ):
+                ParsedJournal(path).read()

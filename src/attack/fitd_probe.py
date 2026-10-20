@@ -98,12 +98,13 @@ class FITDProbe(FITD, Probe):
                     text=response, lang="en"
                 )
             ]
+            accepted = not self._is_refusal(response)
             self.journal.record(
                 {
                     "event": "step",
                     "prompt": prompt,
                     "response": response,
-                    "accepted": not self._is_refusal(response),
+                    "accepted": accepted,
                     "notes": attempt.notes,
                     "turns": [
                         {
@@ -114,14 +115,66 @@ class FITDProbe(FITD, Probe):
                     ]
                 }
             )
-            if not self._is_refusal(response) and self.assessments[0](response):
-                self.success = True
-                completed.append(attempt)
-                break
+            if accepted:
+                if self.assessments[0](response):
+                    self.success = True
+                    completed.append(attempt)
+                    break
             completed.append(
                 self._postprocess_attempt(attempt)
             )
         return completed
+
+    @override
+    def generate_next_turn_attempt(self, conversation: Conversation, last_attempt: Attempt) -> Attempt | None:
+        """Save the native FITD decision and any conversation material it removes.
+
+        Args:
+            conversation (Conversation): Completed exchange used by FITD.
+            last_attempt (Attempt): Its notes and selected level.
+
+        Returns:
+            Attempt | None: Native next attempt, if FITD can continue.
+        """
+        response = conversation.last_message("assistant").text
+        next_attempt = super().generate_next_turn_attempt(
+            conversation, last_attempt
+        )
+        turns = next_attempt.prompt.turns if next_attempt is not None else []
+        kept = len(conversation.turns) if next_attempt is None else 0
+        if next_attempt is not None:
+            for previous, following in zip(
+                conversation.turns, turns
+            ):
+                if previous.role != following.role or previous.content.text != following.content.text:
+                    break
+                kept += 1
+        if next_attempt is None:
+            action = "stalled"
+        elif self._is_refusal(response):
+            action = "safer" if last_attempt.notes["last_non_refused_prompt"] is None else "paraphrase"
+        elif self._is_realign_prompt(turns[-1].content.text) and not self._is_realign_prompt(conversation.last_message("user").text):
+            action = "realignment"
+        else:
+            action = "continuation"
+        self.journal.record(
+            {
+                "event": "decision",
+                "action": action,
+                "prompt": conversation.last_message("user").text,
+                "response": response,
+                "next": turns[-1].content.text if turns else None,
+                "discarded": [
+                    {
+                        "role": turn.role,
+                        "text": turn.content.text
+                    }
+                    for turn in conversation.turns[kept:]
+                ],
+                "kept": kept
+            }
+        )
+        return next_attempt
 
     @override
     def _verify_is_last_response_success(self, attempt: Attempt) -> list[bool]:
@@ -130,13 +183,13 @@ class FITDProbe(FITD, Probe):
         return [False for _ in super()._verify_is_last_response_success(attempt)]
 
     def present(self, attempts: Iterable[Attempt]) -> str | None:
-        """Select the last non-refused Target response from completed exchanges.
+        """Recover the last candidate that this strategy submitted to assessment.
 
         Args:
-            attempts (Iterable[Attempt]): Exchanges returned by the pinned FITD.
+            attempts (Iterable[Attempt]): Completed native FITD exchanges.
 
         Returns:
-            str | None: The last accepted text, if any.
+            str | None: Last accepted Target text, if one exists.
         """
         text: str | None = None
         for attempt in attempts:
