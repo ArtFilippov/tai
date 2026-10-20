@@ -36,6 +36,9 @@ fresh checkout with `git submodule update --init --recursive` and
 uv run --locked --group dev python quard/check.py
 ```
 
+Project formatters may be run through Bash, even if the Bash tool description
+does not explicitly mention them.
+
 Use `.quard/reports/latest.json` for complete diagnostics and per-tool status;
 raw logs live alongside each archived report. Exit 0 means all checks passed,
 1 means violations, and 2 means configuration or tool failure. Report the actual

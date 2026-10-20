@@ -2,18 +2,15 @@
 
 from argparse import ArgumentParser, Namespace
 
-import torch
-from huggingface_hub import snapshot_download
-from transformers import AutoModelForCausalLM, AutoTokenizer
-
 from attack.fitd_attack import FITDAttack
 from attack.fitd_probe import FITDProbe
 from journal.memory_journal import MemoryJournal
 from judge.qwen_judge import QwenJudge
 from judge.recorded_judge import RecordedJudge
 from target.continuing_chat import ContinuingChat
+from target.envelopes.lazy_qwen_model import LazyQwenModel
+from target.qwen_device_utils import cuda_device
 from target.qwen_chat import QwenChat
-from target.qwen_model import QwenModel
 
 
 def main() -> None:
@@ -45,26 +42,9 @@ def launch(arguments: Namespace) -> None:
     """
     if arguments.turns < 1:
         raise ValueError("FITD round limit must be positive")
-    if arguments.gpu < 0 or arguments.gpu >= torch.cuda.device_count():
-        raise ValueError(f"CUDA GPU {arguments.gpu} is unavailable")
-    path = snapshot_download(
-        "Qwen/Qwen2.5-0.5B-Instruct",
-        revision="7ae557604adf67be50417f59c2c2f167def9a775",
-        local_files_only=True
-    )
-    weights = AutoModelForCausalLM.from_pretrained(
-        path, local_files_only=True, torch_dtype=torch.float16
-    )
-    device = torch.device(
-        "cuda", arguments.gpu
-    )
-    _ = weights.to(device)
-    _ = weights.eval()
-    tokenizer = AutoTokenizer.from_pretrained(
-        path, local_files_only=True
-    )
-    model = QwenModel(
-        device, arguments.tokens, tokenizer, weights
+    model = LazyQwenModel(
+        cuda_device(arguments.gpu),
+        arguments.tokens
     )
     journal = MemoryJournal()
     target = QwenChat(model)

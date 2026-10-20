@@ -1381,6 +1381,11 @@ wheels = [
 ]
 
 [[package]]
+name = "qraft"
+version = "0.1.0"
+source = { git = "ssh://git@github.com/ArtFilippov/quard.git?subdirectory=runtime%2Fqraft&rev=9c4a9d3c4f93a137eb7add701a30cca830310d1d#9c4a9d3c4f93a137eb7add701a30cca830310d1d" }
+
+[[package]]
 name = "quard-clones"
 version = "0.1.0"
 source = { git = "ssh://git@github.com/ArtFilippov/quard.git?subdirectory=rust%2Fquard-clones&rev=9c4a9d3c4f93a137eb7add701a30cca830310d1d#9c4a9d3c4f93a137eb7add701a30cca830310d1d" }
@@ -1639,6 +1644,7 @@ source = { editable = "." }
 dependencies = [
     { name = "garak" },
     { name = "huggingface-hub" },
+    { name = "qraft" },
     { name = "torch", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
     { name = "transformers" },
 ]
@@ -1673,6 +1679,7 @@ requires-dist = [
     { name = "garak", git = "https://github.com/NVIDIA/garak.git?rev=3f50ea5ff9cd7050099940647c15c39b07a93392" },
     { name = "huggingface-hub", specifier = "==0.30.2" },
     { name = "numpy", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'vllm'", specifier = "==1.26.4" },
+    { name = "qraft", git = "ssh://git@github.com/ArtFilippov/quard.git?subdirectory=runtime%2Fqraft&rev=9c4a9d3c4f93a137eb7add701a30cca830310d1d" },
     { name = "torch", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'", specifier = "==2.5.1+cu121" },
     { name = "torch", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'qwen'", specifier = "==2.5.1+cu121", index = "https://download.pytorch.org/whl/cu121", conflict = { package = "tai", extra = "qwen" } },
     { name = "torchvision", marker = "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'vllm'", specifier = "==0.20.1+cu121", index = "https://download.pytorch.org/whl/cu121", conflict = { package = "tai", extra = "vllm" } },

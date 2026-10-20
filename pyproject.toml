@@ -11,6 +11,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "garak",
     "huggingface-hub==0.30.2",
+    "qraft==0.1.0",
     "transformers==4.51.3",
     "torch==2.5.1+cu121; sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
@@ -63,6 +64,11 @@ xformers = { index = "pytorch-cu121", extra = "vllm" }
 git = "ssh://git@github.com/ArtFilippov/quard.git"
 rev = "9c4a9d3c4f93a137eb7add701a30cca830310d1d"
 subdirectory = "rust/quard-clones"
+
+[tool.uv.sources.qraft]
+git = "ssh://git@github.com/ArtFilippov/quard.git"
+rev = "9c4a9d3c4f93a137eb7add701a30cca830310d1d"
+subdirectory = "runtime/qraft"
 [[tool.uv.index]]
 name = "pytorch-cu121"
 url = "https://download.pytorch.org/whl/cu121"
@@ -175,6 +181,12 @@ root = "tests"
 extraPaths = ["src"]
 reportPrivateUsage = "none"
 reportUnusedCallResult = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "src/target/envelopes"
+extraPaths = ["src"]
+reportMissingSuperCall = "none"
+reportImplicitOverride = "none"
 
 [[tool.pyright.executionEnvironments]]
 root = "src"

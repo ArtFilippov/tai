@@ -58,6 +58,14 @@
       "extraPaths": [
         "src"
       ],
+      "reportImplicitOverride": "none",
+      "reportMissingSuperCall": "none",
+      "root": "src/target/envelopes"
+    },
+    {
+      "extraPaths": [
+        "src"
+      ],
       "root": "src"
     }
   ],

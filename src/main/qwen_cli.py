@@ -3,9 +3,7 @@
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
 
-import torch
 from huggingface_hub import snapshot_download
-from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from attack.fitd_attack import FITDAttack
 from attack.fitd_probe import FITDProbe
@@ -14,8 +12,9 @@ from journal.parsed_journal import ParsedJournal
 from judge.qwen_judge import QwenJudge
 from judge.recorded_judge import RecordedJudge
 from target.continuing_chat import ContinuingChat
+from target.envelopes.lazy_qwen_model import LazyQwenModel
+from target.qwen_device_utils import cuda_device
 from target.qwen_chat import QwenChat
-from target.qwen_model import QwenModel
 
 PREPARE = "prepare"
 
@@ -91,24 +90,11 @@ def launch(arguments: Namespace) -> None:
         raise ValueError("FITD round limit must be positive")
     if arguments.journal.exists():
         raise FileExistsError(arguments.journal)
-    if arguments.gpu < 0 or arguments.gpu >= torch.cuda.device_count():
-        raise ValueError(f"CUDA GPU {arguments.gpu} is unavailable")
-    path = snapshot(True)
-    device = torch.device(
-        "cuda", arguments.gpu
+    model = LazyQwenModel(
+        cuda_device(arguments.gpu),
+        arguments.tokens
     )
-    weights = AutoModelForCausalLM.from_pretrained(
-        path, local_files_only=True, torch_dtype=torch.float16
-    )
-    _ = weights.to(device)
-    _ = weights.eval()
-    model = QwenModel(
-        device, arguments.tokens,
-        AutoTokenizer.from_pretrained(
-            path, local_files_only=True
-        ),
-        weights
-    )
+    _ = snapshot(True)
     arguments.journal.touch(exist_ok=False)
     journal = DiskJournal(arguments.journal)
     _ = FITDAttack(
