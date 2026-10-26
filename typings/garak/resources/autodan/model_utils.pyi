@@ -1,0 +1,3 @@
+"""Native rejection-string success predicate."""
+
+def check_for_attack_success(gen_str: str, test_prefixes: list[str]) -> bool: ...

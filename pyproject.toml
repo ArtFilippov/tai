@@ -11,6 +11,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "garak",
     "huggingface-hub==0.30.2",
+    "numpy>=1.26,<3",
     "qraft==0.1.0",
     "transformers==4.51.3",
     "torch==2.5.1+cu121; sys_platform == 'linux' and platform_machine == 'x86_64'",
@@ -36,6 +37,7 @@ tai-qwen = "main.qwen_cli:qwen_main"
 tai-alert = "main.alert_series:main"
 tai-goat = "main.goat_cli:main"
 tai-threaten-json = "main.threaten_json_cli:main"
+tai-autodan = "main.autodan_cli:main"
 tai-qwen-observe = "main.qwen_observe:main"
 tai-qwen-search = "main.qwen_observe:search_main"
 
@@ -93,7 +95,7 @@ explicit = true
 name = "garak"
 version = "0.17.1.pre1"
 requires-python = ">=3.11"
-requires-dist = ["colorama>=0.4.3", "tqdm>=4.67.1", "PyYAML>=6", "xdg-base-dirs>=6.0.1", "langdetect==1.0.9", "nltk==3.9.1", "rich==15.0.0"]
+requires-dist = ["colorama>=0.4.3", "tqdm>=4.67.1", "PyYAML>=6", "xdg-base-dirs>=6.0.1", "langdetect==1.0.9", "nltk==3.9.1", "rich==15.0.0", "backoff==2.2.1", "openai==2.54.0", "pandas==2.3.3"]
 
 
 [tool.uv.dependency-groups.dev]

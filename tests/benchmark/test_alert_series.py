@@ -19,6 +19,7 @@ from benchmark.alert_series import AlertSeries
 from journal.parsed_journal import ParsedJournal
 from main.alert_series import journal, prepare, series
 from ..attack.model_fixture_utils import goat, refusal, threaten_json
+from ..target import test_logits, test_model
 
 
 class TestAlertSeries(unittest.TestCase):
@@ -247,7 +248,7 @@ class TestAlertSeries(unittest.TestCase):
         ).requests(1)[0]
         arguments = Namespace(
             gpu=0, tokens=192, attacker="qwen", host="127.0.0.1", port=8080,
-            turns=1, goat_turns=1, no_threaten_json=False
+            turns=1, goat_turns=1, no_threaten_json=False, autodan=False
         )
         with tempfile.TemporaryDirectory() as directory, patch(
             "main.alert_series.LazyQwenModel", return_value=threaten_json()
@@ -261,6 +262,45 @@ class TestAlertSeries(unittest.TestCase):
         ) as factories:
             _ = factories[2](base).run()
             assert ParsedJournal(Path(directory) / "threaten_json" / f"{base.metadata()['id']}.jsonl").read()["text"] == '"Detailed café explanation"', "The ALERT CLI factory did not run its ThreatenJSON variant"
+
+    def test_offline_autodan_series_keeps_separate_journals(self) -> None:
+        bases = AlertPool(
+            Path("examples/alert-manifest-640.json")
+        ).requests(1)[:2]
+        arguments = Namespace(
+            gpu=0, tokens=192, attacker="qwen", host="127.0.0.1", port=8080,
+            turns=1, goat_turns=1, no_threaten_json=True, autodan=True,
+            autodan_target="Desired completion", autodan_steps=1,
+            autodan_batch=3, autodan_elites=1, autodan_points=1,
+            autodan_crossover=0.0, autodan_mutation=0.0, autodan_seed=8
+        )
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "main.alert_series.LazyQwenModel", return_value=test_model.TestModel()
+        ), patch(
+            "main.alert_series.QwenLogits", return_value=test_logits.TestLogits()
+        ), patch(
+            "main.alert_series.cuda_device", return_value="controlled"
+        ), patch(
+            "main.alert_series.snapshot", return_value=None
+        ), prepare(
+            arguments,
+            Path(directory)
+        ) as factories:
+            series(
+                bases, factories[-1:],
+                Path(directory),
+                Path("manifest.json")
+            )
+            journal_path = Path(directory) / "autodan" / f"{bases[1].identity}.jsonl"
+            assert (
+                self.report(directory)["attempted"],
+                list(ParsedJournal(journal_path).events())[0]["base"],
+                ParsedJournal(journal_path).read()["assessment"]
+            ) == (
+                2,
+                bases[1].text(),
+                True
+            ), "The offline GA series mixed requests, verdicts or attempt journals"
 
     def test_empty_plan(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

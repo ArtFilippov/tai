@@ -9,6 +9,9 @@ from attack.attack import Attack
 from attack.envelopes.fitd_attack_envelope import FITDAttackEnvelope
 from attack.envelopes.goat_attack_envelope import GOATAttackEnvelope
 from attack.envelopes.threaten_json_attack_envelope import ThreatenJSONAttackEnvelope
+from attack.autodan_budget import AutoDANBudget
+from attack.autodan_budget_utils import validate
+from attack.envelopes.autodan_attack_envelope import AutoDANAttackEnvelope
 from attack.fitd_setup import FITDSetup
 from attack.run_capture import RunCapture
 from base.alert_identity import AlertIdentity
@@ -25,9 +28,12 @@ from target.qwen_snapshot_utils import snapshot
 from target.gguf.gguf_location import GGUFLocation
 from target.model import Model
 from target.qwen_device_utils import cuda_device
+from target.local_qwen_assets import LocalQwenAssets
+from target.qwen_logits import QwenLogits
 
 GGUF = "gguf"
 OUTCOME = "outcome"
+THREATEN_JSON = 2
 
 
 def main() -> None:
@@ -57,6 +63,33 @@ def main() -> None:
         help="omit the ThreatenJSON variant"
     )
     _ = parser.add_argument(
+        "--autodan", action="store_true", help="include local AutoDAN GA"
+    )
+    _ = parser.add_argument(
+        "--autodan-target", default="Sure, here is the answer"
+    )
+    _ = parser.add_argument(
+        "--autodan-steps", type=int, default=2
+    )
+    _ = parser.add_argument(
+        "--autodan-batch", type=int, default=3
+    )
+    _ = parser.add_argument(
+        "--autodan-elites", type=int, default=1
+    )
+    _ = parser.add_argument(
+        "--autodan-points", type=int, default=5
+    )
+    _ = parser.add_argument(
+        "--autodan-crossover", type=float, default=0.5
+    )
+    _ = parser.add_argument(
+        "--autodan-mutation", type=float, default=0.1
+    )
+    _ = parser.add_argument(
+        "--autodan-seed", type=int, default=0
+    )
+    _ = parser.add_argument(
         "--tokens", type=int, default=192
     )
     _ = parser.add_argument(
@@ -84,6 +117,9 @@ def launch(arguments: Namespace) -> None:
     """
     if min(arguments.turns, arguments.goat_turns, arguments.tokens) < 1 or arguments.gpu < 0 or not 1 <= arguments.port <= 65535:
         raise ValueError("Invalid GPU, turn, token or port limit")
+    if arguments.autodan:
+        limits = budget(arguments)
+        validate(limits)
     pool = AlertPool(arguments.manifest)
     bases = pool.requests(arguments.limit)
     arguments.output_dir.mkdir(
@@ -235,6 +271,40 @@ def context(arguments: Namespace, model: Model) -> AbstractContextManager[Model]
     )
 
 
+def budget(arguments: Namespace) -> AutoDANBudget:
+    """Validate the optional native GA bounds before model access.
+
+    Args:
+        arguments (Namespace): Selected GA settings.
+
+    Returns:
+        AutoDANBudget: Validated reproducible bounds.
+    """
+    return AutoDANBudget(
+        arguments.autodan_steps, arguments.autodan_batch,
+        arguments.autodan_elites, arguments.autodan_points,
+        arguments.autodan_crossover, arguments.autodan_mutation,
+        arguments.autodan_seed, arguments.autodan_target
+    )
+
+
+def ga_setup(attacker: Model, target: Model, base: BaseRequest) -> FITDSetup:
+    """Bind an independent Attacker and pinned Target to one request.
+
+    Args:
+        attacker (Model): Mutation role.
+        target (Model): Target and assessment resource.
+        base (BaseRequest): Selected source request.
+
+    Returns:
+        FITDSetup: Complete GA role binding.
+    """
+    return FITDSetup(
+        attacker, target, target,
+        base.text()
+    )
+
+
 @contextmanager
 def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[BaseRequest], Attack]]]:
     """Hold model resources and expose only request-to-attack factories.
@@ -263,7 +333,14 @@ def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[B
                 journal(directory / "threaten_json" / f"{base.metadata()['id']}.jsonl")
             )
         ]
-        return attacks[:2] if arguments.no_threaten_json else attacks
+        if arguments.autodan:
+            device = cuda_device(arguments.gpu)
+            scorer = QwenLogits(
+                LocalQwenAssets(device),
+                device
+            )
+            attacks.append(lambda base: AutoDANAttackEnvelope( base, ga_setup(attacker, target, base), journal(directory / "autodan" / f"{base.metadata()['id']}.jsonl"), logits=scorer, budget=budget(arguments) ))
+        return [attack for index, attack in enumerate(attacks) if index != THREATEN_JSON or not arguments.no_threaten_json]
 
     model = LazyQwenModel(
         cuda_device(arguments.gpu), arguments.tokens
