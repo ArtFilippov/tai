@@ -7,12 +7,12 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from target.gguf_file import GGUFFile
-from target.gguf_location import GGUFLocation
+from target.gguf.gguf_file import GGUFFile
+from target.gguf.gguf_location import GGUFLocation
 from target.gguf_model import GGUFModel
-from target.gguf_run import GGUFRun
-from target.gguf_server import GGUFServer
-from target.gguf_server_utils import gguf_server
+from target.gguf.gguf_run import GGUFRun
+from target.gguf.gguf_server import GGUFServer
+from target.gguf.gguf_server_utils import gguf_server
 
 from .gguf_fixture_utils import owned, service
 
@@ -54,7 +54,7 @@ class TestGGUFRun(unittest.TestCase):
                 file, server, 24, GGUFModel
             )
             with patch(
-                "target.gguf_file.snapshot_download", return_value=directory
+                "target.gguf.gguf_file.snapshot_download", return_value=directory
             ):
                 with service(
                     address,
@@ -103,7 +103,7 @@ class TestGGUFRun(unittest.TestCase):
             )
             processes: list[subprocess.Popen[bytes]] = []
             with patch(
-                "target.gguf_file.snapshot_download", return_value=directory
+                "target.gguf.gguf_file.snapshot_download", return_value=directory
             ):
                 with owned(processes):
                     with profile.open() as model:

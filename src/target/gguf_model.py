@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from typing import override
 from urllib.request import Request, urlopen
 
-from target.gguf_asset import GGUFAsset
-from target.gguf_service import GGUFService
+from target.gguf.gguf_asset import GGUFAsset
+from target.gguf.gguf_service import GGUFService
 from target.model import Model
 
 

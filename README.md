@@ -74,7 +74,8 @@ uv run --locked --group dev --extra qwen --extra gguf tai-qwen run /tmp/gguf-fit
 Для другого закреплённого GGUF-файла Python-код может создать
 `GGUFProfile(GGUFFile(repository, revision, filename),
 GGUFLocation(host, port), gpu, tokens)` из модулей
-`target.envelopes.gguf_profile`, `target.gguf_file` и `target.gguf_location`.
+`target.gguf.envelopes.gguf_profile`, `target.gguf.gguf_file` и
+`target.gguf.gguf_location`.
 Метод `prepare()` подготавливает файл, а `open()` возвращает контекст с готовым
 `Model` для Attacker. Его `settings()` содержит данные для журнала; вызывать
 модель нужно внутри контекста, пока доступен сервер. При повторном

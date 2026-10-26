@@ -6,7 +6,7 @@ from typing import override
 
 from huggingface_hub import snapshot_download
 
-from target.gguf_asset import GGUFAsset
+from target.gguf.gguf_asset import GGUFAsset
 
 
 @dataclass(frozen=True)

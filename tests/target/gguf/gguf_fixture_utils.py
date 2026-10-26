@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
-from target.gguf_server_utils import listening
+from target.gguf.gguf_server_utils import listening
 
 
 def spawn(port: int, identity: str, mode: str) -> subprocess.Popen[bytes]:
@@ -147,7 +147,7 @@ def owned(processes: list[subprocess.Popen[bytes]]) -> Generator[None]:
         processes.append(process)
         return process
 
-    with patch("target.gguf_server_utils.gpu_support"), patch(
-        "target.gguf_server_utils.start", side_effect=launch
+    with patch("target.gguf.gguf_server_utils.gpu_support"), patch(
+        "target.gguf.gguf_server_utils.start", side_effect=launch
     ):
         yield

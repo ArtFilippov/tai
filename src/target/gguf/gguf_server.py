@@ -4,10 +4,10 @@ from collections.abc import Generator
 from contextlib import AbstractContextManager, contextmanager
 from typing import override
 
-from target.gguf_address import GGUFAddress
-from target.gguf_asset import GGUFAsset
-from target.gguf_service import GGUFService
-from target.gguf_service_factory import GGUFServiceFactory
+from target.gguf.gguf_address import GGUFAddress
+from target.gguf.gguf_asset import GGUFAsset
+from target.gguf.gguf_service import GGUFService
+from target.gguf.gguf_service_factory import GGUFServiceFactory
 
 
 class GGUFServer(GGUFService):

@@ -6,9 +6,9 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from target.envelopes.gguf_profile import GGUFProfile
-from target.gguf_file import GGUFFile
-from target.gguf_location import GGUFLocation
+from target.gguf.envelopes.gguf_profile import GGUFProfile
+from target.gguf.gguf_file import GGUFFile
+from target.gguf.gguf_location import GGUFLocation
 
 from ..gguf_fixture_utils import service
 
@@ -39,7 +39,7 @@ class TestGGUFProfile(unittest.TestCase):
                 2, 24
             )
             with patch(
-                "target.gguf_file.snapshot_download", return_value=directory
+                "target.gguf.gguf_file.snapshot_download", return_value=directory
             ):
                 with service(
                     port,

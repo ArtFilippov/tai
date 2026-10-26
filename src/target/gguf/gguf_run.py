@@ -5,10 +5,10 @@ from contextlib import AbstractContextManager, contextmanager
 from pathlib import Path
 from typing import override
 
-from target.gguf_asset import GGUFAsset
-from target.gguf_model_factory import GGUFModelFactory
-from target.gguf_service import GGUFService
-from target.gguf_source import GGUFSource
+from target.gguf.gguf_asset import GGUFAsset
+from target.gguf.gguf_model_factory import GGUFModelFactory
+from target.gguf.gguf_service import GGUFService
+from target.gguf.gguf_source import GGUFSource
 from target.model import Model
 
 

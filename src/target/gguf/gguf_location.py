@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import override
 
-from target.gguf_address import GGUFAddress
+from target.gguf.gguf_address import GGUFAddress
 
 
 @dataclass(frozen=True)

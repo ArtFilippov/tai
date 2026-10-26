@@ -1,13 +1,13 @@
 """Compose a pinned GGUF Attacker context for a selected address."""
 
-from target.gguf_asset import GGUFAsset
-from target.gguf_address import GGUFAddress
+from target.gguf.gguf_asset import GGUFAsset
+from target.gguf.gguf_address import GGUFAddress
 from target.gguf_model import GGUFModel
-from target.gguf_run import GGUFRun
-from target.gguf_server import GGUFServer
-from target.gguf_server_utils import gguf_service
+from target.gguf.gguf_run import GGUFRun
+from target.gguf.gguf_server import GGUFServer
+from target.gguf.gguf_server_utils import gguf_service
 
-from target.envelopes.gguf_source_envelope import GGUFSourceEnvelope
+from target.gguf.envelopes.gguf_source_envelope import GGUFSourceEnvelope
 
 
 class GGUFProfile(GGUFSourceEnvelope):

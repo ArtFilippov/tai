@@ -194,6 +194,12 @@ reportPrivateUsage = "none"
 reportUnusedCallResult = "none"
 
 [[tool.pyright.executionEnvironments]]
+root = "src/target/gguf/envelopes"
+extraPaths = ["src"]
+reportMissingSuperCall = "none"
+reportImplicitOverride = "none"
+
+[[tool.pyright.executionEnvironments]]
 root = "src/target/envelopes"
 extraPaths = ["src"]
 reportMissingSuperCall = "none"

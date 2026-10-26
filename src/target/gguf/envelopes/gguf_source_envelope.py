@@ -4,7 +4,7 @@ from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import override
 
-from target.gguf_source import GGUFSource
+from target.gguf.gguf_source import GGUFSource
 from target.model import Model
 
 

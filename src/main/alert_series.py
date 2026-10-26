@@ -30,10 +30,10 @@ from journal.versioned_journal import VersionedJournal
 from judge.qwen_judge import QwenJudge
 from judge.recorded_judge import RecordedJudge
 from target.continuing_chat import ContinuingChat
-from target.envelopes.gguf_profile import GGUFProfile
+from target.gguf.envelopes.gguf_profile import GGUFProfile
 from target.envelopes.lazy_qwen_model import LazyQwenModel
-from target.gguf_file import GGUFFile
-from target.gguf_location import GGUFLocation
+from target.gguf.gguf_file import GGUFFile
+from target.gguf.gguf_location import GGUFLocation
 from target.model import Model
 from target.model_chat import ModelChat
 from target.qwen_device_utils import cuda_device

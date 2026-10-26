@@ -11,13 +11,13 @@ from unittest.mock import patch
 from garak.attempt import Conversation, Message, Turn
 
 from target.gguf_model import GGUFModel
-from target.gguf_location import GGUFLocation
-from target.gguf_server import GGUFServer
-from target.gguf_server_utils import gguf_server, start
+from target.gguf.gguf_location import GGUFLocation
+from target.gguf.gguf_server import GGUFServer
+from target.gguf.gguf_server_utils import gguf_server, start
 from target.model_chat import ModelChat
-from target.gguf_file import GGUFFile
+from target.gguf.gguf_file import GGUFFile
 
-from .gguf_fixture_utils import failed_start, owned, service
+from .gguf.gguf_fixture_utils import failed_start, owned, service
 
 
 class TestGGUFModel(unittest.TestCase):
@@ -163,8 +163,8 @@ class TestGGUFModel(unittest.TestCase):
 
     def test_reports_server_startup_failure(self) -> None:
         port = self.port()
-        with patch("target.gguf_server_utils.gpu_support"), patch(
-            "target.gguf_server_utils.start", side_effect=failed_start
+        with patch("target.gguf.gguf_server_utils.gpu_support"), patch(
+            "target.gguf.gguf_server_utils.start", side_effect=failed_start
         ):
             with self.assertRaisesRegex(
                 RuntimeError, "exited during startup"
@@ -178,7 +178,7 @@ class TestGGUFModel(unittest.TestCase):
 
     def test_offline_missing_file_fails_clearly(self) -> None:
         with patch(
-            "target.gguf_file.snapshot_download",
+            "target.gguf.gguf_file.snapshot_download",
             side_effect=OSError("not cached")
         ):
             with self.assertRaisesRegex(
@@ -194,7 +194,7 @@ class TestGGUFModel(unittest.TestCase):
             path = Path(directory) / name
             path.write_bytes(b"prepared")
             with patch(
-                "target.gguf_file.snapshot_download", return_value=directory
+                "target.gguf.gguf_file.snapshot_download", return_value=directory
             ) as download:
                 _ = GGUFFile(
                     "custom/repository", "custom-commit", name
@@ -207,7 +207,7 @@ class TestGGUFModel(unittest.TestCase):
     def test_launch_selects_cuda_and_disables_thinking(self) -> None:
         with patch.dict(
             os.environ, {"CUDA_VISIBLE_DEVICES": "0,1,2,7"}
-        ), patch("target.gguf_server_utils.subprocess.Popen") as process:
+        ), patch("target.gguf.gguf_server_utils.subprocess.Popen") as process:
             _ = start(
                 "127.0.0.1", 8765,
                 Path("custom.gguf"),
