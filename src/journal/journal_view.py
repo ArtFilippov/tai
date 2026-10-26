@@ -22,7 +22,7 @@ class JournalView(Protocol):
     def metrics(self, events: Sequence[dict[str, object]]) -> Mapping[str, object]:
         ...
 
-    def duration(self, events: Sequence[object]) -> float | None:
+    def duration(self, events: Sequence[dict[str, object]]) -> float | None:
         ...
 
     def calls(self, events: Iterable[object]) -> dict[str, int]:

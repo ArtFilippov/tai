@@ -26,6 +26,13 @@ class QwenJudge(Judge):
     chat: Chat
 
     @override
+    def description(self) -> dict[str, object]:
+        return {
+            "type": "qwen_judge",
+            "chat": self.chat.description()
+        }
+
+    @override
     def assess(self, text: str) -> bool:
         response = self.chat.reply(
             Conversation(

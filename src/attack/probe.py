@@ -10,5 +10,8 @@ from target.chat import Chat
 class Probe(Protocol):
     """Produces a presented Target response from one FITD conversation."""
 
+    def description(self) -> dict[str, object]:
+        ...
+
     def execute(self, base: str, target: Chat, assess: Assessment) -> Mapping[str, str | None]:
         ...

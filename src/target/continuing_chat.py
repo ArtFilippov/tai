@@ -31,6 +31,13 @@ class ContinuingChat(Chat):
         self.turns = []
 
     @override
+    def description(self) -> dict[str, object]:
+        return {
+            "type": "continuing_chat",
+            "chat": self.chat.description()
+        }
+
+    @override
     def reply(self, conversation: Conversation) -> str:
         self.turns.extend(conversation.turns)
         response = self.chat.reply(

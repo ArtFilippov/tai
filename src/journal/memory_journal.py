@@ -16,6 +16,13 @@ class MemoryJournal(Observation):
         self.entries: list[dict[str, object]] = []
 
     @override
+    def schema(self) -> dict[str, str | int]:
+        return {
+            "schema_id": "tai.memory",
+            "schema_version": 1
+        }
+
+    @override
     def record(self, event: dict[str, object]) -> None:
         self.entries.append(
             deepcopy(event)

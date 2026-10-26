@@ -8,6 +8,7 @@ from attack.fitd_probe import FITDProbe
 from base.plain_base import PlainBase
 from journal.disk_journal import DiskJournal
 from journal.parsed_journal import ParsedJournal
+from journal.versioned_journal import VersionedJournal
 from judge.equal_judge import EqualJudge
 from judge.recorded_judge import RecordedJudge
 from target.continuing_chat import ContinuingChat
@@ -23,7 +24,9 @@ def main() -> None:
     _ = parser.add_argument("base")
     arguments = ArgumentParser.parse_args(parser)
     arguments.journal.touch(exist_ok=False)
-    journal = DiskJournal(arguments.journal)
+    journal = VersionedJournal(
+        DiskJournal(arguments.journal)
+    )
     base = PlainBase(arguments.base)
     _ = FITDAttack(
         ScriptedChat(["Historical context.", "Social context.", "A fictional account.", "A more detailed fictional account.", "The requested account."]),

@@ -34,6 +34,14 @@ class FITDProbe(FITD, Probe):
         self.max_calls_per_conv = turns
 
     @override
+    def description(self) -> dict[str, object]:
+        return {
+            "type": "fitd_probe",
+            "max_calls_per_conv": self.max_calls_per_conv,
+            "attacker": self.attacker.description()
+        }
+
+    @override
     def _get_red_team_response(self, prompt: str) -> str:
         response = self.attacker.reply(
             Conversation(

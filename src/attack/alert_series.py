@@ -130,6 +130,14 @@ class AlertSeries(AlertSeriesContract):
         ):
             path = self.directory.joinpath(f"{index:03d}-{base.identity}.jsonl")
             path.touch(exist_ok=False)
+            self.archive.record(
+                path,
+                {
+                    "event": "series",
+                    "summary": "summary.json"
+                }
+            )
+            start_size = path.stat().st_size
             entry: dict[str, str | int] = {
                 "id": base.identity,
                 "microcategory": base.microcategory,
@@ -143,7 +151,7 @@ class AlertSeries(AlertSeriesContract):
                     runs, base, path, attempt=attempt
                 )
             except KeyboardInterrupt:
-                if not path.stat().st_size:
+                if path.stat().st_size == start_size:
                     self.archive.record(
                         path,
                         {
@@ -159,7 +167,7 @@ class AlertSeries(AlertSeriesContract):
                 raise
             if attempt.failed():
                 exc = attempt.error()
-                if not path.stat().st_size:
+                if path.stat().st_size == start_size:
                     self.archive.record(
                         path,
                         {

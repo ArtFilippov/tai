@@ -16,6 +16,7 @@ from base.alert_pool import AlertPool
 from base.plain_base import PlainBase
 from journal.disk_journal import DiskJournal
 from journal.parsed_journal import ParsedJournal
+from journal.versioned_journal import VersionedJournal
 from judge.equal_judge import EqualJudge
 from judge.qwen_judge import QwenJudge
 from judge.recorded_judge import RecordedJudge
@@ -33,7 +34,9 @@ class TestFITDAttack(unittest.TestCase):
     def attack(self, path: Path, base: str, response: str) -> Mapping[str, object]:
         attacker = ScriptedChat(["Safe opening", "First escalation", "Second escalation", "Third escalation", "yes", "yes", "yes", "yes", "unsafe"])
         target = ScriptedChat(["First", "Second", "Third", "Fourth", response])
-        journal = DiskJournal(path)
+        journal = VersionedJournal(
+            DiskJournal(path)
+        )
         FITDAttack(
             target,
             RecordedJudge(
@@ -52,7 +55,9 @@ class TestFITDAttack(unittest.TestCase):
         return ParsedJournal(path).read()
 
     def failed(self, path: Path, replies: list[str]) -> Mapping[str, object]:
-        journal = DiskJournal(path)
+        journal = VersionedJournal(
+            DiskJournal(path)
+        )
         with pytest.raises(
             (
                 ValueError, IndexError
@@ -81,7 +86,9 @@ class TestFITDAttack(unittest.TestCase):
         return ParsedJournal(path).read()
 
     def mismatched(self, path: Path) -> Mapping[str, object]:
-        journal = DiskJournal(path)
+        journal = VersionedJournal(
+            DiskJournal(path)
+        )
         with pytest.raises(
             ValueError, match="base request differs"
         ):
@@ -120,7 +127,9 @@ class TestFITDAttack(unittest.TestCase):
 
     def test_round_limit(self) -> None:
         with self.file("limit.jsonl") as path:
-            journal = DiskJournal(path)
+            journal = VersionedJournal(
+                DiskJournal(path)
+            )
             FITDAttack(
                 ScriptedChat(["Partial"]),
                 RecordedJudge(
@@ -188,7 +197,9 @@ class TestFITDAttack(unittest.TestCase):
 
     def test_no_initial_turn(self) -> None:
         with self.file("no-result.jsonl") as path:
-            journal = DiskJournal(path)
+            journal = VersionedJournal(
+                DiskJournal(path)
+            )
             FITDAttack(
                 ScriptedChat([]),
                 RecordedJudge(
@@ -210,7 +221,9 @@ class TestFITDAttack(unittest.TestCase):
 
     def test_refusal_has_no_presented_result(self) -> None:
         with self.file("refusal.jsonl") as path:
-            journal = DiskJournal(path)
+            journal = VersionedJournal(
+                DiskJournal(path)
+            )
             FITDAttack(
                 ScriptedChat(["I cannot fulfill your request"]),
                 RecordedJudge(
@@ -262,12 +275,34 @@ class TestFITDAttack(unittest.TestCase):
             )
             assert list(ParsedJournal(path).events())[0]["base_metadata"] == {}, "The text command invented source taxonomy"
 
+    def test_describes_complete_attack_without_journal(self) -> None:
+        with self.file("description.jsonl") as path:
+            self.attack(
+                path, "Request", "Answer"
+            )
+            attack = json.loads(
+                json.dumps(
+                    list(
+                        ParsedJournal(path).events()
+                    )[0]["attack"]
+                )
+            )
+            assert (
+                attack["type"], attack["target"]["type"],
+                attack["judge"]["judge"]["type"],
+                attack["probe"]["max_calls_per_conv"],
+                attack["probe"]["attacker"]["type"],
+                "journal" in attack
+            ) == ("fitd", "scripted_chat", "equal_judge", 8, "continuing_chat", False), "The attack configuration omitted a dependency or exposed the journal"
+
     def test_alert_start_and_outcome(self) -> None:
         with self.file("alert.jsonl") as path:
             base = AlertPool(
                 Path("examples/alert-manifest-640.json")
             ).requests(1)[0]
-            journal = DiskJournal(path)
+            journal = VersionedJournal(
+                DiskJournal(path)
+            )
             FITDAttack(
                 ScriptedChat(["Reply"]),
                 RecordedJudge(
@@ -318,7 +353,9 @@ class TestFITDAttack(unittest.TestCase):
 
     def test_safer_opening_discards_refusal(self) -> None:
         with self.file("safer.jsonl") as path:
-            journal = DiskJournal(path)
+            journal = VersionedJournal(
+                DiskJournal(path)
+            )
             FITDAttack(
                 ScriptedChat(["I cannot fulfill your request", "Fresh reply"]),
                 RecordedJudge(
@@ -359,7 +396,9 @@ class TestFITDAttack(unittest.TestCase):
 
     def test_paraphrase_restores_accepted_history(self) -> None:
         with self.file("paraphrase.jsonl") as path:
-            journal = DiskJournal(path)
+            journal = VersionedJournal(
+                DiskJournal(path)
+            )
             FITDAttack(
                 ScriptedChat(["First", "I cannot fulfill your request", "Recovered"]),
                 RecordedJudge(
@@ -402,7 +441,9 @@ class TestFITDAttack(unittest.TestCase):
 
     def test_discarded_reply_does_not_replace_result(self) -> None:
         with self.file("discarded.jsonl") as path:
-            journal = DiskJournal(path)
+            journal = VersionedJournal(
+                DiskJournal(path)
+            )
             FITDAttack(
                 ScriptedChat(["First", "I cannot fulfill your request"]),
                 RecordedJudge(
@@ -424,7 +465,9 @@ class TestFITDAttack(unittest.TestCase):
 
     def test_realignment_keeps_conversation(self) -> None:
         with self.file("realign.jsonl") as path:
-            journal = DiskJournal(path)
+            journal = VersionedJournal(
+                DiskJournal(path)
+            )
             FITDAttack(
                 ScriptedChat(["Off topic", "Improved"]),
                 RecordedJudge(

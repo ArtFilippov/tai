@@ -22,11 +22,11 @@ from base.alert_pool import AlertPool
 from base.alert_taxonomy import AlertTaxonomy
 from base.base_request import BaseRequest
 from base.plain_base import PlainBase
-from journal.configured_journal import ConfiguredJournal
 from journal.disk_journal import DiskJournal
 from journal.journal import Journal
 from journal.journal_view import JournalView
 from journal.parsed_journal import ParsedJournal
+from journal.versioned_journal import VersionedJournal
 from judge.qwen_judge import QwenJudge
 from judge.recorded_judge import RecordedJudge
 from target.continuing_chat import ContinuingChat
@@ -55,7 +55,9 @@ class DiskAlertPorts(AlertPorts):
         Returns:
             Journal: Append-only event sink.
         """
-        return DiskJournal(path)
+        return VersionedJournal(
+            DiskJournal(path)
+        )
 
     @override
     def view(self, path: Path) -> JournalView:
@@ -247,8 +249,8 @@ def run(base: BaseRequest, path: Path, model: Model, attacker: Model, *, turns: 
         attacker (Model): Shared Attacker resource.
         turns (int): Maximum FITD turns.
     """
-    journal = ConfiguredJournal(
-        DiskJournal(path), model, attacker
+    journal = VersionedJournal(
+        DiskJournal(path)
     )
     _ = FITDAttack(
         target=ModelChat(model),

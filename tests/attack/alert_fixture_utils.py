@@ -7,6 +7,7 @@ from attack.qwen_run import QwenRun
 from attack.run_operation import RunOperation
 from base.base_request import BaseRequest
 from journal.disk_journal import DiskJournal
+from journal.versioned_journal import VersionedJournal
 from target.model import Model
 from target.scripted_model import ScriptedModel
 
@@ -45,7 +46,9 @@ def scripted(base: BaseRequest, path: Path, model: Model, attacker: Model, *, tu
         )[0]
     )) == 2:
         raise RuntimeError("offline failure before start")
-    journal = DiskJournal(path)
+    journal = VersionedJournal(
+        DiskJournal(path)
+    )
     journal.record(
         {
             "event": "start",
@@ -113,13 +116,17 @@ def interrupted(base: BaseRequest, path: Path, model: Model, attacker: Model, *,
     """
     if path.name.startswith("002-"):
         raise KeyboardInterrupt
-    DiskJournal(path).record(
+    VersionedJournal(
+        DiskJournal(path)
+    ).record(
         {
             "event": "start",
             "base": base.text()
         }
     )
-    DiskJournal(path).record(
+    VersionedJournal(
+        DiskJournal(path)
+    ).record(
         {
             "event": "end",
             "status": "no_result"
@@ -140,7 +147,9 @@ def assessment(base: BaseRequest, path: Path, model: Model, attacker: Model, *, 
     Raises:
         ValueError: After saving an invalid final assessment.
     """
-    journal = DiskJournal(path)
+    journal = VersionedJournal(
+        DiskJournal(path)
+    )
     journal.record(
         {
             "event": "start",

@@ -8,5 +8,8 @@ from garak.attempt import Conversation
 class Chat(Protocol):
     """A conversational participant that answers the supplied history."""
 
+    def description(self) -> dict[str, object]:
+        ...
+
     def reply(self, conversation: Conversation) -> str:
         ...

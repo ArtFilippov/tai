@@ -17,5 +17,12 @@ class EqualJudge(Judge):
     expected: str
 
     @override
+    def description(self) -> dict[str, object]:
+        return {
+            "type": "equal_judge",
+            "expected": self.expected
+        }
+
+    @override
     def assess(self, text: str) -> bool:
         return text == self.expected

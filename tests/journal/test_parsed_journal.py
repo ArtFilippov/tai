@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from journal.disk_journal import DiskJournal
+from journal.versioned_journal import VersionedJournal
 from journal.parsed_journal import ParsedJournal
 from ..journal_utils import temporary_journal
 
@@ -21,7 +22,9 @@ class TestParsedJournal(unittest.TestCase):
         return temporary_journal(name)
 
     def save(self, path: Path, events: list[dict[str, object]]) -> None:
-        journal = DiskJournal(path)
+        journal = VersionedJournal(
+            DiskJournal(path)
+        )
         journal.record(
             {
                 "event": "start",
@@ -43,6 +46,59 @@ class TestParsedJournal(unittest.TestCase):
                 ]
             )
             assert ParsedJournal(path).read()["text"] is None, "An absent result became text"
+
+    def test_version_on_each_event(self) -> None:
+        with self.file("version.jsonl") as path:
+            self.save(
+                path,
+                [
+                    {
+                        "event": "end",
+                        "status": "no_result"
+                    }
+                ]
+            )
+            assert [
+                (event["schema_id"], event["schema_version"])
+                for event in ParsedJournal(path).events()
+            ] == [("tai.run", 1), ("tai.run", 1)], "A journal event lacks its schema identity"
+
+    def test_rejects_unknown_version(self) -> None:
+        with self.file("unknown.jsonl") as path:
+            self.save(
+                path,
+                [
+                    {
+                        "event": "end",
+                        "status": "no_result"
+                    }
+                ]
+            )
+            with path.open(
+                "a", encoding="utf-8"
+            ) as stream:
+                _ = stream.write('{"event":"end","schema_id":"tai.run","schema_version":2}\n')
+            with pytest.raises(
+                ValueError, match="Unsupported journal schema"
+            ):
+                list(
+                    ParsedJournal(path).events()
+                )
+
+    def test_rejects_unversioned_entry(self) -> None:
+        with self.file("old.jsonl") as path:
+            DiskJournal(path).record(
+                {
+                    "event": "start",
+                    "base": "old"
+                }
+            )
+            with pytest.raises(
+                ValueError, match="Unsupported journal schema"
+            ):
+                list(
+                    ParsedJournal(path).events()
+                )
 
     def test_empty_result(self) -> None:
         with self.file("empty.jsonl") as path:

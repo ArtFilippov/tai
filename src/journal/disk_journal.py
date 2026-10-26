@@ -21,6 +21,13 @@ class DiskJournal(Journal):
     path: Path
 
     @override
+    def schema(self) -> dict[str, str | int]:
+        return {
+            "schema_id": "tai.run",
+            "schema_version": 1
+        }
+
+    @override
     def record(self, event: dict[str, object]) -> None:
         with self.path.open(
             "a", encoding="utf-8"

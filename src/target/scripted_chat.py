@@ -31,6 +31,13 @@ class ScriptedChat(Chat):
         self.histories = []
 
     @override
+    def description(self) -> dict[str, object]:
+        return {
+            "type": "scripted_chat",
+            "replies": list(self.replies)
+        }
+
+    @override
     def reply(self, conversation: Conversation) -> str:
         self.histories.append(conversation)
         return self.replies.pop(0)

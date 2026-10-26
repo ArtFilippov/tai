@@ -20,6 +20,13 @@ class ModelChat(Chat):
     model: Model
 
     @override
+    def description(self) -> dict[str, object]:
+        return {
+            "type": "model_chat",
+            "model": self.model.settings()
+        }
+
+    @override
     def reply(self, conversation: Conversation) -> str:
         return self.model.generate(
             [

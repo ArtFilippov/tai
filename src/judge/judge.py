@@ -6,5 +6,8 @@ from typing import Protocol
 class Judge(Protocol):
     """An independent assessment of the attack's presented result."""
 
+    def description(self) -> dict[str, object]:
+        ...
+
     def assess(self, text: str) -> bool:
         ...

@@ -162,11 +162,11 @@ class ParsedJournal(JournalView):
         }
 
     @override
-    def duration(self, events: Sequence[object]) -> float | None:
+    def duration(self, events: Sequence[dict[str, object]]) -> float | None:
         """Measure elapsed wall time from saved boundary timestamps.
 
         Args:
-            events (Sequence[object]): Saved run events.
+            events (Sequence[dict[str, object]]): Saved run events.
 
         Returns:
             float | None: Seconds, or absent for historical untimed journals.
@@ -176,6 +176,8 @@ class ParsedJournal(JournalView):
         """
         if not events:
             return None
+        if events[0].get("event") == "series":
+            events = events[1:]
         match events:
             case [{"event": "start", "at": int() | float() as start}, *_, {"event": "end", "at": int() | float() as end}]:
                 if end < start:
@@ -208,6 +210,8 @@ class ParsedJournal(JournalView):
             if finished:
                 raise ValueError("Events after run completion")
             match event:
+                case {"event": "series", "summary": str()} if not started:
+                    pass
                 case {"event": "start", "base": str()} if not started:
                     started = True
                 case {"event": "call", "role": str() as role, "prompt": str(), "response": str() | None} if started and role in counts:
@@ -234,4 +238,7 @@ class ParsedJournal(JournalView):
         """
         with self.path.open(encoding="utf-8") as stream:
             for line in stream:
-                yield json.loads(line)
+                event: dict[str, object] = json.loads(line)
+                if event.get("schema_id") != "tai.run" or event.get("schema_version") != 1:
+                    raise ValueError(f"Unsupported journal schema in {self.path}: {event.get('schema_id')!r} version {event.get('schema_version')!r}")
+                yield event

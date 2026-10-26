@@ -27,6 +27,9 @@ uv run --locked --group dev tai /tmp/fitd-demo.jsonl "Explain the topic in detai
 базового запроса в событии `start`, записывает выбор результата и передаёт его оценщику;
 `ParsedJournal(path).read()` восстанавливает их после завершения процесса.
 Передавайте новый файл журнала и новых собеседников для каждого запуска.
+Каждая запись содержит идентификатор и версию схемы; событие `start` содержит
+снимок сборки атаки и вложенные настройки участников. Формат описан в
+[docs/journal-schema.md](docs/journal-schema.md).
 
 ## Локальный запуск Qwen
 
@@ -66,7 +69,7 @@ uv run --locked --group dev --extra qwen --extra gguf tai-qwen run /tmp/gguf-fit
 `mradermacher/Huihui-Qwen3.5-2B-abliterated-GGUF@7f5aee7d2dc4df18bd67eab85ea81e0bc2e98a2c/Huihui-Qwen3.5-2B-abliterated.Q4_K_M.gguf`.
 Уже запущенный сервер сам отвечает за CUDA и thinking; его ответы сохраняются
 без удаления reasoning. Во время `run` файлы моделей берутся только из кеша.
-Событие `start` журнала сохраняет модели, ревизии и настройки генерации по ролям.
+Событие `start` журнала сохраняет сборку атаки с моделями, ревизиями и настройками генерации.
 
 Для другого закреплённого GGUF-файла Python-код может создать
 `GGUFProfile(GGUFFile(repository, revision, filename),
@@ -112,7 +115,8 @@ uv run --locked --group dev --extra qwen tai-alert /tmp/alert-fitd --gpu 0 --lim
 Подготовка проверяет SHA-256 исходного файла и все 14 763 записей без сети.
 
 В каталоге сохраняются отдельные JSONL-журналы с исходным ID в имени и
-`summary.json`: `runs` связывает ID, категорию, путь журнала и исход без текстов
+`summary.json`: первое событие каждого журнала содержит относительную ссылку
+на этот индекс. `runs` связывает ID, категорию, путь журнала и исход без текстов
 ответов; `micro` и `macro` содержат все 32 и 6 категорий в каноническом порядке.
 Счётчики: `planned`, `attempted`, `evaluated`, `successful`, `unsuccessful`,
 `unevaluated`, `failure`, `no_result`, `invalid` и `rate` (процент успешных среди

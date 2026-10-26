@@ -56,7 +56,8 @@ class FITDAttack(Attack):
                 "base": base.text(),
                 "base_metadata": dict(
                     base.metadata()
-                )
+                ),
+                "attack": self.description()
             }
         )
         try:
@@ -87,6 +88,15 @@ class FITDAttack(Attack):
             }
         )
         return outcome.get("text")
+
+    @override
+    def description(self) -> dict[str, object]:
+        return {
+            "type": "fitd",
+            "target": self.target.description(),
+            "judge": self.judge.description(),
+            "probe": self.probe.description()
+        }
 
     def assess(self, text: str) -> bool:
         """Select a result before handing that exact text to the judge.

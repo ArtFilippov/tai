@@ -16,6 +16,7 @@ from base.alert_taxonomy import AlertTaxonomy
 from base.base_request import BaseRequest
 from journal.disk_journal import DiskJournal
 from journal.parsed_journal import ParsedJournal
+from journal.versioned_journal import VersionedJournal
 from main.alert_series import archive, launch, outcome
 from main.alert_series import run as qwen_run
 from target.model import Model
@@ -183,12 +184,53 @@ class TestAlertSeries(unittest.TestCase):
             )
             entry = series.report()["runs"][1]
             path = Path(directory) / str(entry["journal"])
-            assert list(ParsedJournal(path).events())[0]["event"] == "startup_error", "The error before start was not saved"
+            assert list(ParsedJournal(path).events())[1]["event"] == "startup_error", "The error before start was not saved"
+
+    def test_startup_error_keeps_series_reference(self) -> None:
+        pool = AlertPool(MANIFEST)
+        with tempfile.TemporaryDirectory() as directory:
+            series = AlertSeries(
+                pool.requests(1)[:2],
+                pool.taxonomy(),
+                Path(directory),
+                MANIFEST,
+                archive=archive()
+            )
+            series.run(
+                attempt(scripted)
+            )
+            path = (Path(directory) /
+                    str(
+                        series.report()["runs"][1]["journal"]
+                    ))
+            assert list(ParsedJournal(path).events())[0]["summary"] == "summary.json", "An early failure lost its series reference"
+
+    def test_interruption_keeps_series_reference(self) -> None:
+        pool = AlertPool(MANIFEST)
+        with tempfile.TemporaryDirectory() as directory:
+            series = AlertSeries(
+                pool.requests(1)[:2],
+                pool.taxonomy(),
+                Path(directory),
+                MANIFEST,
+                archive=archive()
+            )
+            with self.assertRaises(KeyboardInterrupt):
+                series.run(
+                    attempt(interrupted)
+                )
+            path = (Path(directory) /
+                    str(
+                        series.report()["runs"][1]["journal"]
+                    ))
+            assert list(ParsedJournal(path).events())[0]["summary"] == "summary.json", "An interrupted run lost its series reference"
 
     def test_invalid_final_judgment(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "invalid.jsonl"
-            journal = DiskJournal(path)
+            journal = VersionedJournal(
+                DiskJournal(path)
+            )
             journal.record(
                 {
                     "event": "start",
@@ -232,7 +274,9 @@ class TestAlertSeries(unittest.TestCase):
     def test_judge_error_is_distinct_from_execution_failure(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "judge.jsonl"
-            journal = DiskJournal(path)
+            journal = VersionedJournal(
+                DiskJournal(path)
+            )
             journal.record(
                 {
                     "event": "start",
@@ -345,8 +389,9 @@ class TestAlertSeries(unittest.TestCase):
                 ParsedJournal(paths[1]).events()
             )[0]
             assert (
-                first["base_metadata"] == dict(pool.requests(1)[0].metadata())
-                and second["base_metadata"] == dict(pool.requests(1)[1].metadata())
-                and first["models"] == second["models"]
+                first["summary"] == second["summary"] == "summary.json"
+                and list(ParsedJournal(paths[0]).events())[1]["base_metadata"] == dict(pool.requests(1)[0].metadata())
+                and list(ParsedJournal(paths[1]).events())[1]["base_metadata"] == dict(pool.requests(1)[1].metadata())
+                and list(ParsedJournal(paths[0]).events())[1]["attack"] == list(ParsedJournal(paths[1]).events())[1]["attack"]
                 and any(event["event"] == "call" for event in ParsedJournal(paths[0]).events())
-            ), "Separate FITD journals lost their archived base or shared model settings"
+            ), "Separate FITD journals lost their archived base or attack settings"

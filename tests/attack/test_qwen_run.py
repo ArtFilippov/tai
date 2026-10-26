@@ -23,7 +23,37 @@ class TestQwenRun(unittest.TestCase):
         assert journal.events()[0] == {
             "event": "start",
             "base": "Free-form request",
-            "base_metadata": {}
+            "base_metadata": {},
+            "schema_id": "tai.memory",
+            "schema_version": 1,
+            "attack": {
+                "type": "fitd",
+                "target": {
+                    "type": "model_chat",
+                    "model": {"revision": "local"}
+                },
+                "judge": {
+                    "type": "recorded_judge",
+                    "judge": {
+                        "type": "qwen_judge",
+                        "chat": {
+                            "type": "model_chat",
+                            "model": {"revision": "local"}
+                        }
+                    }
+                },
+                "probe": {
+                    "type": "fitd_probe",
+                    "max_calls_per_conv": 1,
+                    "attacker": {
+                        "type": "continuing_chat",
+                        "chat": {
+                            "type": "model_chat",
+                            "model": {"revision": "local"}
+                        }
+                    }
+                }
+            }
         }, "The observation did not preserve a plain text request"
 
     def test_qwen_run(self) -> None:

@@ -22,6 +22,13 @@ class RecordedJudge(Judge):
     base: str
 
     @override
+    def description(self) -> dict[str, object]:
+        return {
+            "type": "recorded_judge",
+            "judge": self.judge.description()
+        }
+
+    @override
     def assess(self, text: str) -> bool:
         try:
             assessment = self.judge.assess(text)
