@@ -146,3 +146,7 @@ def run(base: str, model: Model, attacker: Model, journal: Journal, *, turns: in
             journal, turns
         )
     ).run()
+
+
+if __name__ == "__main__":
+    qwen_main()

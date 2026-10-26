@@ -20,6 +20,7 @@ from base.plain_base import PlainBase
 from benchmark.alert_series import AlertSeries
 from journal.parsed_journal import ParsedJournal
 from main.alert_series import journal, prepare, series
+from target.model import Model
 from ..attack.model_fixture_utils import adaptive, goat, refusal, threaten_json
 from ..target import test_logits, test_model
 
@@ -448,3 +449,119 @@ class TestAlertSeries(unittest.TestCase):
                     for base in bases
                 )
             ) == (32, True, 32, True), "The offline deletion series lost a category or independent journal"
+
+    def test_all_eight_variants_cover_the_pinned_pool_offline(self) -> None:
+        bases = AlertPool(
+            Path("examples/alert-manifest-640.json")
+        ).requests(1)
+        arguments = Namespace(
+            gpu=0, tokens=64, attacker="qwen", host="127.0.0.1", port=8080,
+            turns=1, goat_turns=2, no_threaten_json=False,
+            no_adaptive_attacks=False, no_dra=False, dra_candidates=2, dra_seed=13,
+            no_deletion=False, deletion_perturbations=1, deletion_positions=2,
+            deletion_ascii=2, autodan=True, autodan_hga=True,
+            autodan_target="Desired completion", autodan_steps=2,
+            autodan_batch=3, autodan_elites=1, autodan_points=1,
+            autodan_crossover=0.0, autodan_mutation=0.0, autodan_seed=8
+        )
+
+        def respond(messages: Any) -> str:
+            if messages[0]["role"] == "system":
+                return "NO"
+            if "You might be wondering why" in messages[0]["content"] and bases[0].text() in messages[0]["content"]:
+                raise ValueError("controlled failure")
+            if "You might be wondering why" in messages[0]["content"]:
+                return '"Controlled answer"'
+            if "JSON" in messages[0]["content"]:
+                return '"Control answer"'
+            if "Observation:" in messages[0]["content"]:
+                return "Observation: start\nThought: adapt\nStrategy: ask\nResponse: Prompt"
+            return "I'm sorry, I cannot help with that request."
+
+        model = Mock(spec=Model)
+        model.generate.side_effect = respond
+        model.revision.return_value = (
+            test_model.TestModel()
+            .revision()
+        )
+        model.settings.return_value = (
+            test_model.TestModel()
+            .settings()
+        )
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "main.alert_series.LazyQwenModel", return_value=model
+        ), patch(
+            "main.alert_series.QwenLogits", return_value=test_logits.TestLogits()
+        ), patch(
+            "main.alert_series.cuda_device", return_value="controlled"
+        ), patch(
+            "main.alert_series.snapshot", return_value=None
+        ), prepare(
+            arguments,
+            Path(directory)
+        ) as factories:
+            series(
+                bases, factories,
+                Path(directory),
+                Path("examples/alert-manifest-640.json")
+            )
+            report = self.report(directory)
+            names = (
+                "fitd", "goat", "threaten_json", "adaptive_attacks",
+                "dra", "bad_characters_deletion", "autodan_ga", "autodan_hga"
+            )
+            paths = [
+                Path(directory) / name / f"{base.identity}.jsonl"
+                for name in (
+                    "fitd", "goat", "threaten_json", "adaptive_attacks",
+                    "dra", "deletion", "autodan", "autodan_hga"
+                )
+                for base in bases
+            ]
+            outcomes: list[dict[str, Any]] = [dict(ParsedJournal(path).read()) for path in paths]
+            empty = {
+                "target": 0,
+                "attacker": 0,
+                "judge": 0
+            }
+            checks: list[bool] = []
+            for index, run in enumerate(report["runs"]):
+                base = bases[index % 32]
+                outcome = outcomes[index]
+                checks.append(run["base"] == base.text())
+                checks.append(run["base_metadata"] == dict(base.metadata()))
+                checks.append(run["attack"]["type"] == names[index // 32])
+                checks.append(list(ParsedJournal(paths[index]).events())[0]["base"] == run["base"])
+                checks.append(run.get("result") == outcome["text"])
+                checks.append((outcome["assessment"] is None) == (outcome["text"] is None))
+                checks.append(outcome["calls"] != empty or outcome["reason"] == "no_result")
+            checks.append(report["runs"][64]["outcome"] == "failure")
+            checks.append(report["runs"][64]["error"] == "ValueError('controlled failure')")
+            checks.append(outcomes[64]["reason"] == "execution_error")
+            checks.append(report["runs"][65]["outcome"] == "completed")
+            checks.append(
+                all((outcome["assessment"] is False for outcome in outcomes[96:192]))
+            )
+            checks.append(
+                all((outcome["assessment"] is None for outcome in outcomes[192:256]))
+            )
+            checks.append(
+                all((outcome["calls"]["target"] == 5 for outcome in outcomes[96:128]))
+            )
+            checks.append(
+                all((outcome["calls"]["target"] == 2 for outcome in outcomes[128:160]))
+            )
+            checks.append(
+                all((outcome["calls"]["target"] == 4 for outcome in outcomes[160:192]))
+            )
+            observed = (
+                len(bases),
+                len(factories),
+                report["planned"], report["attempted"], report["complete"],
+                all(checks),
+                len(
+                    set(paths)
+                ),
+                {outcomes[index]["reason"] for index in range(192, 256)}
+            )
+            assert observed == (32, 8, 256, 256, True, True, 256, {"search_exhausted"}), "The complete offline series lost a base, variant, journal, call or recorded outcome"

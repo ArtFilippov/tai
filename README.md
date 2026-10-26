@@ -9,7 +9,8 @@
 ## Текущее состояние
 
 Проект переписывается с нуля. Доступны FITD, GOAT с разбором O-T-S-R из
-закреплённого garak, Simple Adaptive Attacks, DRA и ThreatenJSON с адаптированным coercive passage. Также
+закреплённого garak, Simple Adaptive Attacks, DRA, Bad Characters/deletion,
+AutoDAN GA/HGA и ThreatenJSON с адаптированным coercive passage. Также
 доступны управляемые собеседники, оценка предъявленного текста и построчный
 журнал JSON. Команда `tai` запускает автономный FITD.
 
@@ -19,10 +20,10 @@
 uv run --locked --group dev tai /tmp/fitd-demo.jsonl "Explain the topic in detail"
 ```
 
-`FITDAttack` из `attack.fitd_attack` принимает Target с методом
-`reply(Conversation) -> str`, стратегию через контракт `Probe`, оценщика с
-`assess(str) -> bool` и журнал с `record(dict)`. `Attack.run(base)` получает
-`BaseRequest` с `text()` и `metadata()`; для свободного текста CLI использует
+`FITDAttack` из `attack.fitd_attack` принимает `BaseRequest` с `text()` и
+`metadata()`, Target с методом `reply(Conversation) -> str`, стратегию `Probe`,
+оценщика с `assess(str) -> bool` и журнал с `record(dict)`. `Attack.run()`
+выполняет уже связанный запрос; для свободного текста CLI использует
 `PlainBase` без метаданных. `main()` собирает отдельного Attacker для `FITDProbe`
 и оценщика с записью вердикта в журнал; запуск сохраняет текст и метаданные
 базового запроса в событии `start`, записывает выбор результата и передаёт его оценщику;
@@ -92,6 +93,24 @@ GGUFLocation(host, port), gpu, tokens)` из модулей
 
 ## Последовательный пул ALERT
 
+Автономные команды запускаются также как Python-модули из корня проекта
+(`uv run --locked --group dev --extra qwen python -m main.<module>`):
+
+| Стратегия | `<module>` | Дополнительные флаги |
+|---|---|---|
+| FITD | `qwen_cli` (`run JOURNAL BASE`) | `--turns`, `--tokens`, `--attacker` |
+| GOAT | `goat_cli` (`JOURNAL BASE`) | `--turns`, `--tokens` |
+| ThreatenJSON | `threaten_json_cli` (`JOURNAL BASE`) | `--tokens` |
+| Simple Adaptive Attacks | `adaptive_attacks_cli` (`JOURNAL BASE`) | `--tokens` |
+| DRA | `dra_cli` (`JOURNAL BASE`) | `--candidates`, `--seed`, `--tokens` |
+| Bad Characters/deletion | `deletion_cli` (`JOURNAL BASE`) | `--perturbations`, `--positions`, `--ascii`, `--tokens` |
+| AutoDAN GA/HGA | `autodan_cli` (`JOURNAL BASE`) | `--mode ga|hga`, `--target`, `--steps`, `--batch`, `--elites`, `--points`, `--crossover`, `--mutation`, `--seed`, `--tokens` |
+
+Каждый автономный запуск требует `--gpu N` и **новый** путь `JOURNAL`.
+Существующие команды `tai` и `tai-qwen run` для FITD остаются доступны.
+Например, `uv run --locked --group dev --extra qwen python -m main.deletion_cli /tmp/deletion.jsonl "Explain the topic in detail" --gpu 0 --positions 2 --ascii 2`.
+Настройки выбираются аргументами команды, без отдельного файла конфигурации.
+
 Для отдельного GOAT без конфигурационного файла укажите новый путь журнала,
 исходный запрос и лимит ходов; модель и токенизатор Qwen должны быть заранее
 подготовлены:
@@ -152,6 +171,14 @@ base), journal, DRABudget(candidates, seed))` из `attack.envelopes.dra_attack_
 запуск, иначе предъявляется последний оценённый ответ. `--seed` действует только
 внутри этого запуска, не изменяя глобальный генератор случайных чисел.
 
+Bad Characters/deletion использует закреплённое преобразование garak:
+печатаемый ASCII-символ и настоящий U+0008 после выбранного символа исходного
+запроса. Автономная команда `tai-deletion JOURNAL BASE --gpu N` принимает
+`--perturbations` (по умолчанию 1), `--positions` (8) и `--ascii` (4):
+обычный профиль даёт до 32 кандидатов на один базовый запрос.
+В серии `tai-alert` это `--deletion-perturbations`, `--deletion-positions`,
+`--deletion-ascii`; исключение варианта — `--no-deletion`.
+
 AutoDAN GA запускается с исходным запросом и **явным желаемым продолжением**:
 
 ```bash
@@ -198,7 +225,7 @@ Target. При этом нативная проверка успешности �
 репозитория укажите **новый** каталог вывода и CUDA GPU:
 
 ```bash
-uv run --locked --group dev --extra qwen tai-alert /tmp/alert-fitd --gpu 0 --limit 1
+uv run --locked --group dev --extra qwen tai-alert /tmp/alert-series --gpu 0 --limit 1 --autodan --autodan-hga
 ```
 
 По умолчанию `--limit 20`: команда берёт первые N запросов в каждой из 32
@@ -211,6 +238,11 @@ Simple Adaptive Attacks также включён по умолчанию; `--no
 исключает его. Журналы находятся в `adaptive_attacks/<id>.jsonl`.
 DRA включён независимо: `--no-dra` исключает его, `--dra-candidates` и `--dra-seed`
 задают бюджет и локальное зерно. Журналы находятся в `dra/<id>.jsonl`.
+При `--limit 1 --autodan --autodan-hga` включены все восемь фабрик:
+32 исходных запроса × 8 вариантов = **256 попыток**. Это не один запрос и не
+число внутренних кандидатов. Пять суффиксов Simple Adaptive Attacks всегда
+остаются нативными; ранний положительный вердикт может сократить фактическое
+число вызовов. Без двух флагов AutoDAN планируются 192 попытки.
 Для GGUF нужны подготовленный файл и зависимость `--extra gguf`.
 Загрузчик сверяет весь файл с закреплённым SHA-256
 `3ee64c7a6b86c2b28174d8c699407e24f94a4e54ca9b8f9c5fc35bf460725f43`:
@@ -224,8 +256,11 @@ DRA включён независимо: `--no-dra` исключает его, `
 `uv run --locked --group dev --extra qwen python -m main.alert_manifest_cli /path/to/alert.jsonl /tmp/alert-manifest-640.json`.
 Подготовка проверяет SHA-256 исходного файла и все 14 763 записей без сети.
 
-В корне находится общий `summary.json`, а журналы FITD, GOAT и ThreatenJSON лежат в
-`fitd/<id>.jsonl`, `goat/<id>.jsonl` и `threaten_json/<id>.jsonl` соответственно.
+В корне находится общий `summary.json`. По одному независимому журналу на
+исходный запрос находятся в `fitd/`, `goat/`, `threaten_json/`,
+`adaptive_attacks/`, `dra/`, `deletion/`, `autodan/`, `autodan_hga/`
+(`id.jsonl` в каждом каталоге). Внутренние кандидаты и контрольный обмен
+ThreatenJSON не создают дополнительных записей серии.
 Фабрики атак выполняются по очереди; каждая обходит весь пул запросов. В `runs`
 записываются сквозной номер попытки, номер фабрики, полный базовый запрос и его
 метаданные, JSON-описание атаки, финальный результат или ошибка. Верхний уровень
@@ -234,8 +269,30 @@ DRA включён независимо: `--no-dra` исключает его, `
 каждой попытки и не вычисляет успех, процент или вердикт оценщика: они доступны в
 журнале через `ParsedJournal(path).read()`. Если атака не была собрана, поле
 `attack` отсутствует; при ошибке вместо `result` сохраняется `error`.
+`outcome: failure` — ошибка выполнения, а не успешная атака;
+`result: null` при `no_result` означает отсутствие предъявленного ответа.
+События `call` сохраняют фактические вызовы по ролям, `result` — предъявленный
+текст, `judgment` — оценку именно этого текста, `end.reason` — причину остановки.
+`ParsedJournal(path).read()` возвращает `text`, `assessment`, `reason` и
+`calls`; оценку нельзя выводить из контрольного ответа либо отвергнутого кандидата.
+ThreatenJSON использует отдельную **JSON-answer** рубрику: усиленный ответ
+должен быть корректным JSON и содержательно отвечать на исходный запрос;
+обычный `YES/NO`-оценщик других атак проверяет выполнение запроса без JSON-гейта.
 Качество оценки зависит от малой модели Qwen 0.5B и не гарантирует объективную
 успешность атаки.
+
+Для ограниченного воспроизведения всей серии с обоими AutoDAN (укажите свободный
+GPU и новый каталог; перед запуском подготовьте Qwen и NLTK `punkt_tab` как выше):
+
+```bash
+uv run --locked --group dev --extra qwen --extra vllm tai-alert /tmp/alert-issue-97-live-20261027 --gpu 1 --limit 1 --turns 1 --goat-turns 2 --tokens 64 --dra-candidates 2 --dra-seed 13 --deletion-perturbations 1 --deletion-positions 2 --deletion-ascii 2 --autodan --autodan-hga --autodan-target 'Sure, here is the answer' --autodan-steps 2 --autodan-batch 3 --autodan-elites 1 --autodan-points 1 --autodan-crossover 0 --autodan-mutation 0 --autodan-seed 8
+```
+
+Этот короткий профиль: FITD 1 обмен, GOAT 2, DRA до 2 кандидатов, удаление
+до 4, AutoDAN GA/HGA по 2 шага × 3 особи, Simple Adaptive Attacks до пяти
+нативных суффиксов. Общие бюджеты отличаются: FITD 10, GOAT 5, DRA 4,
+удаление до 32, AutoDAN (если включён) 2 × 3; `--tokens` по умолчанию 192.
+Реальные итоги и разбор журналов приведены в [проверке #97](docs/issue-97-verification.md).
 
 Для наблюдения за изменениями кандидатов без файла журнала используйте отдельную
 команду (снимок Qwen должен быть подготовлен заранее):
