@@ -250,7 +250,9 @@ class TestAlertSeries(unittest.TestCase):
         ).requests(1)[0]
         arguments = Namespace(
             gpu=0, tokens=192, attacker="qwen", host="127.0.0.1", port=8080,
-            turns=1, goat_turns=1, no_threaten_json=False, autodan=False, autodan_hga=False
+            turns=1, goat_turns=1, no_threaten_json=False, no_deletion=True,
+            deletion_perturbations=1, deletion_positions=8, deletion_ascii=4,
+            autodan=False, autodan_hga=False
         )
         with tempfile.TemporaryDirectory() as directory, patch(
             "main.alert_series.LazyQwenModel", return_value=threaten_json()
@@ -271,7 +273,9 @@ class TestAlertSeries(unittest.TestCase):
         ).requests(1)[:2]
         arguments = Namespace(
             gpu=0, tokens=192, attacker="qwen", host="127.0.0.1", port=8080,
-            turns=1, goat_turns=1, no_threaten_json=True, autodan=True, autodan_hga=True,
+            turns=1, goat_turns=1, no_threaten_json=True, no_deletion=True,
+            deletion_perturbations=1, deletion_positions=8, deletion_ascii=4,
+            autodan=True, autodan_hga=True,
             autodan_target="Desired completion", autodan_steps=1,
             autodan_batch=3, autodan_elites=1, autodan_points=1,
             autodan_crossover=0.0, autodan_mutation=0.0, autodan_seed=8
@@ -325,7 +329,9 @@ class TestAlertSeries(unittest.TestCase):
         arguments = Namespace(
             gpu=0, tokens=192, attacker="qwen", host="127.0.0.1", port=8080,
             turns=1, goat_turns=1, no_threaten_json=False,
-            no_adaptive_attacks=False, no_dra=True, autodan=False, autodan_hga=False
+            no_adaptive_attacks=False, no_dra=True, no_deletion=True,
+            deletion_perturbations=1, deletion_positions=8, deletion_ascii=4,
+            autodan=False, autodan_hga=False
         )
         with tempfile.TemporaryDirectory() as directory, patch(
             "main.alert_series.LazyQwenModel", return_value=adaptive()
@@ -372,7 +378,9 @@ class TestAlertSeries(unittest.TestCase):
         arguments = Namespace(
             gpu=0, tokens=192, attacker="qwen", host="127.0.0.1", port=8080,
             turns=1, goat_turns=1, no_threaten_json=False, no_adaptive_attacks=False,
-            no_dra=False, dra_candidates=2, dra_seed=13, autodan=False, autodan_hga=False
+            no_dra=False, no_deletion=True, dra_candidates=2, dra_seed=13,
+            deletion_perturbations=1, deletion_positions=8, deletion_ascii=4,
+            autodan=False, autodan_hga=False
         )
         with tempfile.TemporaryDirectory() as directory, patch(
             "main.alert_series.LazyQwenModel", return_value=adaptive()
@@ -404,3 +412,39 @@ class TestAlertSeries(unittest.TestCase):
                     '"budget": ' + json.dumps(expected) in json.dumps(next(ParsedJournal(Path(directory) / "dra" / f"{base.identity}.jsonl").events())["attack"]) for base in bases
                 )
             ) == (32, True, 32, True), "The offline DRA series lost a category, journal, or effective parameters"
+
+    def test_deletion_series_covers_every_category_offline(self) -> None:
+        bases = AlertPool(
+            Path("examples/alert-manifest-640.json")
+        ).requests(1)
+        arguments = Namespace(
+            gpu=0, tokens=192, attacker="qwen", host="127.0.0.1", port=8080,
+            turns=1, goat_turns=1, no_threaten_json=True,
+            no_adaptive_attacks=True, no_dra=True, no_deletion=False,
+            deletion_perturbations=1, deletion_positions=2, deletion_ascii=2,
+            autodan=False, autodan_hga=False
+        )
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "main.alert_series.LazyQwenModel", return_value=adaptive()
+        ), patch(
+            "main.alert_series.cuda_device", return_value="controlled"
+        ), patch(
+            "main.alert_series.snapshot", return_value=None
+        ), prepare(
+            arguments,
+            Path(directory)
+        ) as factories:
+            series(
+                bases, factories[-1:],
+                Path(directory),
+                Path("examples/alert-manifest-640.json")
+            )
+            report = self.report(directory)
+            assert (
+                report["attempted"], report["complete"],
+                len({run["base_metadata"]["microcategory"] for run in report["runs"]}),
+                all(
+                    ParsedJournal(Path(directory) / "deletion" / f"{base.identity}.jsonl").calls(ParsedJournal(Path(directory) / "deletion" / f"{base.identity}.jsonl").events())["target"] == 4
+                    for base in bases
+                )
+            ) == (32, True, 32, True), "The offline deletion series lost a category or independent journal"

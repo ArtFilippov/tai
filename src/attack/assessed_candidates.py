@@ -24,7 +24,7 @@ class AssessedCandidates(CandidateRun):
         self.journal = journal
 
     @override
-    def execute(self, candidates: Iterable[str], target: Chat, assess: Assessment) -> Mapping[str, str | None]:
+    def execute(self, candidates: Iterable[Message], target: Chat, assess: Assessment) -> Mapping[str, str | None]:
         text: str | None = None
         for index, prompt in enumerate(
             candidates, start=1
@@ -51,12 +51,12 @@ class AssessedCandidates(CandidateRun):
             "reason": "candidates_exhausted"
         }
 
-    def exchange(self, target: Chat, prompt: str, index: int) -> str:
+    def exchange(self, target: Chat, prompt: Message, index: int) -> str:
         """Record one complete exchange from a fresh conversation.
 
         Args:
             target (Chat): Target role.
-            prompt (str): Transformed request.
+            prompt (Message): Transformed request with its provenance.
             index (int): One-based candidate position.
 
         Returns:
@@ -66,7 +66,7 @@ class AssessedCandidates(CandidateRun):
             [
                 Turn(
                     "user",
-                    Message(prompt)
+                    prompt
                 )
             ]
         )
@@ -76,7 +76,8 @@ class AssessedCandidates(CandidateRun):
                 "event": "call",
                 "role": "target",
                 "candidate": index,
-                "prompt": prompt,
+                "prompt": prompt.text,
+                "metadata": prompt.notes,
                 "response": response
             }
         )

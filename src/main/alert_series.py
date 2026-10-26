@@ -12,12 +12,16 @@ from attack.dra_budget import DRABudget
 from attack.dra_limits_utils import validate as validate_dra
 from attack.dra_options_utils import options as dra_options
 from attack.envelopes.dra_attack_envelope import DRAAttackEnvelope
+from attack.deletion_budget import DeletionBudget
+from attack.deletion_options_utils import options as deletion_options
+from attack.envelopes.deletion_attack_envelope import DeletionAttackEnvelope
 from attack.envelopes.goat_attack_envelope import GOATAttackEnvelope
 from attack.envelopes.threaten_json_attack_envelope import ThreatenJSONAttackEnvelope
 from attack.autodan_budget import AutoDANBudget
 from attack.autodan_budget_utils import validate
 from attack.envelopes.autodan_attack_envelope import AutoDANAttackEnvelope
 from attack.fitd_setup import FITDSetup
+from attack.alert_attempt_utils import invoke
 from attack.run_capture import RunCapture
 from base.alert_identity import AlertIdentity
 from base.alert_pool import AlertPool
@@ -37,7 +41,6 @@ from target.local_qwen_assets import LocalQwenAssets
 from target.qwen_logits import QwenLogits
 
 GGUF = "gguf"
-OUTCOME = "outcome"
 THREATEN_JSON = 2
 
 
@@ -72,6 +75,7 @@ def main() -> None:
         help="omit the Simple Adaptive Attacks variant"
     )
     dra_options(parser)
+    deletion_options(parser)
     _ = parser.add_argument(
         "--autodan", action="store_true", help="include local AutoDAN GA"
     )
@@ -138,6 +142,14 @@ def launch(arguments: Namespace) -> None:
                 arguments.dra_candidates, arguments.dra_seed
             )
         )
+    if not getattr(
+        arguments, "no_deletion", False
+    ):
+        DeletionBudget(
+            arguments.deletion_perturbations,
+            arguments.deletion_positions,
+            arguments.deletion_ascii
+        ).validate()
     if arguments.autodan or arguments.autodan_hga:
         limits = budget(arguments)
         if arguments.autodan:
@@ -199,68 +211,14 @@ def series(
         for base in bases:
             number += 1
             invoke(
-                base, factory, index, number, summary=summary
+                base, factory,
+                {
+                    "factory": index,
+                    "number": number
+                },
+                summary=summary,
+                attempt=RunCapture()
             )
-
-
-def invoke(
-    base: BaseRequest, factory: Callable[[BaseRequest], Attack],
-    index: int, number: int, *, summary: AlertSeries,
-) -> None:
-    """Keep one attempt's available result or error in the root index.
-
-    Args:
-        base (BaseRequest): Selected source request.
-        factory (Callable[[BaseRequest], Attack]): Current bound attack variant.
-        index (int): Current factory number.
-        number (int): Global attempt number.
-        summary (AlertSeries): Root summary for the launch.
-
-    Raises:
-        KeyboardInterrupt: After recording an interrupted attempt.
-    """
-    entry: dict[str, object] = {
-        "number": number,
-        "factory": index,
-        "base": base.text(),
-        "base_metadata": dict(
-            base.metadata()
-        )
-    }
-    attempt = RunCapture()
-    try:
-        result(
-            base, factory, entry, attempt
-        )
-    except KeyboardInterrupt:
-        entry[OUTCOME] = "interrupted"
-        raise
-    finally:
-        if OUTCOME not in entry:
-            if attempt.failed():
-                entry[OUTCOME] = "failure"
-                entry["error"] = attempt.error()
-            else:
-                entry[OUTCOME] = "completed"
-        summary.record(entry)
-
-
-def result(
-    base: BaseRequest, factory: Callable[[BaseRequest], Attack],
-    entry: dict[str, object], attempt: RunCapture,
-) -> None:
-    """Run a fresh attack and retain its description alongside its result.
-
-    Args:
-        base (BaseRequest): Selected request.
-        factory (Callable[[BaseRequest], Attack]): Bound attack composition.
-        entry (dict[str, object]): Partial index entry to complete.
-        attempt (RunCapture): Independent failure boundary.
-    """
-    with attempt.guard():
-        attack = factory(base)
-        entry["attack"] = attack.description()
-        entry["result"] = attack.run()
 
 
 def journal(path: Path) -> Journal:
@@ -331,6 +289,27 @@ def ga_setup(attacker: Model, target: Model, base: BaseRequest) -> FITDSetup:
     )
 
 
+def deletion_budget(arguments: Namespace) -> DeletionBudget:
+    """Validate the selected native deletion bounds.
+
+    Args:
+        arguments (Namespace): Series deletion settings.
+
+    Returns:
+        DeletionBudget: Effective per-base bounds.
+    """
+    limits = DeletionBudget(
+        arguments.deletion_perturbations,
+        arguments.deletion_positions,
+        arguments.deletion_ascii
+    )
+    if not getattr(
+        arguments, "no_deletion", False
+    ):
+        limits.validate()
+    return limits
+
+
 @contextmanager
 def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[BaseRequest], Attack]]]:
     """Hold model resources and expose only request-to-attack factories.
@@ -351,6 +330,7 @@ def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[B
                 arguments, "dra_seed", 0
             )
         )
+        deletion_limits = deletion_budget(arguments)
         attacks: list[Callable[[BaseRequest], Attack]] = [
             lambda base: FITDAttackEnvelope(
                 base, FITDSetup(attacker, target, target, base.text()),
@@ -375,6 +355,10 @@ def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[B
             arguments, "no_dra", False
         ):
             attacks.append(lambda base: DRAAttackEnvelope( base, FITDSetup(attacker, target, target, base.text()), journal(directory / "dra" / f"{base.metadata()['id']}.jsonl"), dra_budget ))
+        if not getattr(
+            arguments, "no_deletion", False
+        ):
+            attacks.append(lambda base: DeletionAttackEnvelope( base, FITDSetup(attacker, target, target, base.text()), journal(directory / "deletion" / f"{base.metadata()['id']}.jsonl"), deletion_limits ))
         if arguments.autodan or arguments.autodan_hga:
             device = cuda_device(arguments.gpu)
             scorer = QwenLogits(

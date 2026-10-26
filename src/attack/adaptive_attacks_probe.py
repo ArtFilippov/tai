@@ -3,6 +3,7 @@
 from collections.abc import Mapping
 from typing import override
 
+from garak.attempt import Message
 from garak.probes.adaptive_attacks import ADAPTIVE_TEMPLATE, SUFFIXES_PATH
 
 from attack.assessment import Assessment
@@ -49,6 +50,6 @@ class AdaptiveAttacksProbe(Probe):
         if len(suffixes) != SUFFIX_COUNT:
             raise ValueError("The pinned adaptive suffix resource must contain five candidates")
         return self.candidates.execute(
-            (ADAPTIVE_TEMPLATE.format(goal=base, suffix=suffix) for suffix in suffixes),
+            (Message(ADAPTIVE_TEMPLATE.format(goal=base, suffix=suffix)) for suffix in suffixes),
             target, assess
         )

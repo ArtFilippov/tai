@@ -5,6 +5,7 @@ import random
 from collections.abc import Iterator, Mapping
 from typing import override
 
+from garak.attempt import Message
 from garak.data import path as data_path
 from garak.probes.dra import TOOL_LIST
 
@@ -161,14 +162,14 @@ class DRAProbe(Probe):
             "`", '"'
         )
 
-    def prompts(self, rng: random.Random) -> Iterator[str]:
+    def prompts(self, rng: random.Random) -> Iterator[Message]:
         """Yield pinned templates in order, recording each puzzle's provenance.
 
         Args:
             rng (random.Random): Fresh random stream for this run.
 
         Yields:
-            str: Disguised request for an independent Target conversation.
+            Message: Disguised request for an independent Target conversation.
 
         Raises:
             ValueError: If the pinned template count changes.
@@ -206,7 +207,7 @@ class DRAProbe(Probe):
                     "prompt": prompt
                 }
             )
-            yield prompt
+            yield Message(prompt)
 
     @override
     def execute(self, base: str, target: Chat, assess: Assessment) -> Mapping[str, str | None]:

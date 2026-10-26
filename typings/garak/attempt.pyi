@@ -3,7 +3,8 @@
 class Message:
     text: str
     lang: str | None
-    def __init__(self, text: str, lang: str | None = ...) -> None: ...
+    notes: dict[str, object]
+    def __init__(self, text: str, lang: str | None = ..., notes: dict[str, object] = ...) -> None: ...
 
 class Turn:
     role: str
