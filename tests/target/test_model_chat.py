@@ -4,11 +4,11 @@ import unittest
 
 from garak.attempt import Conversation, Message, Turn
 
-from target.qwen_chat import QwenChat
+from target.model_chat import ModelChat
 from target.scripted_model import ScriptedModel
 
 
-class TestQwenChat(unittest.TestCase):
+class TestModelChat(unittest.TestCase):
     """Checks that histories do not leak between model roles."""
 
     def test_role_isolation(self) -> None:
@@ -28,8 +28,8 @@ class TestQwenChat(unittest.TestCase):
                 ]
             ]
         )
-        target = QwenChat(model)
-        attacker = QwenChat(model)
+        target = ModelChat(model)
+        attacker = ModelChat(model)
         target.reply(
             Conversation(
                 [

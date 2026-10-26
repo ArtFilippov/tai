@@ -26,6 +26,9 @@ vllm = [
     "xformers==0.0.28.post3; sys_platform == 'linux' and platform_machine == 'x86_64'",
     "numpy==1.26.4; sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
+gguf = [
+    "llama-cpp-python[server]==0.3.36; sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
 
 [project.scripts]
 tai = "main.cli:main"
@@ -54,6 +57,10 @@ dev = [
 [tool.uv]
 # garak rejects resource symlinks that resolve outside its installed data directory.
 link-mode = "copy"
+no-binary-package = ["llama-cpp-python"]
+
+[tool.uv.extra-build-variables]
+llama-cpp-python = { CMAKE_ARGS = "-DGGML_CUDA=on" }
 
 [tool.uv.sources]
 garak = { git = "https://github.com/NVIDIA/garak.git", rev = "3f50ea5ff9cd7050099940647c15c39b07a93392" }

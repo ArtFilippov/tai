@@ -13,7 +13,7 @@ from target.continuing_chat import ContinuingChat
 from target.envelopes.lazy_qwen_model import LazyQwenModel
 from target.model import Model
 from target.qwen_device_utils import cuda_device
-from target.qwen_chat import QwenChat
+from target.model_chat import ModelChat
 
 # Micro-category identifiers follow ALERT_taxonomy.md, Figure 2.
 BASES = (
@@ -83,17 +83,17 @@ def observe(base: str, model: Model, turns: int) -> MemoryJournal:
     if turns < 1:
         raise ValueError("FITD round limit must be positive")
     journal = MemoryJournal()
-    target = QwenChat(model)
+    target = ModelChat(model)
     judge = RecordedJudge(
         QwenJudge(
             base,
-            QwenChat(model)
+            ModelChat(model)
         ),
         journal, base
     )
     probe = FITDProbe(
         base, ContinuingChat(
-            QwenChat(model)
+            ModelChat(model)
         ), journal, turns
     )
     _ = FITDAttack(

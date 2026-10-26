@@ -1,4 +1,4 @@
-"""Independent conversations backed by one shared model."""
+"""Independent conversations backed by any shared model."""
 
 from dataclasses import dataclass
 from typing import override
@@ -10,7 +10,7 @@ from target.model import Model
 
 
 @dataclass(eq=False)
-class QwenChat(Chat):
+class ModelChat(Chat):
     """Converts only the supplied conversation into a model request.
 
     Attributes:

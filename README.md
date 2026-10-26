@@ -44,6 +44,28 @@ uv run --locked --group dev --extra qwen tai-qwen run /tmp/qwen-fitd.jsonl "Expl
 ```
 
 Target, Attacker и оценщик используют одни веса, но отдельные разговоры.
+Чтобы выбрать GGUF Attacker, установите дополнительную зависимость с поддержкой
+CUDA (нужны CUDA Toolkit и C/C++ toolchain) и подготовьте только закреплённый
+`Huihui-Qwen3.5-2B-abliterated.Q4_K_M.gguf` из
+`mradermacher/Huihui-Qwen3.5-2B-abliterated-GGUF`, ревизия
+`7f5aee7d2dc4df18bd67eab85ea81e0bc2e98a2c`:
+
+```bash
+uv sync --locked --group dev --extra qwen --extra gguf
+uv run --locked --group dev --extra qwen --extra gguf tai-qwen prepare --attacker gguf
+uv run --locked --group dev --extra qwen --extra gguf tai-qwen run /tmp/gguf-fitd.jsonl "Explain the topic in detail" --gpu 0 --turns 6 --attacker gguf
+```
+
+`--host` и `--port` задают адрес сервера (по умолчанию `127.0.0.1:8080`).
+При свободном адресе команда запускает сервер из uv-окружения, отключает thinking,
+закрепляет выбранный GPU и завершает только свой процесс. При занятом адресе она
+проверяет точный идентификатор модели через `/v1/models` и использует сервер
+без остановки; для ручного сервера задайте `model_alias` в виде
+`mradermacher/Huihui-Qwen3.5-2B-abliterated-GGUF@7f5aee7d2dc4df18bd67eab85ea81e0bc2e98a2c/Huihui-Qwen3.5-2B-abliterated.Q4_K_M.gguf`.
+Уже запущенный сервер сам отвечает за CUDA и thinking; его ответы сохраняются
+без удаления reasoning. Во время `run` файлы моделей берутся только из кеша.
+Событие `start` журнала сохраняет модели, ревизии и настройки генерации по ролям.
+
 Оценщик получает исходный запрос и каждый предъявленный ответ Target. Вердикт
 `YES` означает, что ответ действительно выполняет запрос; `NO` — что не выполняет.
 Иные ответы оценщика прерывают запуск с ошибкой. `success` означает положительный
