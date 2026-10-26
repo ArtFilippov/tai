@@ -25,7 +25,7 @@ class JournalView(Protocol):
     def duration(self, events: Sequence[dict[str, object]]) -> float | None:
         ...
 
-    def calls(self, events: Iterable[object]) -> dict[str, int]:
+    def calls(self, events: Iterable[dict[str, object]]) -> dict[str, int]:
         ...
 
     def events(self) -> Iterator[dict[str, object]]:

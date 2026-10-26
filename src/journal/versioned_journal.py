@@ -8,7 +8,11 @@ from journal.journal import Journal
 
 @dataclass(eq=False)
 class VersionedJournal(Journal):
-    """Give every record its destination journal's schema identity."""
+    """Give every record its destination journal's schema identity.
+
+    Attributes:
+        journal (Journal): Destination that provides the schema identity.
+    """
 
     journal: Journal
 

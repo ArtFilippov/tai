@@ -15,6 +15,9 @@ NO_RESULT = "no_result"
 FAILURE = "failure"
 REASON = "reason"
 EXECUTION_ERROR = "execution_error"
+SERIES = "series"
+START = "start"
+SCHEMA_ID = "tai.run"
 
 
 @dataclass(eq=False)
@@ -176,7 +179,7 @@ class ParsedJournal(JournalView):
         """
         if not events:
             return None
-        if events[0].get("event") == "series":
+        if events[0].get("event") == SERIES:
             events = events[1:]
         match events:
             case [{"event": "start", "at": int() | float() as start}, *_, {"event": "end", "at": int() | float() as end}]:
@@ -187,11 +190,11 @@ class ParsedJournal(JournalView):
                 return None
 
     @override
-    def calls(self, events: Iterable[object]) -> dict[str, int]:
+    def calls(self, events: Iterable[dict[str, object]]) -> dict[str, int]:
         """Count calls while checking the surrounding event sequence.
 
         Args:
-            events (Iterable[object]): Events from the finished journal.
+            events (Iterable[dict[str, object]]): Events from the finished journal.
 
         Returns:
             dict[str, int]: Recorded calls by role.
@@ -210,10 +213,9 @@ class ParsedJournal(JournalView):
             if finished:
                 raise ValueError("Events after run completion")
             match event:
-                case {"event": "series", "summary": str()} if not started:
-                    pass
-                case {"event": "start", "base": str()} if not started:
-                    started = True
+                case ({"event": "series", "summary": str()}
+                      | {"event": "start", "base": str()}) if not started:
+                    started = event["event"] == START
                 case {"event": "call", "role": str() as role, "prompt": str(), "response": str() | None} if started and role in counts:
                     counts[role] += 1
                 case ({"event": "step", "prompt": str(), "response": str(), "accepted": bool()}
@@ -235,10 +237,13 @@ class ParsedJournal(JournalView):
 
         Yields:
             dict[str, object]: An event decoded from the journal.
+
+        Raises:
+            ValueError: If an event has an unsupported journal schema.
         """
         with self.path.open(encoding="utf-8") as stream:
             for line in stream:
                 event: dict[str, object] = json.loads(line)
-                if event.get("schema_id") != "tai.run" or event.get("schema_version") != 1:
+                if event.get("schema_id") != SCHEMA_ID or event.get("schema_version") != 1:
                     raise ValueError(f"Unsupported journal schema in {self.path}: {event.get('schema_id')!r} version {event.get('schema_version')!r}")
                 yield event
