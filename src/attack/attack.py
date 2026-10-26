@@ -2,14 +2,11 @@
 
 from typing import Protocol
 
-from base.base_request import BaseRequest
-
-
 class Attack(Protocol):
-    """Selects a presented text from a supplied base request."""
+    """Select a presented text for the request bound to this attack."""
 
     def description(self) -> dict[str, object]:
         ...
 
-    def run(self, base: BaseRequest) -> str | None:
+    def run(self) -> str | None:
         ...

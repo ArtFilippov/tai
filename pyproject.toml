@@ -32,7 +32,7 @@ gguf = [
 
 [project.scripts]
 tai = "main.cli:main"
-tai-qwen = "main.alert_series:qwen_main"
+tai-qwen = "main.qwen_cli:qwen_main"
 tai-alert = "main.alert_series:main"
 tai-qwen-observe = "main.qwen_observe:main"
 tai-qwen-search = "main.qwen_observe:search_main"

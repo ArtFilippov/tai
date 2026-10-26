@@ -18,6 +18,7 @@ class FITDAttack(Attack):
     """One attack run that owns selection before requesting judgment.
 
     Attributes:
+        base (BaseRequest): Request associated with this run.
         target (Chat): Conversation being attacked.
         judge (Judge): Assessment of the presented result.
         journal (Journal): Destination for all run events.
@@ -25,23 +26,26 @@ class FITDAttack(Attack):
         failures (list[str]): Assessment failures during this run.
     """
 
+    base: BaseRequest
     target: Chat
     judge: Judge
     journal: Journal
     probe: Probe
     failures: list[str]
 
-    def __init__(self, target: Chat, judge: Judge, journal: Journal,
-                 probe: Probe) -> None:
+    def __init__(self, base: BaseRequest, target: Chat, judge: Judge, journal: Journal,
+                 *, probe: Probe) -> None:
         """Keep the independently injected participants and journal.
 
         Args:
+            base (BaseRequest): Request associated with this run.
             target (Chat): Conversation being attacked.
             judge (Judge): Assessment of the presented result.
             journal (Journal): Destination for all run events.
             probe (Probe): Configured FITD strategy.
         """
         super().__init__()
+        self.base = base
         self.target = target
         self.judge = judge
         self.journal = journal
@@ -49,20 +53,20 @@ class FITDAttack(Attack):
         self.failures: list[str] = []
 
     @override
-    def run(self, base: BaseRequest) -> str | None:
+    def run(self) -> str | None:
         self.journal.record(
             {
                 "event": "start",
-                "base": base.text(),
+                "base": self.base.text(),
                 "base_metadata": dict(
-                    base.metadata()
+                    self.base.metadata()
                 ),
                 "attack": self.description()
             }
         )
         try:
             outcome = self.probe.execute(
-                base.text(), self.target, self.assess
+                self.base.text(), self.target, self.assess
             )
         except Exception as exc:
             if not self.failures:

@@ -1,108 +1,111 @@
-"""Sequential ALERT runs and a compact index derived from saved journals."""
+"""Sequential ALERT attacks over a validated pool of base requests."""
 
 from argparse import ArgumentParser, Namespace
-from collections.abc import Generator, Mapping, Sequence
-from contextlib import contextmanager, nullcontext
+from collections.abc import Callable, Generator, Sequence
+from contextlib import AbstractContextManager, contextmanager, nullcontext
+from dataclasses import dataclass
 from pathlib import Path
 from typing import override
 
-from huggingface_hub import snapshot_download
-
+from attack.attack import Attack
 from attack.fitd_attack import FITDAttack
 from attack.fitd_probe import FITDProbe
-from attack.model_run import ModelRun
 from attack.run_capture import RunCapture
-from attack.run_capture_contract import RunCaptureContract
 from base.alert_identity import AlertIdentity
 from base.alert_pool import AlertPool
-from base.alert_taxonomy import AlertTaxonomy
 from base.base_request import BaseRequest
-from base.plain_base import PlainBase
-from benchmark.alert_archive import AlertArchive
-from benchmark.alert_ports import AlertPorts
 from benchmark.alert_series import AlertSeries
-from benchmark.recorded_alert_archive import RecordedAlertArchive
 from journal.disk_journal import DiskJournal
 from journal.journal import Journal
-from journal.journal_view import JournalView
-from journal.parsed_journal import ParsedJournal
 from journal.versioned_journal import VersionedJournal
 from judge.qwen_judge import QwenJudge
 from judge.recorded_judge import RecordedJudge
 from target.continuing_chat import ContinuingChat
 from target.gguf.envelopes.gguf_profile import GGUFProfile
+from target.gguf.envelopes.alert_gguf_file import AlertGGUFFile
 from target.envelopes.lazy_qwen_model import LazyQwenModel
-from target.gguf.gguf_file import GGUFFile
+from target.qwen_snapshot_utils import snapshot
 from target.gguf.gguf_location import GGUFLocation
 from target.model import Model
 from target.model_chat import ModelChat
 from target.qwen_device_utils import cuda_device
 
 GGUF = "gguf"
-PREPARE = "prepare"
+OUTCOME = "outcome"
 
 
-class DiskAlertPorts(AlertPorts):
-    """Open a fresh disk journal or recover one already written."""
+def text(base: BaseRequest) -> str:
+    """Read the request shared by the independent FITD roles.
 
-    @override
-    def journal(self, path: Path) -> Journal:
-        """Create the journal for one attempt.
+    Args:
+        base (BaseRequest): Bound source request.
 
-        Args:
-            path (Path): Reserved attempt path.
+    Returns:
+        str: Original text.
+    """
+    return base.text()
+
+
+@dataclass(eq=False)
+class FITDAttackEnvelope(Attack):
+    """Bind one request and fresh role conversations to shared model resources.
+
+    Attributes:
+        base (BaseRequest): Original request.
+        attacker (Model): Shared Attacker resource.
+        target (Model): Shared Target resource.
+        judge (Model): Shared assessment resource.
+        journal (Journal): Attempt event sink.
+        turns (int): Maximum Target exchanges.
+    """
+
+    base: BaseRequest
+    attacker: Model
+    target: Model
+    judge: Model
+    journal: Journal
+    turns: int
+
+    def attack(self) -> Attack:
+        """Assemble isolated FITD conversations for this attempt.
 
         Returns:
-            Journal: Append-only event sink.
+            Attack: Bound strategy with a recorded assessment.
         """
-        return VersionedJournal(
-            DiskJournal(path)
+        return FITDAttack(
+            self.base,
+            ModelChat(self.target),
+            RecordedJudge(
+                QwenJudge(
+                    text(self.base),
+                    ModelChat(self.judge)
+                ),
+                self.journal,
+                text(self.base)
+            ),
+            self.journal,
+            probe=FITDProbe(
+                text(self.base),
+                ContinuingChat(
+                    ModelChat(self.attacker)
+                ),
+                self.journal, self.turns
+            )
         )
 
     @override
-    def view(self, path: Path) -> JournalView:
-        """Recover the saved record of an attempt.
-
-        Args:
-            path (Path): Finished journal path.
-
-        Returns:
-            JournalView: Recorded outcome and exchanges.
-        """
-        return ParsedJournal(path)
+    def description(self) -> dict[str, object]:
+        return (
+            self.attack()
+            .description()
+        )
 
     @override
-    def capture(self) -> RunCaptureContract:
-        """Create a fresh failure boundary for the next run.
-
-        Returns:
-            RunCaptureContract: Isolated failure state.
-        """
-        return RunCapture()
-
-
-def outcome(path: Path) -> dict[str, str]:
-    """Classify a finished journal through the assembled archive.
-
-    Args:
-        path (Path): Saved journal of an attempt.
-
-    Returns:
-        dict[str, str]: Outcome with an optional error.
-    """
-    return archive().outcome(path)
-
-
-def archive() -> AlertArchive:
-    """Bind the journal format and complete ALERT taxonomy.
-
-    Returns:
-        AlertArchive: Independent series storage boundary.
-    """
-    return RecordedAlertArchive(
-        DiskAlertPorts(),
-        AlertTaxonomy()
-    )
+    def run(self) -> str | None:
+        return (
+            self.attack()
+            .run()
+        )
 
 
 def main() -> None:
@@ -130,7 +133,7 @@ def main() -> None:
     _ = parser.add_argument(
         "--attacker",
         choices=(
-            "qwen", "gguf"
+            "qwen", GGUF
         ),
         default="qwen"
     )
@@ -161,232 +164,179 @@ def launch(arguments: Namespace) -> None:
     arguments.output_dir.mkdir(
         parents=True, exist_ok=False
     )
-    series = assemble_series(
-        bases,
-        pool.taxonomy(),
-        arguments.output_dir, arguments.manifest
-    )
-    series.save()
-    with session(arguments) as runs:
-        series.run(runs)
+    with prepare(
+        arguments, arguments.output_dir
+    ) as factories:
+        series(
+            bases, factories, arguments.output_dir, arguments.manifest
+        )
     print(arguments.output_dir / "summary.json")
 
 
-def assemble_series(
-    bases: Sequence[AlertIdentity], taxonomy: Mapping[str, object],
+def planned(bases: Sequence[AlertIdentity], factories: Sequence[Callable[[BaseRequest], Attack]]) -> int:
+    """Count the full Cartesian product before the first attempt.
+
+    Args:
+        bases (Sequence[AlertIdentity]): Validated requests.
+        factories (Sequence[Callable[[BaseRequest], Attack]]): Attack variants.
+
+    Returns:
+        int: Planned attempts.
+    """
+    return len(bases) * len(factories)
+
+
+def series(
+    bases: Sequence[AlertIdentity], factories: Sequence[Callable[[BaseRequest], Attack]],
     directory: Path, manifest: Path,
-) -> AlertSeries:
-    """Bind validated requests to a fresh journal archive.
+) -> None:
+    """Run every factory over the validated requests and save known results.
 
     Args:
         bases (Sequence[AlertIdentity]): Validated selection.
-        taxonomy (Mapping[str, object]): Published macro groups.
-        directory (Path): Reserved output directory.
+        factories (Sequence[Callable[[BaseRequest], Attack]]): Bound attack compositions.
+        directory (Path): Reserved output directory for the whole launch.
         manifest (Path): Source manifest.
-
-    Returns:
-        AlertSeries: Series ready for independent attempts.
     """
-    return AlertSeries(
-        bases, taxonomy, directory, manifest, archive=archive()
+    summary = AlertSeries(
+        manifest, directory,
+        planned(
+            bases, factories
+        )
     )
+    summary.save()
+    number = 0
+    for index, factory in enumerate(
+        factories, start=1
+    ):
+        for base in bases:
+            number += 1
+            invoke(
+                base, factory, index, number, summary=summary
+            )
 
 
-def text(base: BaseRequest) -> str:
-    """Read the original request for the three independent FITD roles.
+def invoke(
+    base: BaseRequest, factory: Callable[[BaseRequest], Attack],
+    index: int, number: int, *, summary: AlertSeries,
+) -> None:
+    """Keep one attempt's available result or error in the root index.
+
+    Args:
+        base (BaseRequest): Selected source request.
+        factory (Callable[[BaseRequest], Attack]): Current bound attack variant.
+        index (int): Current factory number.
+        number (int): Global attempt number.
+        summary (AlertSeries): Root summary for the launch.
+
+    Raises:
+        KeyboardInterrupt: After recording an interrupted attempt.
+    """
+    entry: dict[str, object] = {
+        "number": number,
+        "factory": index,
+        "base": base.text(),
+        "base_metadata": dict(
+            base.metadata()
+        )
+    }
+    attempt = RunCapture()
+    try:
+        result(
+            base, factory, entry, attempt
+        )
+    except KeyboardInterrupt:
+        entry[OUTCOME] = "interrupted"
+        raise
+    finally:
+        if OUTCOME not in entry:
+            if attempt.failed():
+                entry[OUTCOME] = "failure"
+                entry["error"] = attempt.error()
+            else:
+                entry[OUTCOME] = "completed"
+        summary.record(entry)
+
+
+def result(
+    base: BaseRequest, factory: Callable[[BaseRequest], Attack],
+    entry: dict[str, object], attempt: RunCapture,
+) -> None:
+    """Run a fresh attack and retain its description alongside its result.
 
     Args:
         base (BaseRequest): Selected request.
+        factory (Callable[[BaseRequest], Attack]): Bound attack composition.
+        entry (dict[str, object]): Partial index entry to complete.
+        attempt (RunCapture): Independent failure boundary.
+    """
+    with attempt.guard():
+        attack = factory(base)
+        entry["attack"] = attack.description()
+        entry["result"] = attack.run()
+
+
+def journal(path: Path) -> Journal:
+    """Reserve one independent journal in its attack's output directory.
+
+    Args:
+        path (Path): Unique destination for the attempt.
 
     Returns:
-        str: Original request text.
+        Journal: Versioned event sink for the attack.
     """
-    return base.text()
-
-
-def gguf() -> GGUFFile:
-    """Identify the pinned optional Attacker file.
-
-    Returns:
-        GGUFFile: Pinned local asset identity.
-    """
-    return GGUFFile(
-        "mradermacher/Huihui-Qwen3.5-2B-abliterated-GGUF",
-        "7f5aee7d2dc4df18bd67eab85ea81e0bc2e98a2c",
-        "Huihui-Qwen3.5-2B-abliterated.Q4_K_M.gguf"
+    path.parent.mkdir(
+        parents=True, exist_ok=True
     )
-
-
-def snapshot(offline: bool) -> str:
-    """Locate the pinned Qwen snapshot, downloading only during preparation.
-
-    Args:
-        offline (bool): Require an already prepared local snapshot.
-
-    Returns:
-        str: Local snapshot path.
-
-    Raises:
-        FileNotFoundError: If the requested snapshot is unavailable locally.
-    """
-    try:
-        return snapshot_download(
-            "Qwen/Qwen2.5-0.5B-Instruct",
-            revision="7ae557604adf67be50417f59c2c2f167def9a775",
-            local_files_only=offline,
-        )
-    except OSError as exc:
-        raise FileNotFoundError("Prepare the pinned Qwen snapshot before running offline") from exc
-
-
-def run(base: BaseRequest, path: Path, model: Model, attacker: Model, *, turns: int) -> None:
-    """Build fresh FITD roles and a journal for one attempt.
-
-    Args:
-        base (BaseRequest): Original request and provenance.
-        path (Path): Unique journal destination.
-        model (Model): Shared Target and judge resource.
-        attacker (Model): Shared Attacker resource.
-        turns (int): Maximum FITD turns.
-    """
-    journal = VersionedJournal(
+    path.touch(exist_ok=False)
+    return VersionedJournal(
         DiskJournal(path)
     )
-    _ = FITDAttack(
-        target=ModelChat(model),
-        judge=RecordedJudge(
-            QwenJudge(
-                text(base),
-                ModelChat(model)
-            ),
-            journal,
-            text(base)
-        ),
-        journal=journal,
-        probe=FITDProbe(
-            text(base),
-            ContinuingChat(
-                ModelChat(attacker)
-            ),
-            journal, turns
-        )
-    ).run(base)
 
 
-@contextmanager
-def session(arguments: Namespace) -> Generator[ModelRun]:
-    """Hold the selected Attacker resource across all attempts.
+def context(arguments: Namespace, model: Model) -> AbstractContextManager[Model]:
+    """Keep an optional GGUF Attacker alive for the whole invocation.
 
     Args:
         arguments (Namespace): Model and CUDA settings.
+        model (Model): Shared Qwen resource for all roles by default.
+
+    Returns:
+        AbstractContextManager[Model]: Selected Attacker resource.
+    """
+    return (
+        GGUFProfile(AlertGGUFFile(), GGUFLocation(arguments.host, arguments.port), arguments.gpu, arguments.tokens).open()
+        if arguments.attacker == GGUF else nullcontext(model)
+    )
+
+
+@contextmanager
+def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[BaseRequest], Attack]]]:
+    """Hold model resources and expose only request-to-attack factories.
+
+    Args:
+        arguments (Namespace): Selected models and limits.
+        directory (Path): Root of this launch's artifacts.
 
     Yields:
-        ModelRun: Shared resources for independent attempts.
+        list[Callable[[BaseRequest], Attack]]: Independent per-request attacks.
     """
+    def factories(attacker: Model, target: Model) -> list[Callable[[BaseRequest], Attack]]:
+        return [
+            lambda base: FITDAttackEnvelope(
+                base, attacker, target, target,
+                journal(directory / "fitd" / f"{base.metadata()['id']}.jsonl"),
+                arguments.turns
+            )
+        ]
+
     model = LazyQwenModel(
         cuda_device(arguments.gpu), arguments.tokens
     )
     _ = snapshot(True)
-    context = (
-        GGUFProfile(gguf(), GGUFLocation(arguments.host, arguments.port), arguments.gpu, arguments.tokens).open()
-        if arguments.attacker == GGUF else nullcontext(model)
-    )
-    with context as attacker:
-        yield assemble(
-            model, attacker, arguments.turns
+    with context(
+        arguments, model
+    ) as attacker:
+        yield factories(
+            attacker, model
         )
-
-
-def assemble(model: Model, attacker: Model, turns: int) -> ModelRun:
-    """Bind reusable resources to fresh per-attempt composition.
-
-    Args:
-        model (Model): Shared Target and judge resource.
-        attacker (Model): Shared Attacker resource.
-        turns (int): Maximum FITD turns.
-
-    Returns:
-        ModelRun: An isolated attempt for each invocation.
-    """
-    return ModelRun(
-        model, attacker, turns,
-        lambda base, path, model, attacker, turns=turns: run(base, path, model, attacker, turns=turns)
-    )
-
-
-def qwen_main() -> None:
-    """Prepare pinned weights or run a local CUDA FITD experiment."""
-    parser = ArgumentParser(description="Local Qwen FITD experiment")
-    commands = parser.add_subparsers(
-        dest="command", required=True
-    )
-    prepare = commands.add_parser(
-        PREPARE, help="Download pinned model and tokenizer"
-    )
-    _ = prepare.add_argument(
-        "--attacker",
-        choices=(
-            "qwen", GGUF
-        ),
-        default="qwen"
-    )
-    command = commands.add_parser(
-        "run", help="Run offline FITD"
-    )
-    _ = command.add_argument(
-        "journal", type=Path
-    )
-    _ = command.add_argument("base")
-    _ = command.add_argument(
-        "--gpu", type=int, required=True
-    )
-    _ = command.add_argument(
-        "--turns", type=int, default=10
-    )
-    _ = command.add_argument(
-        "--tokens", type=int, default=192
-    )
-    _ = command.add_argument(
-        "--attacker",
-        choices=(
-            "qwen", GGUF
-        ),
-        default="qwen"
-    )
-    _ = command.add_argument(
-        "--host", default="127.0.0.1"
-    )
-    _ = command.add_argument(
-        "--port", type=int, default=8080
-    )
-    qwen_launch(
-        parser.parse_args()
-    )
-
-
-def qwen_launch(arguments: Namespace) -> None:
-    """Assemble one run from parsed command arguments.
-
-    Args:
-        arguments (Namespace): Parsed command arguments.
-
-    Raises:
-        ValueError: If the round limit is invalid.
-        FileExistsError: If the journal already exists.
-    """
-    if arguments.command == PREPARE:
-        print(gguf().prepare() if arguments.attacker == GGUF else snapshot(False))
-        return
-    if arguments.turns < 1:
-        raise ValueError("FITD round limit must be positive")
-    if arguments.journal.exists():
-        raise FileExistsError(arguments.journal)
-    with session(arguments) as runs:
-        arguments.journal.touch(exist_ok=False)
-        runs.run(
-            PlainBase(arguments.base),
-            arguments.journal
-        )
-    print(
-        ParsedJournal(arguments.journal).read()
-    )

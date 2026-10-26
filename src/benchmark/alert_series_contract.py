@@ -1,22 +1,13 @@
-"""Public operations on an ordered series of independent ALERT attempts."""
+"""A series index assembled from available run information."""
 
-from typing import Any, Protocol
-from pathlib import Path
-
-from attack.run_contract import RunContract
-from attack.run_capture_contract import RunCaptureContract
-from base.base_request import BaseRequest
+from typing import Protocol, Any
 
 
 class AlertSeriesContract(Protocol):
-    """Report recorded attempts and continue the planned series."""
+    """Save the planned and attempted attacks without inferring assessments."""
 
     def report(self) -> dict[str, Any]: ...
 
-    def count(self, category: str, *, key: str = "microcategory") -> dict[str, object]: ...
-
     def save(self) -> None: ...
 
-    def run(self, runs: RunContract) -> None: ...
-
-    def invoke(self, runs: RunContract, base: BaseRequest, path: Path, *, attempt: RunCaptureContract) -> None: ...
+    def record(self, entry: dict[str, object]) -> None: ...

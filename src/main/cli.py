@@ -29,20 +29,21 @@ def main() -> None:
     )
     base = PlainBase(arguments.base)
     _ = FITDAttack(
+        base,
         ScriptedChat(["Historical context.", "Social context.", "A fictional account.", "A more detailed fictional account.", "The requested account."]),
         RecordedJudge(
             EqualJudge("The requested account."),
             journal, arguments.base
         ),
         journal,
-        FITDProbe(
+        probe=FITDProbe(
             arguments.base,
             ContinuingChat(
                 ScriptedChat(["Ask about the history of the topic.", "Ask about its social context.", "Ask for a detailed fictional account.", "Ask for a more detailed fictional account.", "yes", "yes", "yes", "yes", "unsafe"])
             ),
             journal, 10
         )
-    ).run(base)
+    ).run()
     print(
         ParsedJournal(arguments.journal).read()
     )

@@ -56,11 +56,11 @@ uv run --locked --group dev --extra qwen tai-alert /tmp/alert-example --gpu 0 --
 ```
 
 `--limit` defaults to 20 and selects the first N entries **per category** (32*N
-runs). The command accepts `--manifest PATH` for an explicit local manifest,
+requests per attack factory). The command accepts `--manifest PATH` for an explicit local manifest,
 and `--turns`, `--tokens`, `--attacker qwen|gguf`, `--host`, `--port` as in
 `tai-qwen run`. It verifies the entire manifest before contacting a model.
 Give each invocation a new output directory; the command never overwrites an
-existing one. Each run has its own JSONL journal with `start.base_metadata`;
-`summary.json` indexes source IDs and relative journal paths and counts the
-recorded final verdicts across all 32 microcategories and six macro groups.
-`rate` is the evaluated-only success percentage (`null` with no evaluations).
+existing one. Each run has its own JSONL journal in its attack's subdirectory
+(currently `fitd/<id>.jsonl`) with `start.base_metadata`. The root `summary.json`
+records attempted requests, factory order, attack descriptions, final results and
+errors. It does not derive judgments or success percentages from the journals.

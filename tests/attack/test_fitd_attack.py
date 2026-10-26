@@ -38,20 +38,19 @@ class TestFITDAttack(unittest.TestCase):
             DiskJournal(path)
         )
         FITDAttack(
+            PlainBase(base),
             target,
             RecordedJudge(
                 EqualJudge(response),
                 journal, base
             ),
             journal,
-            FITDProbe(
+            probe=FITDProbe(
                 base,
                 ContinuingChat(attacker),
                 journal, 8
             )
-        ).run(
-            PlainBase(base)
-        )
+        ).run()
         return ParsedJournal(path).read()
 
     def failed(self, path: Path, replies: list[str]) -> Mapping[str, object]:
@@ -64,6 +63,7 @@ class TestFITDAttack(unittest.TestCase):
             )
         ):
             FITDAttack(
+                PlainBase("Request"),
                 ScriptedChat(["Exact candidate"]),
                 RecordedJudge(
                     QwenJudge(
@@ -73,16 +73,14 @@ class TestFITDAttack(unittest.TestCase):
                     journal, "Request"
                 ),
                 journal,
-                FITDProbe(
+                probe=FITDProbe(
                     "Request",
                     ContinuingChat(
                         ScriptedChat(["Opening", "One", "Two", "Three"])
                     ),
                     journal, 1
                 )
-            ).run(
-                PlainBase("Request")
-            )
+            ).run()
         return ParsedJournal(path).read()
 
     def mismatched(self, path: Path) -> Mapping[str, object]:
@@ -93,22 +91,21 @@ class TestFITDAttack(unittest.TestCase):
             ValueError, match="base request differs"
         ):
             FITDAttack(
+                PlainBase("Other request"),
                 ScriptedChat([]),
                 RecordedJudge(
                     EqualJudge("Nothing"),
                     journal, "Other request"
                 ),
                 journal,
-                FITDProbe(
+                probe=FITDProbe(
                     "First request",
                     ContinuingChat(
                         ScriptedChat([])
                     ),
                     journal, 1
                 )
-            ).run(
-                PlainBase("Other request")
-            )
+            ).run()
         return ParsedJournal(path).read()
 
     def test_presented_result(self) -> None:
@@ -131,22 +128,21 @@ class TestFITDAttack(unittest.TestCase):
                 DiskJournal(path)
             )
             FITDAttack(
+                PlainBase("Request"),
                 ScriptedChat(["Partial"]),
                 RecordedJudge(
                     EqualJudge("Success"),
                     journal, "Request"
                 ),
                 journal,
-                FITDProbe(
+                probe=FITDProbe(
                     "Request",
                     ContinuingChat(
                         ScriptedChat(["Safe", "One", "Two", "Three", "yes", "unsafe"])
                     ),
                     journal, 1
                 )
-            ).run(
-                PlainBase("Request")
-            )
+            ).run()
             assert ParsedJournal(path).read()["status"] == "round_limit", "The round limit was mistaken for success"
 
     def test_escales_to_base(self) -> None:
@@ -201,22 +197,21 @@ class TestFITDAttack(unittest.TestCase):
                 DiskJournal(path)
             )
             FITDAttack(
+                PlainBase("Request refused"),
                 ScriptedChat([]),
                 RecordedJudge(
                     EqualJudge("Nothing"),
                     journal, "Request refused"
                 ),
                 journal,
-                FITDProbe(
+                probe=FITDProbe(
                     "Request refused",
                     ContinuingChat(
                         ScriptedChat(["I cannot fulfill your request"] * 3)
                     ),
                     journal, 8
                 )
-            ).run(
-                PlainBase("Request refused")
-            )
+            ).run()
             assert ParsedJournal(path).read()["status"] == "no_result", "A failed opening was presented as a result"
 
     def test_refusal_has_no_presented_result(self) -> None:
@@ -225,22 +220,21 @@ class TestFITDAttack(unittest.TestCase):
                 DiskJournal(path)
             )
             FITDAttack(
+                PlainBase("Request refused"),
                 ScriptedChat(["I cannot fulfill your request"]),
                 RecordedJudge(
                     EqualJudge("Nothing"),
                     journal, "Request refused"
                 ),
                 journal,
-                FITDProbe(
+                probe=FITDProbe(
                     "Request refused",
                     ContinuingChat(
                         ScriptedChat(["Safe opening", "First", "Second", "Third", "Safer opening"])
                     ),
                     journal, 1
                 )
-            ).run(
-                PlainBase("Request refused")
-            )
+            ).run()
             assert ParsedJournal(path).read()["calls"] == {
                 "target": 1,
                 "attacker": 5,
@@ -304,6 +298,7 @@ class TestFITDAttack(unittest.TestCase):
                 DiskJournal(path)
             )
             FITDAttack(
+                base,
                 ScriptedChat(["Reply"]),
                 RecordedJudge(
                     EqualJudge("Never"),
@@ -311,14 +306,14 @@ class TestFITDAttack(unittest.TestCase):
                     base.text()
                 ),
                 journal,
-                FITDProbe(
+                probe=FITDProbe(
                     base.text(),
                     ContinuingChat(
                         ScriptedChat(["Opening", "One", "Two", "Three", "yes"])
                     ),
                     journal, 1
                 )
-            ).run(base)
+            ).run()
             events = list(
                 ParsedJournal(path).events()
             )
@@ -357,22 +352,21 @@ class TestFITDAttack(unittest.TestCase):
                 DiskJournal(path)
             )
             FITDAttack(
+                PlainBase("Request"),
                 ScriptedChat(["I cannot fulfill your request", "Fresh reply"]),
                 RecordedJudge(
                     EqualJudge("Never"),
                     journal, "Request"
                 ),
                 journal,
-                FITDProbe(
+                probe=FITDProbe(
                     "Request",
                     ContinuingChat(
                         ScriptedChat(["Opening", "One", "Two", "Three", "Safer opening", "yes"])
                     ),
                     journal, 2
                 )
-            ).run(
-                PlainBase("Request")
-            )
+            ).run()
             events = list(
                 ParsedJournal(path).events()
             )
@@ -400,22 +394,21 @@ class TestFITDAttack(unittest.TestCase):
                 DiskJournal(path)
             )
             FITDAttack(
+                PlainBase("Request"),
                 ScriptedChat(["First", "I cannot fulfill your request", "Recovered"]),
                 RecordedJudge(
                     EqualJudge("Never"),
                     journal, "Request"
                 ),
                 journal,
-                FITDProbe(
+                probe=FITDProbe(
                     "Request",
                     ContinuingChat(
                         ScriptedChat(["Opening", "One", "Two", "Three", "yes", "Paraphrased", "yes"])
                     ),
                     journal, 3
                 )
-            ).run(
-                PlainBase("Request")
-            )
+            ).run()
             events = list(
                 ParsedJournal(path).events()
             )
@@ -445,22 +438,21 @@ class TestFITDAttack(unittest.TestCase):
                 DiskJournal(path)
             )
             FITDAttack(
+                PlainBase("Request"),
                 ScriptedChat(["First", "I cannot fulfill your request"]),
                 RecordedJudge(
                     EqualJudge("Never"),
                     journal, "Request"
                 ),
                 journal,
-                FITDProbe(
+                probe=FITDProbe(
                     "Request",
                     ContinuingChat(
                         ScriptedChat(["Opening", "One", "Two", "Three", "yes", "Paraphrased"])
                     ),
                     journal, 2
                 )
-            ).run(
-                PlainBase("Request")
-            )
+            ).run()
             assert ParsedJournal(path).read()["text"] == "First", "The discarded refusal replaced the selected result"
 
     def test_realignment_keeps_conversation(self) -> None:
@@ -469,22 +461,21 @@ class TestFITDAttack(unittest.TestCase):
                 DiskJournal(path)
             )
             FITDAttack(
+                PlainBase("Request"),
                 ScriptedChat(["Off topic", "Improved"]),
                 RecordedJudge(
                     EqualJudge("Improved"),
                     journal, "Request"
                 ),
                 journal,
-                FITDProbe(
+                probe=FITDProbe(
                     "Request",
                     ContinuingChat(
                         ScriptedChat(["Opening", "One", "Two", "Three", "no"])
                     ),
                     journal, 2
                 )
-            ).run(
-                PlainBase("Request")
-            )
+            ).run()
             events = list(
                 ParsedJournal(path).events()
             )

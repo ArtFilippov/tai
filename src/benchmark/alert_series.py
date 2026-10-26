@@ -1,194 +1,66 @@
-"""Ordered independent runs with a summary derived from saved outcomes."""
+"""A durable index of known outcomes for an ALERT attack series."""
 
-from collections.abc import Mapping, Sequence
+import json
 from pathlib import Path
 from typing import Any, override
 
-from attack.run_capture_contract import RunCaptureContract
-from attack.run_contract import RunContract
-from base.alert_identity import AlertIdentity
-from base.base_request import BaseRequest
-from benchmark.alert_archive import AlertArchive
 from benchmark.alert_series_contract import AlertSeriesContract
 
 INTERRUPTED = "interrupted"
-SUCCESSFUL = "successful"
-FAILURE = "failure"
-INVALID = "invalid"
-NO_RESULT = "no_result"
-ERROR = "error"
 
 
 class AlertSeries(AlertSeriesContract):
-    """Own a new output directory and preserve each attempted run's outcome."""
+    """Keep the attempt index current as the outer loop performs attacks."""
 
     def __init__(
-        self, bases: Sequence[AlertIdentity], taxonomy: Mapping[str, object],
-        directory: Path, manifest: Path, *, archive: AlertArchive,
+        self, manifest: Path, directory: Path, planned: int,
     ) -> None:
-        """Keep the plan, taxonomy and destination for the series.
+        """Hold the output destination and the number of planned attempts.
 
         Args:
-            bases (Sequence[AlertIdentity]): Selected original requests.
-            taxonomy (Mapping[str, object]): Macro categories in canonical order.
-            directory (Path): New journal directory.
-            manifest (Path): Source manifest location.
-            archive (AlertArchive): Persistence and classification boundary.
+            manifest (Path): Original pool manifest.
+            directory (Path): Reserved output directory.
+            planned (int): Total attempts across all factories.
         """
         super().__init__()
-        self.bases = bases
-        self.taxonomy = taxonomy
-        self.directory = directory
         self.manifest = manifest
-        self.archive = archive
-        self.entries: list[dict[str, str | int]] = []
+        self.directory = directory
+        self.planned = planned
+        self.entries: list[dict[str, object]] = []
 
     @override
     def report(self) -> dict[str, Any]:
-        """Count only verified terminal assessments, without calling a model.
+        """Describe only known attempts, texts and execution outcomes.
 
         Returns:
-            dict[str, Any]: Counts and linked journal outcomes.
+            dict[str, Any]: Current plan and saved observations.
         """
         return {
             "manifest": str(self.manifest),
-            "complete": len(self.entries) == len(self.bases) and all(
+            "planned": self.planned,
+            "attempted": len(self.entries),
+            "complete": len(self.entries) == self.planned and all(
                 entry["outcome"] != INTERRUPTED for entry in self.entries
             ),
-            "planned": len(self.bases),
-            "attempted": len(self.entries),
-            "runs": self.entries,
-            "micro": {category: self.count(category) for category in self.archive.categories()},
-            "macro": {
-                macro: self.count(macro, key="macro") for macro in self.taxonomy
-            },
-        }
-
-    @override
-    def count(self, category: str, *, key: str = "microcategory") -> dict[str, object]:
-        """Aggregate recorded outcomes for one canonical category or group.
-
-        Args:
-            category (str): Category to count.
-            key (str, default='microcategory'): Entry field naming the category.
-
-        Returns:
-            dict[str, object]: Outcome counts and percentage.
-        """
-        items = [entry for entry in self.entries if entry[key] == category]
-        planned = sum(base.metadata()[key] == category for base in self.bases)
-        evaluated = sum(entry["outcome"] in {SUCCESSFUL, "unsuccessful"} for entry in items)
-        successful = sum(entry["outcome"] == SUCCESSFUL for entry in items)
-        return {
-            "planned": planned,
-            "attempted": len(items),
-            "evaluated": evaluated,
-            "successful": successful,
-            "unsuccessful": evaluated - successful,
-            "unevaluated": len(items) - evaluated,
-            "failure": sum(entry["outcome"] == FAILURE for entry in items),
-            "no_result": sum(entry["outcome"] == NO_RESULT for entry in items),
-            "invalid": sum(entry["outcome"] == INVALID for entry in items),
-            "rate": 100 * successful / evaluated if evaluated else None,
+            "runs": self.entries
         }
 
     @override
     def save(self) -> None:
-        """Replace only this series' own summary after every completed attempt."""
-        self.archive.save(
-            self.directory / "summary.json",
-            self.report()
+        """Save the latest index in the launch's root directory."""
+        _ = (self.directory / "summary.json").write_text(
+            json.dumps(
+                self.report(),
+                ensure_ascii=False, indent=2
+            ) + "\n", encoding="utf-8"
         )
 
     @override
-    def invoke(self, runs: RunContract, base: BaseRequest, path: Path, *, attempt: RunCaptureContract) -> None:
-        """Run one attempt inside its independent failure boundary.
+    def record(self, entry: dict[str, object]) -> None:
+        """Commit one observed attempt immediately.
 
         Args:
-            runs (RunContract): Shared per-attempt execution.
-            base (BaseRequest): Selected original request.
-            path (Path): Reserved journal path.
-            attempt (RunCaptureContract): Current exception boundary.
+            entry (dict[str, object]): Available request, attack and outcome facts.
         """
-        with attempt.guard():
-            runs.run(
-                base, path
-            )
-
-    @override
-    def run(self, runs: RunContract) -> None:
-        """Attempt every base in order, retaining errors and partial interruptions.
-
-        Args:
-            runs (RunContract): Fresh isolated run for each base.
-
-        Raises:
-            KeyboardInterrupt: When the series has been interrupted and saved.
-        """
-        for index, base in enumerate(
-            self.bases, start=1
-        ):
-            path = self.directory.joinpath(f"{index:03d}-{base.identity}.jsonl")
-            path.touch(exist_ok=False)
-            self.archive.record(
-                path,
-                {
-                    "event": "series",
-                    "summary": "summary.json"
-                }
-            )
-            start_size = path.stat().st_size
-            entry: dict[str, str | int] = {
-                "id": base.identity,
-                "microcategory": base.microcategory,
-                "macro": base.macro,
-                "journal": path.name,
-                "outcome": "pending",
-            }
-            attempt = self.archive.capture()
-            try:
-                self.invoke(
-                    runs, base, path, attempt=attempt
-                )
-            except KeyboardInterrupt:
-                if path.stat().st_size == start_size:
-                    self.archive.record(
-                        path,
-                        {
-                            "event": "interruption",
-                            "base_metadata": dict(
-                                base.metadata()
-                            )
-                        }
-                    )
-                entry["outcome"] = INTERRUPTED
-                self.entries.append(entry)
-                self.save()
-                raise
-            if attempt.failed():
-                exc = attempt.error()
-                if path.stat().st_size == start_size:
-                    self.archive.record(
-                        path,
-                        {
-                            "event": "startup_error",
-                            "base_metadata": dict(
-                                base.metadata()
-                            ),
-                            "error": exc
-                        }
-                    )
-                entry.update(
-                    {
-                        "outcome": self.archive.failure(path),
-                        "error": exc
-                    }
-                )
-                self.entries.append(entry)
-            else:
-                verdict = self.archive.outcome(path)
-                entry["outcome"] = verdict["outcome"]
-                if ERROR in verdict:
-                    entry[ERROR] = verdict[ERROR]
-                self.entries.append(entry)
-            self.save()
+        self.entries.append(entry)
+        self.save()

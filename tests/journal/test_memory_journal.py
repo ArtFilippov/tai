@@ -185,16 +185,15 @@ class TestMemoryJournal(unittest.TestCase):
         chat = ScriptedChat(["Opening", "One", "Two", "Three", "yes", "yes", "yes"])
         attacker = ContinuingChat(chat)
         _ = FITDAttack(
+            PlainBase("Request"),
             target,
             RecordedJudge(
                 EqualJudge("Never"),
                 journal, "Request"
             ),
             journal,
-            FITDProbe(
+            probe=FITDProbe(
                 "Request", attacker, journal, 2
             )
-        ).run(
-            PlainBase("Request")
-        )
+        ).run()
         assert journal.report()["target_requests"] == ["Opening", "Two"], "FITD requests were not observed without a disk journal"

@@ -103,8 +103,8 @@ def observe(base: str, model: Model, turns: int) -> MemoryJournal:
         recorded, turns
     )
     _ = FITDAttack(
-        target, judge, recorded, probe
-    ).run(request)
+        request, target, judge, recorded, probe=probe
+    ).run()
     return journal
 
 
