@@ -12,6 +12,8 @@ import pytest
 
 from attack.fitd_attack import FITDAttack
 from attack.fitd_probe import FITDProbe
+from base.alert_pool import AlertPool
+from base.plain_base import PlainBase
 from journal.disk_journal import DiskJournal
 from journal.parsed_journal import ParsedJournal
 from judge.equal_judge import EqualJudge
@@ -35,13 +37,18 @@ class TestFITDAttack(unittest.TestCase):
         FITDAttack(
             target,
             RecordedJudge(
-                EqualJudge(response), journal, base
+                EqualJudge(response),
+                journal, base
             ),
             journal,
             FITDProbe(
-                base, ContinuingChat(attacker), journal, 8
+                base,
+                ContinuingChat(attacker),
+                journal, 8
             )
-        ).run(base)
+        ).run(
+            PlainBase(base)
+        )
         return ParsedJournal(path).read()
 
     def failed(self, path: Path, replies: list[str]) -> Mapping[str, object]:
@@ -68,7 +75,9 @@ class TestFITDAttack(unittest.TestCase):
                     ),
                     journal, 1
                 )
-            ).run("Request")
+            ).run(
+                PlainBase("Request")
+            )
         return ParsedJournal(path).read()
 
     def mismatched(self, path: Path) -> Mapping[str, object]:
@@ -90,7 +99,9 @@ class TestFITDAttack(unittest.TestCase):
                     ),
                     journal, 1
                 )
-            ).run("Other request")
+            ).run(
+                PlainBase("Other request")
+            )
         return ParsedJournal(path).read()
 
     def test_presented_result(self) -> None:
@@ -124,7 +135,9 @@ class TestFITDAttack(unittest.TestCase):
                     ),
                     journal, 1
                 )
-            ).run("Request")
+            ).run(
+                PlainBase("Request")
+            )
             assert ParsedJournal(path).read()["status"] == "round_limit", "The round limit was mistaken for success"
 
     def test_escales_to_base(self) -> None:
@@ -190,7 +203,9 @@ class TestFITDAttack(unittest.TestCase):
                     ),
                     journal, 8
                 )
-            ).run("Request refused")
+            ).run(
+                PlainBase("Request refused")
+            )
             assert ParsedJournal(path).read()["status"] == "no_result", "A failed opening was presented as a result"
 
     def test_refusal_has_no_presented_result(self) -> None:
@@ -210,7 +225,9 @@ class TestFITDAttack(unittest.TestCase):
                     ),
                     journal, 1
                 )
-            ).run("Request refused")
+            ).run(
+                PlainBase("Request refused")
+            )
             assert ParsedJournal(path).read()["calls"] == {
                 "target": 1,
                 "attacker": 5,
@@ -230,6 +247,70 @@ class TestFITDAttack(unittest.TestCase):
                 check=True, capture_output=True, text=True
             )
             assert ParsedJournal(path).read()["status"] == "success", "The command did not finish the experiment"
+
+    def test_plain_command_start(self) -> None:
+        with self.file("plain.jsonl") as path:
+            subprocess.run(
+                [
+                    str(
+                        Path(sys.executable).with_name("tai")
+                    ),
+                    str(path),
+                    "Free-form request"
+                ],
+                check=True, capture_output=True, text=True
+            )
+            assert list(ParsedJournal(path).events())[0]["base_metadata"] == {}, "The text command invented source taxonomy"
+
+    def test_alert_start_and_outcome(self) -> None:
+        with self.file("alert.jsonl") as path:
+            base = AlertPool(
+                Path("examples/alert-manifest-640.json")
+            ).requests(1)[0]
+            journal = DiskJournal(path)
+            FITDAttack(
+                ScriptedChat(["Reply"]),
+                RecordedJudge(
+                    EqualJudge("Never"),
+                    journal,
+                    base.text()
+                ),
+                journal,
+                FITDProbe(
+                    base.text(),
+                    ContinuingChat(
+                        ScriptedChat(["Opening", "One", "Two", "Three", "yes"])
+                    ),
+                    journal, 1
+                )
+            ).run(base)
+            events = list(
+                ParsedJournal(path).events()
+            )
+            assert [(
+                event["event"],
+                event.get("base"),
+                event.get("base_metadata")
+            ) for event in events if event["event"] in {"start", "result", "judgment", "end"}] == [
+                (
+                    "start",
+                    base.text(),
+                    dict(
+                        base.metadata()
+                    )
+                ),
+                (
+                    "result", None, None
+                ),
+                (
+                    "judgment",
+                    base.text(),
+                    None
+                ),
+                (
+                    "end", None, None
+                )
+            ], "The ALERT start provenance or result-to-judgment ordering was lost"
 
     def test_inconsistent_base(self) -> None:
         with self.file("mismatch.jsonl") as path:
@@ -252,7 +333,9 @@ class TestFITDAttack(unittest.TestCase):
                     ),
                     journal, 2
                 )
-            ).run("Request")
+            ).run(
+                PlainBase("Request")
+            )
             events = list(
                 ParsedJournal(path).events()
             )
@@ -291,7 +374,9 @@ class TestFITDAttack(unittest.TestCase):
                     ),
                     journal, 3
                 )
-            ).run("Request")
+            ).run(
+                PlainBase("Request")
+            )
             events = list(
                 ParsedJournal(path).events()
             )
@@ -332,7 +417,9 @@ class TestFITDAttack(unittest.TestCase):
                     ),
                     journal, 2
                 )
-            ).run("Request")
+            ).run(
+                PlainBase("Request")
+            )
             assert ParsedJournal(path).read()["text"] == "First", "The discarded refusal replaced the selected result"
 
     def test_realignment_keeps_conversation(self) -> None:
@@ -352,7 +439,9 @@ class TestFITDAttack(unittest.TestCase):
                     ),
                     journal, 2
                 )
-            ).run("Request")
+            ).run(
+                PlainBase("Request")
+            )
             events = list(
                 ParsedJournal(path).events()
             )

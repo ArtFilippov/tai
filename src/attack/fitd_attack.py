@@ -5,6 +5,7 @@ from typing import override
 
 from attack.attack import Attack
 from attack.probe import Probe
+from base.base_request import BaseRequest
 from journal.journal import Journal
 from judge.judge import Judge
 from target.chat import Chat
@@ -48,16 +49,19 @@ class FITDAttack(Attack):
         self.failures: list[str] = []
 
     @override
-    def run(self, base: str) -> str | None:
+    def run(self, base: BaseRequest) -> str | None:
         self.journal.record(
             {
                 "event": "start",
-                "base": base
+                "base": base.text(),
+                "base_metadata": dict(
+                    base.metadata()
+                )
             }
         )
         try:
             outcome = self.probe.execute(
-                base, self.target, self.assess
+                base.text(), self.target, self.assess
             )
         except Exception as exc:
             if not self.failures:

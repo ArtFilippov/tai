@@ -5,6 +5,7 @@ from pathlib import Path
 
 from attack.fitd_attack import FITDAttack
 from attack.fitd_probe import FITDProbe
+from base.plain_base import PlainBase
 from journal.disk_journal import DiskJournal
 from journal.parsed_journal import ParsedJournal
 from judge.equal_judge import EqualJudge
@@ -23,6 +24,7 @@ def main() -> None:
     arguments = ArgumentParser.parse_args(parser)
     arguments.journal.touch(exist_ok=False)
     journal = DiskJournal(arguments.journal)
+    base = PlainBase(arguments.base)
     _ = FITDAttack(
         ScriptedChat(["Historical context.", "Social context.", "A fictional account.", "A more detailed fictional account.", "The requested account."]),
         RecordedJudge(
@@ -37,7 +39,7 @@ def main() -> None:
             ),
             journal, 10
         )
-    ).run(arguments.base)
+    ).run(base)
     print(
         ParsedJournal(arguments.journal).read()
     )

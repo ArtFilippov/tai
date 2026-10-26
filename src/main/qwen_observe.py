@@ -6,6 +6,7 @@ from collections.abc import Mapping
 
 from attack.fitd_attack import FITDAttack
 from attack.fitd_probe import FITDProbe
+from base.plain_base import PlainBase
 from journal.memory_journal import MemoryJournal
 from judge.qwen_judge import QwenJudge
 from judge.recorded_judge import RecordedJudge
@@ -82,6 +83,7 @@ def observe(base: str, model: Model, turns: int) -> MemoryJournal:
     """
     if turns < 1:
         raise ValueError("FITD round limit must be positive")
+    request = PlainBase(base)
     journal = MemoryJournal()
     target = ModelChat(model)
     judge = RecordedJudge(
@@ -92,13 +94,15 @@ def observe(base: str, model: Model, turns: int) -> MemoryJournal:
         journal, base
     )
     probe = FITDProbe(
-        base, ContinuingChat(
+        base,
+        ContinuingChat(
             ModelChat(model)
-        ), journal, turns
+        ),
+        journal, turns
     )
     _ = FITDAttack(
         target, judge, journal, probe
-    ).run(base)
+    ).run(request)
     return journal
 
 

@@ -4,6 +4,7 @@ import unittest
 
 from attack.fitd_attack import FITDAttack
 from attack.fitd_probe import FITDProbe
+from base.plain_base import PlainBase
 from journal.memory_journal import MemoryJournal
 from judge.equal_judge import EqualJudge
 from judge.recorded_judge import RecordedJudge
@@ -191,9 +192,9 @@ class TestMemoryJournal(unittest.TestCase):
             ),
             journal,
             FITDProbe(
-                "Request",
-                attacker,
-                journal, 2
+                "Request", attacker, journal, 2
             )
-        ).run("Request")
+        ).run(
+            PlainBase("Request")
+        )
         assert journal.report()["target_requests"] == ["Opening", "Two"], "FITD requests were not observed without a disk journal"
