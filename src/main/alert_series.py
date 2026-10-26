@@ -7,6 +7,7 @@ from pathlib import Path
 
 from attack.attack import Attack
 from attack.envelopes.fitd_attack_envelope import FITDAttackEnvelope
+from attack.envelopes.goat_attack_envelope import GOATAttackEnvelope
 from attack.fitd_setup import FITDSetup
 from attack.run_capture import RunCapture
 from base.alert_identity import AlertIdentity
@@ -48,14 +49,13 @@ def main() -> None:
         "--turns", type=int, default=10
     )
     _ = parser.add_argument(
+        "--goat-turns", type=int, default=5
+    )
+    _ = parser.add_argument(
         "--tokens", type=int, default=192
     )
     _ = parser.add_argument(
-        "--attacker",
-        choices=(
-            "qwen", GGUF
-        ),
-        default="qwen"
+        "--attacker", choices=("qwen", GGUF), default="qwen"
     )
     _ = parser.add_argument(
         "--host", default="127.0.0.1"
@@ -77,7 +77,7 @@ def launch(arguments: Namespace) -> None:
     Raises:
         ValueError: If the run limits are invalid.
     """
-    if arguments.turns < 1 or arguments.tokens < 1 or arguments.gpu < 0 or not 1 <= arguments.port <= 65535:
+    if min(arguments.turns, arguments.goat_turns, arguments.tokens) < 1 or arguments.gpu < 0 or not 1 <= arguments.port <= 65535:
         raise ValueError("Invalid GPU, turn, token or port limit")
     pool = AlertPool(arguments.manifest)
     bases = pool.requests(arguments.limit)
@@ -247,6 +247,11 @@ def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[B
                 base, FITDSetup(attacker, target, target, base.text()),
                 journal(directory / "fitd" / f"{base.metadata()['id']}.jsonl"),
                 arguments.turns
+            ),
+            lambda base: GOATAttackEnvelope(
+                base, FITDSetup(attacker, target, target, base.text()),
+                journal(directory / "goat" / f"{base.metadata()['id']}.jsonl"),
+                arguments.goat_turns
             )
         ]
 

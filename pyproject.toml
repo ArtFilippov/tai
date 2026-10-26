@@ -34,6 +34,7 @@ gguf = [
 tai = "main.cli:main"
 tai-qwen = "main.qwen_cli:qwen_main"
 tai-alert = "main.alert_series:main"
+tai-goat = "main.goat_cli:main"
 tai-qwen-observe = "main.qwen_observe:main"
 tai-qwen-search = "main.qwen_observe:search_main"
 

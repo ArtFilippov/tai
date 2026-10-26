@@ -34,6 +34,10 @@ class FITDProbe(FITD, Probe):
         self.max_calls_per_conv = turns
 
     @override
+    def kind(self) -> str:
+        return "fitd"
+
+    @override
     def description(self) -> dict[str, object]:
         return {
             "type": "fitd_probe",

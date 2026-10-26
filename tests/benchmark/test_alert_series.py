@@ -9,13 +9,14 @@ from unittest.mock import Mock
 
 from attack.attack import Attack
 from attack.envelopes.fitd_attack_envelope import FITDAttackEnvelope
+from attack.envelopes.goat_attack_envelope import GOATAttackEnvelope
 from attack.fitd_setup import FITDSetup
 from base.alert_pool import AlertPool
 from base.base_request import BaseRequest
 from benchmark.alert_series import AlertSeries
 from journal.parsed_journal import ParsedJournal
 from main.alert_series import journal, series
-from ..attack.model_fixture_utils import refusal
+from ..attack.model_fixture_utils import goat, refusal
 
 
 class TestAlertSeries(unittest.TestCase):
@@ -170,6 +171,31 @@ class TestAlertSeries(unittest.TestCase):
                 ),
                 "fitd", 2
             ), "The shared models mixed requests across FITD attempts"
+
+    def test_offline_goat_has_independent_alert_journals(self) -> None:
+        bases = AlertPool(
+            Path("examples/alert-manifest-640.json")
+        ).requests(1)[:2]
+        model = goat()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            series(
+                bases, [lambda base: GOATAttackEnvelope( base, FITDSetup(model, model, model, base.text()), journal(root / "goat" / f"{base.metadata()['id']}.jsonl"), 1 )], root,
+                Path("manifest.json")
+            )
+            events = list(
+                ParsedJournal(root / "goat" / f"{bases[1].identity}.jsonl").events()
+            )
+            assert (
+                self.report(directory)["attempted"],
+                events[0]["base"], [event["role"] for event in events if event["event"] == "call"]
+            ) == (
+                        2,
+                        bases[1].text(),
+                        [
+                            "attacker", "target", "attacker", "judge"
+                        ]
+                    ), "The offline GOAT series lost an independent run or mixed roles"
 
     def test_interruption_keeps_partial_summary(self) -> None:
         bases = AlertPool(

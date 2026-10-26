@@ -34,7 +34,7 @@ class FITDAttack(Attack):
     failures: list[str]
 
     def __init__(self, base: BaseRequest, target: Chat, judge: Judge, journal: Journal,
-                 *, probe: Probe) -> None:
+                  *, probe: Probe) -> None:
         """Keep the independently injected participants and journal.
 
         Args:
@@ -88,7 +88,9 @@ class FITDAttack(Attack):
             {
                 "event": "end",
                 "status": outcome.get("status"),
-                "reason": "early_success" if outcome.get("status") == SUCCESS else outcome.get("status")
+                "reason": outcome.get(
+                    "reason", "early_success" if outcome.get("status") == SUCCESS else outcome.get("status")
+                )
             }
         )
         return outcome.get("text")
@@ -96,7 +98,7 @@ class FITDAttack(Attack):
     @override
     def description(self) -> dict[str, object]:
         return {
-            "type": "fitd",
+            "type": self.probe.kind(),
             "target": self.target.description(),
             "judge": self.judge.description(),
             "probe": self.probe.description()
