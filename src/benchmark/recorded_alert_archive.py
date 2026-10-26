@@ -4,10 +4,10 @@ import json
 from pathlib import Path
 from typing import Any, override
 
-from attack.alert_archive import AlertArchive
-from attack.alert_ports import AlertPorts
 from attack.run_capture_contract import RunCaptureContract
 from base.alert_taxonomy_contract import AlertTaxonomyContract
+from benchmark.alert_archive import AlertArchive
+from benchmark.alert_ports import AlertPorts
 
 FAILURE = "failure"
 INVALID = "invalid"

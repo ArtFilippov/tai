@@ -8,13 +8,9 @@ from typing import override
 
 from huggingface_hub import snapshot_download
 
-from attack.alert_archive import AlertArchive
-from attack.alert_ports import AlertPorts
-from attack.alert_series import AlertSeries
 from attack.fitd_attack import FITDAttack
 from attack.fitd_probe import FITDProbe
-from attack.qwen_run import QwenRun
-from attack.recorded_alert_archive import RecordedAlertArchive
+from attack.model_run import ModelRun
 from attack.run_capture import RunCapture
 from attack.run_capture_contract import RunCaptureContract
 from base.alert_identity import AlertIdentity
@@ -22,6 +18,10 @@ from base.alert_pool import AlertPool
 from base.alert_taxonomy import AlertTaxonomy
 from base.base_request import BaseRequest
 from base.plain_base import PlainBase
+from benchmark.alert_archive import AlertArchive
+from benchmark.alert_ports import AlertPorts
+from benchmark.alert_series import AlertSeries
+from benchmark.recorded_alert_archive import RecordedAlertArchive
 from journal.disk_journal import DiskJournal
 from journal.journal import Journal
 from journal.journal_view import JournalView
@@ -274,14 +274,14 @@ def run(base: BaseRequest, path: Path, model: Model, attacker: Model, *, turns: 
 
 
 @contextmanager
-def session(arguments: Namespace) -> Generator[QwenRun]:
+def session(arguments: Namespace) -> Generator[ModelRun]:
     """Hold the selected Attacker resource across all attempts.
 
     Args:
         arguments (Namespace): Model and CUDA settings.
 
     Yields:
-        QwenRun: Shared resources for independent attempts.
+        ModelRun: Shared resources for independent attempts.
     """
     model = LazyQwenModel(
         cuda_device(arguments.gpu), arguments.tokens
@@ -297,7 +297,7 @@ def session(arguments: Namespace) -> Generator[QwenRun]:
         )
 
 
-def assemble(model: Model, attacker: Model, turns: int) -> QwenRun:
+def assemble(model: Model, attacker: Model, turns: int) -> ModelRun:
     """Bind reusable resources to fresh per-attempt composition.
 
     Args:
@@ -306,9 +306,9 @@ def assemble(model: Model, attacker: Model, turns: int) -> QwenRun:
         turns (int): Maximum FITD turns.
 
     Returns:
-        QwenRun: An isolated attempt for each invocation.
+        ModelRun: An isolated attempt for each invocation.
     """
-    return QwenRun(
+    return ModelRun(
         model, attacker, turns,
         lambda base, path, model, attacker, turns=turns: run(base, path, model, attacker, turns=turns)
     )

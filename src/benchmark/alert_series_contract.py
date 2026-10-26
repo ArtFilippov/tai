@@ -3,7 +3,7 @@
 from typing import Any, Protocol
 from pathlib import Path
 
-from attack.alert_run import AlertRun
+from attack.run_contract import RunContract
 from attack.run_capture_contract import RunCaptureContract
 from base.base_request import BaseRequest
 
@@ -17,6 +17,6 @@ class AlertSeriesContract(Protocol):
 
     def save(self) -> None: ...
 
-    def run(self, runs: AlertRun) -> None: ...
+    def run(self, runs: RunContract) -> None: ...
 
-    def invoke(self, runs: AlertRun, base: BaseRequest, path: Path, *, attempt: RunCaptureContract) -> None: ...
+    def invoke(self, runs: RunContract, base: BaseRequest, path: Path, *, attempt: RunCaptureContract) -> None: ...

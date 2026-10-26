@@ -4,14 +4,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import override
 
-from attack.alert_run import AlertRun
+from attack.run_contract import RunContract
 from attack.run_operation import RunOperation
 from base.base_request import BaseRequest
 from target.model import Model
 
 
 @dataclass(eq=False)
-class QwenRun(AlertRun):
+class ModelRun(RunContract):
     """Keep model resources shared while each invocation builds new conversations.
 
     Attributes:

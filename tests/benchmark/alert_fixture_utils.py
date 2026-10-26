@@ -1,9 +1,8 @@
 """Controlled attempts and offline model responses for ALERT series tests."""
 
 from pathlib import Path
-from unittest.mock import Mock
 
-from attack.qwen_run import QwenRun
+from attack.model_run import ModelRun
 from attack.run_operation import RunOperation
 from base.base_request import BaseRequest
 from journal.disk_journal import DiskJournal
@@ -12,16 +11,16 @@ from target.model import Model
 from target.scripted_model import ScriptedModel
 
 
-def attempt(operation: RunOperation) -> QwenRun:
+def attempt(operation: RunOperation) -> ModelRun:
     """Bind an offline operation to the per-attempt run interface.
 
     Args:
         operation (RunOperation): Controlled journal operation.
 
     Returns:
-        QwenRun: A run using inert model resources.
+        ModelRun: A run using inert model resources.
     """
-    return QwenRun(
+    return ModelRun(
         ScriptedModel([]),
         ScriptedModel([]), 1, operation
     )
@@ -177,16 +176,3 @@ def assessment(base: BaseRequest, path: Path, model: Model, attacker: Model, *, 
         }
     )
     raise ValueError("invalid verdict")
-
-
-def refusal() -> Model:
-    """Answer every FITD role without loading model weights.
-
-    Returns:
-        Model: A model responding with refusals.
-    """
-    model = Mock(spec=Model)
-    model.generate.return_value = "I cannot help with that request."
-    model.revision.return_value = "local"
-    model.settings.return_value = {"revision": "local"}
-    return model

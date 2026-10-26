@@ -8,11 +8,11 @@ from base.plain_base import PlainBase
 from journal.parsed_journal import ParsedJournal
 from main.alert_series import assemble
 from main.qwen_observe import observe
-from .alert_fixture_utils import refusal
+from .model_fixture_utils import refusal
 
 
-class TestQwenRun(unittest.TestCase):
-    """Check offline Qwen assembly without model weights."""
+class TestModelRun(unittest.TestCase):
+    """Check offline model-run assembly without model weights."""
 
     def test_observation(self) -> None:
         journal = observe(
@@ -56,7 +56,7 @@ class TestQwenRun(unittest.TestCase):
             }
         }, "The observation did not preserve a plain text request"
 
-    def test_qwen_run(self) -> None:
+    def test_model_run(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "run.jsonl"
             assemble(
@@ -67,4 +67,4 @@ class TestQwenRun(unittest.TestCase):
                 PlainBase("Free-form request"),
                 path
             )
-            assert list(ParsedJournal(path).events())[0]["base_metadata"] == {}, "The Qwen run invented source taxonomy"
+            assert list(ParsedJournal(path).events())[0]["base_metadata"] == {}, "The model run invented source taxonomy"

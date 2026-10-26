@@ -7,20 +7,21 @@ from argparse import Namespace
 from pathlib import Path
 from unittest.mock import Mock
 
-from attack.alert_archive import AlertArchive
-from attack.alert_series import AlertSeries
-from attack.qwen_run import QwenRun
+from attack.model_run import ModelRun
 from attack.run_capture import RunCapture
 from base.alert_pool import AlertPool
 from base.alert_taxonomy import AlertTaxonomy
 from base.base_request import BaseRequest
+from benchmark.alert_archive import AlertArchive
+from benchmark.alert_series import AlertSeries
 from journal.disk_journal import DiskJournal
 from journal.parsed_journal import ParsedJournal
 from journal.versioned_journal import VersionedJournal
 from main.alert_series import archive, launch, outcome
 from main.alert_series import run as qwen_run
 from target.model import Model
-from .alert_fixture_utils import assessment, attempt, interrupted, refusal, scripted
+from ..attack.model_fixture_utils import refusal
+from .alert_fixture_utils import assessment, attempt, interrupted, scripted
 
 
 MANIFEST = Path("examples/alert-manifest-640.json")
@@ -376,7 +377,7 @@ class TestAlertSeries(unittest.TestCase):
                 MANIFEST, archive=archive()
             )
             series.run(
-                QwenRun(
+                ModelRun(
                     model, model, 1,
                     qwen_run
                 )

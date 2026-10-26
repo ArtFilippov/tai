@@ -4,12 +4,12 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, override
 
-from attack.alert_archive import AlertArchive
-from attack.alert_run import AlertRun
-from attack.alert_series_contract import AlertSeriesContract
 from attack.run_capture_contract import RunCaptureContract
+from attack.run_contract import RunContract
 from base.alert_identity import AlertIdentity
 from base.base_request import BaseRequest
+from benchmark.alert_archive import AlertArchive
+from benchmark.alert_series_contract import AlertSeriesContract
 
 INTERRUPTED = "interrupted"
 SUCCESSFUL = "successful"
@@ -101,11 +101,11 @@ class AlertSeries(AlertSeriesContract):
         )
 
     @override
-    def invoke(self, runs: AlertRun, base: BaseRequest, path: Path, *, attempt: RunCaptureContract) -> None:
+    def invoke(self, runs: RunContract, base: BaseRequest, path: Path, *, attempt: RunCaptureContract) -> None:
         """Run one attempt inside its independent failure boundary.
 
         Args:
-            runs (AlertRun): Shared per-attempt execution.
+            runs (RunContract): Shared per-attempt execution.
             base (BaseRequest): Selected original request.
             path (Path): Reserved journal path.
             attempt (RunCaptureContract): Current exception boundary.
@@ -116,11 +116,11 @@ class AlertSeries(AlertSeriesContract):
             )
 
     @override
-    def run(self, runs: AlertRun) -> None:
+    def run(self, runs: RunContract) -> None:
         """Attempt every base in order, retaining errors and partial interruptions.
 
         Args:
-            runs (AlertRun): Fresh isolated run for each base.
+            runs (RunContract): Fresh isolated run for each base.
 
         Raises:
             KeyboardInterrupt: When the series has been interrupted and saved.
