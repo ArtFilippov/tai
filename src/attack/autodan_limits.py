@@ -1,10 +1,10 @@
-"""Read-only contract for GA's explicit finite limits."""
+"""Read-only contract for AutoDAN's explicit finite limits."""
 
 from typing import Protocol
 
 
 class AutoDANLimits(Protocol):
-    """Expose the reproducible native GA search budget."""
+    """Expose the reproducible native GA/HGA search budget."""
 
     @property
     def steps(self) -> int: ...
@@ -29,3 +29,6 @@ class AutoDANLimits(Protocol):
 
     @property
     def target(self) -> str: ...
+
+    @property
+    def mode(self) -> str: ...

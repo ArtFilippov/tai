@@ -1,4 +1,4 @@
-"""Pinned garak genetic evolution over an explicit base request."""
+"""Pinned garak GA/HGA evolution over an explicit base request."""
 
 import random
 from collections.abc import Mapping
@@ -6,7 +6,7 @@ from typing import override
 
 import numpy as np
 from garak.attempt import Conversation, Message, Turn
-from garak.resources.autodan.genetic import autodan_ga
+from garak.resources.autodan.genetic import autodan_ga, autodan_hga
 from garak.resources.autodan.model_utils import check_for_attack_success
 from garak.resources.common import REJECTION_STRINGS
 
@@ -19,12 +19,14 @@ from journal.journal import Journal
 from target.chat import Chat
 from target.logits import Logits
 
-PAIR = 2
 MUTATION_ABORT = "AutoDAN mutation failed"
+PAIR = 2
+GA = "ga"
+HGA = "hga"
 
 
 class AutoDANProbe(Probe):
-    """Search by native GA fitness and check success on prefix-only replies."""
+    """Search by native GA/HGA fitness and check prefix-only replies."""
 
     def __init__(self, logits: Logits, journal: Journal, *,
                  budget: AutoDANLimits, mutation: AutoDANMutationContract,
@@ -47,12 +49,13 @@ class AutoDANProbe(Probe):
 
     @override
     def kind(self) -> str:
-        return "autodan_ga"
+        return f"autodan_{self.budget.mode}"
 
     @override
     def description(self) -> dict[str, object]:
         return {
-            "type": "autodan_ga_probe",
+            "type": f"autodan_{self.budget.mode}_probe",
+            "mode": self.budget.mode,
             "source": "garak.resources.autodan",
             "references": self.corpus.description(),
             "fitness": "prefix + base / target completion",
@@ -99,13 +102,15 @@ class AutoDANProbe(Probe):
         )
         return prefixes[choice]
 
-    def evolve(self, prefixes: list[str], scores: list[float], step: int) -> list[str]:
-        """Advance the native GA and journal the complete next population.
+    def evolve(self, prefixes: list[str], scores: list[float], step: int,
+               words: dict[str, float]) -> list[str]:
+        """Advance the chosen native transition and journal its population.
 
         Args:
             prefixes (list[str]): Current generation.
             scores (list[float]): Current native losses.
             step (int): One-based generation number.
+            words (dict[str, float]): Momentum accumulated within this attempt.
 
         Returns:
             list[str]: Elites and mutated offspring.
@@ -115,11 +120,8 @@ class AutoDANProbe(Probe):
             SystemExit: If the host process exits for another reason.
         """
         try:
-            offspring: list[str] = autodan_ga(
-                control_prefixes=prefixes, score_list=scores,
-                num_elites=self.budget.elites, batch_size=self.budget.batch,
-                crossover_rate=self.budget.crossover, num_points=self.budget.points,
-                mutation=self.budget.mutation, mutation_generator=self.mutation
+            offspring = self.generation(
+                prefixes, scores, words
             )
         except SystemExit as exc:
             if exc.code != MUTATION_ABORT:
@@ -132,20 +134,52 @@ class AutoDANProbe(Probe):
                 "discarded": [],
                 "kept": len(offspring),
                 "step": step,
-                "prefixes": list(offspring)
+                "prefixes": list(offspring),
+                "momentum": dict(words) if self.budget.mode == HGA else {}
             }
         )
         return offspring
 
+    def generation(self, prefixes: list[str], scores: list[float],
+                   words: dict[str, float]) -> list[str]:
+        """Apply the chosen pinned native operation and retain HGA momentum.
+
+        Args:
+            prefixes (list[str]): Current population.
+            scores (list[float]): Completion losses.
+            words (dict[str, float]): Current word-level momentum.
+
+        Returns:
+            list[str]: Next native population.
+        """
+        if self.budget.mode == HGA:
+            offspring, momentum = autodan_hga(
+                word_dict=words, control_prefixes=prefixes, score_list=scores,
+                num_elites=self.budget.elites, batch_size=self.budget.batch,
+                crossover_rate=self.budget.crossover,
+                mutation_rate=self.budget.mutation, mutation_generator=self.mutation
+            )
+            words.clear()
+            words.update(momentum)
+            return offspring
+        return autodan_ga(
+            control_prefixes=prefixes, score_list=scores,
+            num_elites=self.budget.elites, batch_size=self.budget.batch,
+            crossover_rate=self.budget.crossover, num_points=self.budget.points,
+            mutation=self.budget.mutation, mutation_generator=self.mutation
+        )
+
     def preflight(self) -> None:
-        """Validate native GA limits before the first model operation.
+        """Validate native GA/HGA limits before the first model operation.
 
         Raises:
-            ValueError: If the requested GA budget is invalid.
+            ValueError: If the requested search budget is invalid.
         """
+        if self.budget.mode not in {GA, HGA}:
+            raise ValueError("Invalid AutoDAN mode")
         if self.budget.steps < 1 or not PAIR <= self.budget.batch <= 128:
             raise ValueError("Invalid AutoDAN steps or reference population")
-        if not 0 < self.budget.elites < self.budget.batch or (self.budget.batch - self.budget.elites) % PAIR:
+        if not 0 < self.budget.elites < self.budget.batch or (self.budget.mode == GA and (self.budget.batch - self.budget.elites) % PAIR):
             raise ValueError("Invalid AutoDAN elite or offspring count")
         if self.budget.points < 1 or self.budget.seed < 0 or not self.budget.target:
             raise ValueError("Invalid AutoDAN crossover, seed or completion")
@@ -158,6 +192,7 @@ class AutoDANProbe(Probe):
         random.seed(self.budget.seed)
         np.random.seed(self.budget.seed)
         prefixes = self.corpus.population(self.budget.batch)
+        words: dict[str, float] = {}
         for step in range(self.budget.steps):
             scores = [
                 self.logits.score(prefix, base, self.budget.target)
@@ -207,7 +242,7 @@ class AutoDANProbe(Probe):
                 }
             if step + 1 < self.budget.steps:
                 prefixes = self.evolve(
-                    prefixes, scores, step + 1
+                    prefixes, scores, step + 1, words
                 )
         return {
             "text": None,

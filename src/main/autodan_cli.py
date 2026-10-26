@@ -1,4 +1,4 @@
-"""Standalone offline AutoDAN GA command for one explicit request."""
+"""Standalone offline AutoDAN GA/HGA command for one request."""
 
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
@@ -24,8 +24,15 @@ from target.model import Model
 
 
 def main() -> None:
-    """Run bounded GA from its own Python entry point."""
-    parser = ArgumentParser(description="Standalone offline AutoDAN GA")
+    """Run bounded GA or HGA from its own Python entry point."""
+    parser = ArgumentParser(description="Standalone offline AutoDAN GA/HGA")
+    _ = parser.add_argument(
+        "--mode",
+        choices=(
+            "ga", "hga"
+        ),
+        default="ga"
+    )
     _ = parser.add_argument(
         "journal", type=Path
     )
@@ -66,7 +73,7 @@ def main() -> None:
 
 
 def bounds(arguments: Namespace) -> AutoDANLimits:
-    """Validate and expose native GA limits before local model access.
+    """Validate and expose native search limits before local model access.
 
     Args:
         arguments (Namespace): Explicit CLI options.
@@ -76,7 +83,8 @@ def bounds(arguments: Namespace) -> AutoDANLimits:
     """
     limits = AutoDANBudget(
         arguments.steps, arguments.batch, arguments.elites, arguments.points,
-        arguments.crossover, arguments.mutation, arguments.seed, arguments.target
+        arguments.crossover, arguments.mutation, arguments.seed, arguments.target,
+        arguments.mode
     )
     validate(limits)
     return limits

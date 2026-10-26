@@ -4,6 +4,8 @@ from attack.autodan_limits import AutoDANLimits
 
 MAX_REFERENCES = 128
 PAIR = 2
+GA = "ga"
+HGA = "hga"
 
 
 def validate(budget: AutoDANLimits) -> None:
@@ -13,11 +15,13 @@ def validate(budget: AutoDANLimits) -> None:
         budget (AutoDANLimits): Explicit search limits to check.
 
     Raises:
-        ValueError: If native GA cannot run within the requested budget.
+        ValueError: If the selected native mode cannot run within the budget.
     """
     if budget.steps < 1 or not PAIR <= budget.batch <= MAX_REFERENCES:
         raise ValueError("Invalid AutoDAN steps or reference population")
-    if not 0 < budget.elites < budget.batch or (budget.batch - budget.elites) % PAIR:
+    if budget.mode not in {GA, HGA}:
+        raise ValueError("Invalid AutoDAN mode")
+    if not 0 < budget.elites < budget.batch or (budget.mode == GA and (budget.batch - budget.elites) % PAIR):
         raise ValueError("Invalid AutoDAN elite or offspring count")
     if budget.points < 1 or budget.seed < 0 or not budget.target:
         raise ValueError("Invalid AutoDAN crossover, seed or completion")

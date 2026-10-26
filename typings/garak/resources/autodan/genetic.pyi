@@ -12,3 +12,10 @@ def autodan_ga(
     mutation: float = ..., if_softmax: bool = ...,
     mutation_generator: Mutation = ...,
 ) -> list[str]: ...
+
+def autodan_hga(
+    word_dict: dict[str, float], control_prefixes: list[str],
+    score_list: list[float], num_elites: int, batch_size: int,
+    crossover_rate: float = ..., mutation_rate: float = ...,
+    mutation_generator: Mutation = ...,
+) -> tuple[list[str], dict[str, float]]: ...

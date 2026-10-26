@@ -248,7 +248,7 @@ class TestAlertSeries(unittest.TestCase):
         ).requests(1)[0]
         arguments = Namespace(
             gpu=0, tokens=192, attacker="qwen", host="127.0.0.1", port=8080,
-            turns=1, goat_turns=1, no_threaten_json=False, autodan=False
+            turns=1, goat_turns=1, no_threaten_json=False, autodan=False, autodan_hga=False
         )
         with tempfile.TemporaryDirectory() as directory, patch(
             "main.alert_series.LazyQwenModel", return_value=threaten_json()
@@ -269,7 +269,7 @@ class TestAlertSeries(unittest.TestCase):
         ).requests(1)[:2]
         arguments = Namespace(
             gpu=0, tokens=192, attacker="qwen", host="127.0.0.1", port=8080,
-            turns=1, goat_turns=1, no_threaten_json=True, autodan=True,
+            turns=1, goat_turns=1, no_threaten_json=True, autodan=True, autodan_hga=True,
             autodan_target="Desired completion", autodan_steps=1,
             autodan_batch=3, autodan_elites=1, autodan_points=1,
             autodan_crossover=0.0, autodan_mutation=0.0, autodan_seed=8
@@ -287,20 +287,25 @@ class TestAlertSeries(unittest.TestCase):
             Path(directory)
         ) as factories:
             series(
-                bases, factories[-1:],
+                bases, factories[-2:],
                 Path(directory),
                 Path("manifest.json")
             )
             journal_path = Path(directory) / "autodan" / f"{bases[1].identity}.jsonl"
+            hga_path = Path(directory) / "autodan_hga" / f"{bases[1].identity}.jsonl"
             assert (
                 self.report(directory)["attempted"],
                 list(ParsedJournal(journal_path).events())[0]["base"],
-                ParsedJournal(journal_path).read()["assessment"]
+                ParsedJournal(journal_path).read()["assessment"],
+                list(ParsedJournal(hga_path).events())[0]["base"],
+                "'type': 'autodan_hga'" in str(list(ParsedJournal(hga_path).events())[0]["attack"])
             ) == (
-                2,
+                4,
+                bases[1].text(),
+                True,
                 bases[1].text(),
                 True
-            ), "The offline GA series mixed requests, verdicts or attempt journals"
+            ), "The offline GA/HGA series mixed requests or attempt journals"
 
     def test_empty_plan(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

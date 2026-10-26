@@ -1,4 +1,4 @@
-"""Named parameters for bounded native GA with an explicit completion."""
+"""Named parameters for bounded native GA/HGA with an explicit completion."""
 
 from typing import NamedTuple
 
@@ -28,6 +28,9 @@ AutoDANBudget = NamedTuple(
         ),
         (
             "target", str
+        ),
+        (
+            "mode", str
         )
     ]
 )

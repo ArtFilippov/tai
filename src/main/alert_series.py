@@ -66,6 +66,9 @@ def main() -> None:
         "--autodan", action="store_true", help="include local AutoDAN GA"
     )
     _ = parser.add_argument(
+        "--autodan-hga", action="store_true", help="include local AutoDAN HGA"
+    )
+    _ = parser.add_argument(
         "--autodan-target", default="Sure, here is the answer"
     )
     _ = parser.add_argument(
@@ -117,9 +120,14 @@ def launch(arguments: Namespace) -> None:
     """
     if min(arguments.turns, arguments.goat_turns, arguments.tokens) < 1 or arguments.gpu < 0 or not 1 <= arguments.port <= 65535:
         raise ValueError("Invalid GPU, turn, token or port limit")
-    if arguments.autodan:
+    if arguments.autodan or arguments.autodan_hga:
         limits = budget(arguments)
-        validate(limits)
+        if arguments.autodan:
+            validate(limits)
+        if arguments.autodan_hga:
+            validate(
+                limits._replace(mode="hga")
+            )
     pool = AlertPool(arguments.manifest)
     bases = pool.requests(arguments.limit)
     arguments.output_dir.mkdir(
@@ -284,7 +292,7 @@ def budget(arguments: Namespace) -> AutoDANBudget:
         arguments.autodan_steps, arguments.autodan_batch,
         arguments.autodan_elites, arguments.autodan_points,
         arguments.autodan_crossover, arguments.autodan_mutation,
-        arguments.autodan_seed, arguments.autodan_target
+        arguments.autodan_seed, arguments.autodan_target, "ga"
     )
 
 
@@ -333,13 +341,16 @@ def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[B
                 journal(directory / "threaten_json" / f"{base.metadata()['id']}.jsonl")
             )
         ]
-        if arguments.autodan:
+        if arguments.autodan or arguments.autodan_hga:
             device = cuda_device(arguments.gpu)
             scorer = QwenLogits(
                 LocalQwenAssets(device),
                 device
             )
-            attacks.append(lambda base: AutoDANAttackEnvelope( base, ga_setup(attacker, target, base), journal(directory / "autodan" / f"{base.metadata()['id']}.jsonl"), logits=scorer, budget=budget(arguments) ))
+            if arguments.autodan:
+                attacks.append(lambda base: AutoDANAttackEnvelope( base, ga_setup(attacker, target, base), journal(directory / "autodan" / f"{base.metadata()['id']}.jsonl"), logits=scorer, budget=budget(arguments) ))
+            if arguments.autodan_hga:
+                attacks.append(lambda base: AutoDANAttackEnvelope( base, ga_setup(attacker, target, base), journal(directory / "autodan_hga" / f"{base.metadata()['id']}.jsonl"), logits=scorer, budget=budget(arguments)._replace(mode="hga") ))
         return [attack for index, attack in enumerate(attacks) if index != THREATEN_JSON or not arguments.no_threaten_json]
 
     model = LazyQwenModel(

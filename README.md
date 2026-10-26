@@ -127,12 +127,25 @@ AutoDAN GA запускается с исходным запросом и **яв
 uv run --locked --group dev --extra qwen tai-autodan /tmp/autodan.jsonl "Explain the topic in detail" --gpu 0 --target "Sure, here is an explanation" --steps 2 --batch 3 --elites 1 --seed 7
 ```
 
+Для иерархического поиска добавьте `--mode hga`. Он использует нативные
+`autodan_hga`, накопление словарного momentum и замену слов с вероятностью
+`--crossover` (для GA этот флаг управляет скрещиванием предложений). Мутации
+`--mutation` выполняет отдельный Attacker в обоих режимах; `--points`
+применяется только к GA. Перед автономным HGA-запуском с несколькими шагами
+подготовьте NLTK `punkt_tab` вместе с локальными весами: закреплённый garak
+использует его для разбиения слов при переходе между поколениями.
+
+```bash
+uv run --locked --group dev python -c 'import nltk; nltk.download("punkt_tab", raise_on_error=True)'
+```
+
 `AutoDANAttack` и `AutoDANAttackEnvelope` предоставляют Python API: связывают
 `FITDSetup`, `QwenLogits`, журнал и `AutoDANBudget(steps, batch, elites, points,
-crossover, mutation, seed, target)`. Шаги и размер популяции ограничивают число
+crossover, mutation, seed, target, mode)`, где mode равен `ga` или `hga`.
+Шаги и размер популяции ограничивают число
 вычислений fitness (`steps × batch`); `--tokens` ограничивает длину каждого
 ответа Target/Attacker. `--batch` от 2 до 128, `--elites` строго между 0 и batch,
-число потомков `batch - elites` чётное. `--points`, `--crossover` и `--mutation`
+число потомков `batch - elites` чётное для GA. `--points`, `--crossover` и `--mutation`
 задают нативные операции garak; `--seed` закрепляет выбор и скрещивание.
 Ресурс `garak.data/autodan/prompt_group.pth` читается без перезаписи; мутации
 проводит отдельный Attacker. Fitness использует локальные logits Qwen и целевое
@@ -142,11 +155,13 @@ Target. При этом нативная проверка успешности �
 нативный результат отдельно предъявляется оценщику исходного запроса; отсутствие
 такого результата записывается как `no_result` без предъявленного текста и оценки.
 Поддерживается только закреплённый локальный Qwen Target; бюджеты и backend
-проверяются до inference. `--autodan` включает вариант в `tai-alert` (по умолчанию
+проверяются до inference. `--autodan` включает вариант GA в `tai-alert` (по умолчанию
 он выключен); параметры задаются отдельными флагами `--autodan-target`,
 `--autodan-steps`, `--autodan-batch`, `--autodan-elites`, `--autodan-points`,
 `--autodan-crossover`, `--autodan-mutation`, `--autodan-seed`. Каждый запрос
 получает отдельный журнал в подкаталоге `autodan/`.
+`--autodan-hga` независимо добавляет вариант HGA с теми же бюджетами и
+отдельными журналами `autodan_hga/<id>.jsonl`; можно выбрать оба варианта.
 
 Подготовьте локальный снимок Qwen командой `tai-qwen prepare` выше; затем из корня
 репозитория укажите **новый** каталог вывода и CUDA GPU:
