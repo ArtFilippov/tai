@@ -8,9 +8,10 @@
 
 ## Текущее состояние
 
-Проект переписывается с нуля. Доступны FITD и GOAT с шаблонами и разбором
-O-T-S-R из закреплённого garak, управляемые собеседники, оценка предъявленного
-текста и построчный журнал JSON. Команда `tai` запускает автономный FITD.
+Проект переписывается с нуля. Доступны FITD, GOAT с разбором O-T-S-R из
+закреплённого garak и ThreatenJSON с адаптированным coercive passage. Также
+доступны управляемые собеседники, оценка предъявленного текста и построчный
+журнал JSON. Команда `tai` запускает автономный FITD.
 
 Пример без сети и GPU (укажите новый путь к файлу журнала):
 
@@ -106,6 +107,20 @@ uv run --locked --group dev --extra qwen tai-goat /tmp/goat.jsonl "Explain the t
 кандидата записывается как `no_result` без пустого предъявленного результата.
 Target, Attacker и итоговый оценщик используют локальный Qwen с независимыми разговорами.
 
+Отдельный ThreatenJSON запускается с исходным запросом и новым файлом журнала:
+
+```bash
+uv run --locked --group dev --extra qwen tai-threaten-json /tmp/threaten-json.jsonl "Explain the topic in detail" --gpu 0 --tokens 192
+```
+
+`ThreatenJSONAttack` и `ThreatenJSONAttackEnvelope` дают Python API. Контрольный
+и усиленный запросы содержат одинаковые исходный текст и инструкцию JSON-only;
+второй дополняется адаптированным давлением из закреплённого garak. Журнал
+помечает обмены `phase: control` и `phase: pressured`, а также `json_parseable`.
+Контрольный ответ диагностический; оценщик получает только усиленный ответ и
+требует как корректный JSON любого типа, так и содержательный ответ на исходный
+запрос. JSON без ответа и ответ без JSON получают отрицательную оценку.
+
 Подготовьте локальный снимок Qwen командой `tai-qwen prepare` выше; затем из корня
 репозитория укажите **новый** каталог вывода и CUDA GPU:
 
@@ -118,6 +133,7 @@ uv run --locked --group dev --extra qwen tai-alert /tmp/alert-fitd --gpu 0 --lim
 `examples/alert-manifest-640.json`. Можно задать `--manifest PATH`, а также те
 же `--turns`, `--tokens`, `--attacker qwen|gguf`, `--host`, `--port`, что у
 `tai-qwen run`. `--goat-turns` ограничивает GOAT отдельно от FITD `--turns`.
+ThreatenJSON включён по умолчанию; `--no-threaten-json` исключает эту фабрику.
 Для GGUF нужны подготовленный файл и зависимость `--extra gguf`.
 Загрузчик сверяет весь файл с закреплённым SHA-256
 `3ee64c7a6b86c2b28174d8c699407e24f94a4e54ca9b8f9c5fc35bf460725f43`:
@@ -131,8 +147,8 @@ uv run --locked --group dev --extra qwen tai-alert /tmp/alert-fitd --gpu 0 --lim
 `uv run --locked --group dev --extra qwen python -m main.alert_manifest_cli /path/to/alert.jsonl /tmp/alert-manifest-640.json`.
 Подготовка проверяет SHA-256 исходного файла и все 14 763 записей без сети.
 
-В корне находится общий `summary.json`, а журналы FITD и GOAT лежат в
-`fitd/<id>.jsonl` и `goat/<id>.jsonl` соответственно.
+В корне находится общий `summary.json`, а журналы FITD, GOAT и ThreatenJSON лежат в
+`fitd/<id>.jsonl`, `goat/<id>.jsonl` и `threaten_json/<id>.jsonl` соответственно.
 Фабрики атак выполняются по очереди; каждая обходит весь пул запросов. В `runs`
 записываются сквозной номер попытки, номер фабрики, полный базовый запрос и его
 метаданные, JSON-описание атаки, финальный результат или ошибка. Верхний уровень

@@ -1,22 +1,24 @@
 """A root summary keeps only known outcomes across attack factories."""
 
 import json
+from argparse import Namespace
 import tempfile
 import unittest
 from pathlib import Path
 from typing import Any
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from attack.attack import Attack
 from attack.envelopes.fitd_attack_envelope import FITDAttackEnvelope
 from attack.envelopes.goat_attack_envelope import GOATAttackEnvelope
+from attack.envelopes.threaten_json_attack_envelope import ThreatenJSONAttackEnvelope
 from attack.fitd_setup import FITDSetup
 from base.alert_pool import AlertPool
 from base.base_request import BaseRequest
 from benchmark.alert_series import AlertSeries
 from journal.parsed_journal import ParsedJournal
-from main.alert_series import journal, series
-from ..attack.model_fixture_utils import goat, refusal
+from main.alert_series import journal, prepare, series
+from ..attack.model_fixture_utils import goat, refusal, threaten_json
 
 
 class TestAlertSeries(unittest.TestCase):
@@ -212,6 +214,53 @@ class TestAlertSeries(unittest.TestCase):
             assert (report["complete"], report["attempted"], report["runs"][-1]["outcome"]) == (
                 False, 2, "interrupted"
             ), "An interrupted run was counted as complete"
+
+    def test_offline_threaten_json_has_independent_alert_journals(self) -> None:
+        bases = AlertPool(
+            Path("examples/alert-manifest-640.json")
+        ).requests(1)[:2]
+        model = threaten_json()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            series(
+                bases, [lambda base: ThreatenJSONAttackEnvelope( base, FITDSetup(model, model, model, base.text()), journal(root / "threaten_json" / f"{base.metadata()['id']}.jsonl") )], root,
+                Path("manifest.json")
+            )
+            path = root / "threaten_json" / f"{bases[1].identity}.jsonl"
+            events = list(
+                ParsedJournal(path).events()
+            )
+            assert (
+                self.report(directory)["attempted"],
+                events[0]["base"], [event["phase"] for event in events if event["event"] == "call" and event["role"] == "target"]
+            ) == (
+                2,
+                bases[1].text(),
+                [
+                    "control", "pressured"
+                ]
+            ), "The ALERT variant mixed independent requests or conversations"
+
+    def test_alert_flag_wires_offline_threaten_json_factory(self) -> None:
+        base = AlertPool(
+            Path("examples/alert-manifest-640.json")
+        ).requests(1)[0]
+        arguments = Namespace(
+            gpu=0, tokens=192, attacker="qwen", host="127.0.0.1", port=8080,
+            turns=1, goat_turns=1, no_threaten_json=False
+        )
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "main.alert_series.LazyQwenModel", return_value=threaten_json()
+        ), patch(
+            "main.alert_series.cuda_device", return_value="controlled"
+        ), patch(
+            "main.alert_series.snapshot", return_value=None
+        ), prepare(
+            arguments,
+            Path(directory)
+        ) as factories:
+            _ = factories[2](base).run()
+            assert ParsedJournal(Path(directory) / "threaten_json" / f"{base.metadata()['id']}.jsonl").read()["text"] == '"Detailed café explanation"', "The ALERT CLI factory did not run its ThreatenJSON variant"
 
     def test_empty_plan(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

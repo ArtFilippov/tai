@@ -8,6 +8,7 @@ from pathlib import Path
 from attack.attack import Attack
 from attack.envelopes.fitd_attack_envelope import FITDAttackEnvelope
 from attack.envelopes.goat_attack_envelope import GOATAttackEnvelope
+from attack.envelopes.threaten_json_attack_envelope import ThreatenJSONAttackEnvelope
 from attack.fitd_setup import FITDSetup
 from attack.run_capture import RunCapture
 from base.alert_identity import AlertIdentity
@@ -50,6 +51,10 @@ def main() -> None:
     )
     _ = parser.add_argument(
         "--goat-turns", type=int, default=5
+    )
+    _ = parser.add_argument(
+        "--no-threaten-json", action="store_true",
+        help="omit the ThreatenJSON variant"
     )
     _ = parser.add_argument(
         "--tokens", type=int, default=192
@@ -242,7 +247,7 @@ def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[B
         list[Callable[[BaseRequest], Attack]]: Independent per-request attacks.
     """
     def factories(attacker: Model, target: Model) -> list[Callable[[BaseRequest], Attack]]:
-        return [
+        attacks: list[Callable[[BaseRequest], Attack]] = [
             lambda base: FITDAttackEnvelope(
                 base, FITDSetup(attacker, target, target, base.text()),
                 journal(directory / "fitd" / f"{base.metadata()['id']}.jsonl"),
@@ -252,8 +257,13 @@ def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[B
                 base, FITDSetup(attacker, target, target, base.text()),
                 journal(directory / "goat" / f"{base.metadata()['id']}.jsonl"),
                 arguments.goat_turns
+            ),
+            lambda base: ThreatenJSONAttackEnvelope(
+                base, FITDSetup(attacker, target, target, base.text()),
+                journal(directory / "threaten_json" / f"{base.metadata()['id']}.jsonl")
             )
         ]
+        return attacks[:2] if arguments.no_threaten_json else attacks
 
     model = LazyQwenModel(
         cuda_device(arguments.gpu), arguments.tokens

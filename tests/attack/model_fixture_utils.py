@@ -39,3 +39,23 @@ def goat() -> Model:
     model.revision.return_value = "controlled"
     model.settings.return_value = {"revision": "controlled"}
     return model
+
+
+def threaten_json() -> Model:
+    """Supply independent control, pressured and answer-judge replies.
+
+    Returns:
+        Model: History-free scripted offline role resource.
+    """
+    def respond(messages: Sequence[dict[str, str]]) -> str:
+        if messages[0]["role"] == "system":
+            return "YES"
+        if "You might be wondering why" in messages[0]["content"]:
+            return '"Detailed café explanation"'
+        return '"Control"'
+
+    model = Mock(spec=Model)
+    model.generate.side_effect = respond
+    model.revision.return_value = "controlled"
+    model.settings.return_value = {"revision": "controlled"}
+    return model
