@@ -5,14 +5,20 @@ import tempfile
 import unittest
 from argparse import Namespace
 from pathlib import Path
+from unittest.mock import Mock
 
+from attack.alert_archive import AlertArchive
 from attack.alert_series import AlertSeries
 from attack.qwen_run import QwenRun
+from attack.run_capture import RunCapture
 from base.alert_pool import AlertPool
+from base.alert_taxonomy import AlertTaxonomy
+from base.base_request import BaseRequest
 from journal.disk_journal import DiskJournal
 from journal.parsed_journal import ParsedJournal
 from main.alert_series import archive, launch, outcome
 from main.alert_series import run as qwen_run
+from target.model import Model
 from .alert_fixture_utils import assessment, attempt, interrupted, refusal, scripted
 
 
@@ -30,22 +36,53 @@ class TestAlertSeries(unittest.TestCase):
         pool = AlertPool(MANIFEST)
         assert len(pool.requests(20)) == 640, "The default-sized pool did not select 640 requests"
 
-    def test_full_offline_series_counts(self) -> None:
+    def test_short_offline_series_counts(self) -> None:
         pool = AlertPool(MANIFEST)
+        outcomes: dict[Path, dict[str, str]] = {}
+        memory = Mock(spec=AlertArchive)
+        memory.categories.return_value = AlertTaxonomy().categories()
+        memory.capture.side_effect = RunCapture
+        memory.outcome.side_effect = outcomes.__getitem__
+
+        def record(base: BaseRequest, path: Path, model: Model, attacker: Model, *, turns: int) -> None:
+            outcomes[path] = {
+                "outcome": "successful",
+                "base": str(
+                    base.metadata()["id"]
+                )
+            }
+
         with tempfile.TemporaryDirectory() as directory:
             series = AlertSeries(
+                pool.requests(1),
+                pool.taxonomy(),
+                Path(directory),
+                MANIFEST, archive=memory
+            )
+            series.run(
+                attempt(record)
+            )
+            summary = series.report()
+            assert (
+                summary["complete"], summary["attempted"],
+                tuple(group["planned"] for group in summary["macro"].values()),
+                len({entry["journal"] for entry in summary["runs"]}),
+                memory.save.call_count
+            ) == (True, 32, (8, 8, 5, 3, 3, 5), 32, 32), "The short series lost an attempt, category, or summary"
+
+    def test_full_pool_plan(self) -> None:
+        pool = AlertPool(MANIFEST)
+        with tempfile.TemporaryDirectory() as directory:
+            summary = AlertSeries(
                 pool.requests(20),
                 pool.taxonomy(),
                 Path(directory),
                 MANIFEST, archive=archive()
-            )
-            series.run(
-                attempt(scripted)
-            )
-            summary = series.report()
-            assert (summary["complete"], summary["attempted"], [group["planned"] for group in summary["macro"].values()]) == (
-                True, 640, [160, 160, 100, 60, 60, 100]
-            ), "The offline 640-run series lost an attempt or macro-category"
+            ).report()
+            assert (
+                summary["planned"],
+                [group["planned"] for group in summary["macro"].values()]
+            ) == (640, [160, 160, 100, 60, 60, 100]), "The complete pool lost its macro-category plan"
 
     def test_invalid_limit_precedes_output(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

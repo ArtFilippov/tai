@@ -7,11 +7,25 @@
       "skillPath": "skills/engineering/ask-matt/SKILL.md",
       "computedHash": "0cd14026efa0330083cbc7adf590976c162b60e02f696a8dcce96f0b4dab8a72"
     },
+    "bootstrap": {
+      "source": "git@github.com:ArtFilippov/research-skills.git",
+      "sourceUrl": "git@github.com:ArtFilippov/research-skills.git",
+      "sourceType": "git",
+      "skillPath": ".agents/skills/bootstrap/SKILL.md",
+      "computedHash": "30d11e98ddfd003d30b84cbcf95948f88b900c39db7424cb4385cbf6be4ec49c"
+    },
     "claude-handoff": {
       "source": "mattpocock/skills",
       "sourceType": "github",
       "skillPath": "skills/in-progress/claude-handoff/SKILL.md",
       "computedHash": "f8c4754a25aa4e12601ce69db4388bb0d30ca526b225351180c5b0d2a4649a95"
+    },
+    "clean-tests": {
+      "source": "git@github.com:ArtFilippov/research-skills.git",
+      "sourceUrl": "git@github.com:ArtFilippov/research-skills.git",
+      "sourceType": "git",
+      "skillPath": ".agents/skills/clean-tests/SKILL.md",
+      "computedHash": "a11628456a3982fed55854f429a9fde8c332e9e05f34e5d7da79f02a788d9921"
     },
     "code-review": {
       "source": "mattpocock/skills",
@@ -36,6 +50,13 @@
       "sourceType": "github",
       "skillPath": "skills/engineering/domain-modeling/SKILL.md",
       "computedHash": "a11713c0ff7870efa3c331b2e273f09116158485246edc89ae5088eefd1b0b48"
+    },
+    "eda": {
+      "source": "git@github.com:ArtFilippov/research-skills.git",
+      "sourceUrl": "git@github.com:ArtFilippov/research-skills.git",
+      "sourceType": "git",
+      "skillPath": ".agents/skills/eda/SKILL.md",
+      "computedHash": "31a6bf0d1f97325993d02cefbba7baade621d493740768e5fbde4afd4a9ed1f5"
     },
     "git-guardrails-claude-code": {
       "source": "mattpocock/skills",
@@ -96,6 +117,20 @@
       "sourceType": "github",
       "skillPath": "skills/misc/migrate-to-shoehorn/SKILL.md",
       "computedHash": "6397731ced114f3657aa88b55ed13d1344a56d77ca449c568e3200c21740fa99"
+    },
+    "msu-tmux": {
+      "source": "git@github.com:ArtFilippov/research-skills.git",
+      "sourceUrl": "git@github.com:ArtFilippov/research-skills.git",
+      "sourceType": "git",
+      "skillPath": ".agents/skills/msu-tmux/SKILL.md",
+      "computedHash": "32a463a806eb0b7fb50ae8752ede0020576f0ed92ec506937f11be99d4cb87a9"
+    },
+    "plot-it": {
+      "source": "git@github.com:ArtFilippov/research-skills.git",
+      "sourceUrl": "git@github.com:ArtFilippov/research-skills.git",
+      "sourceType": "git",
+      "skillPath": ".agents/skills/plot-it/SKILL.md",
+      "computedHash": "95ec1853dc6124973a673eec15b8c404a470064a67b8fccc099a3e16c8f7cb91"
     },
     "pr": {
       "source": "mattpocock/skills",
