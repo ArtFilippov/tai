@@ -56,3 +56,17 @@ class QwenModel(Model):
     @override
     def revision(self) -> str:
         return "7ae557604adf67be50417f59c2c2f167def9a775"
+
+    @override
+    def settings(self) -> dict[str, object]:
+        return {
+            "id": "Qwen/Qwen2.5-0.5B-Instruct",
+            "revision": self.revision(),
+            "generation": {
+                "max_new_tokens": self.tokens,
+                "do_sample": False,
+                "pad_token_id": "eos_token_id"
+            },
+            "device": str(self.device),
+            "dtype": "float16"
+        }

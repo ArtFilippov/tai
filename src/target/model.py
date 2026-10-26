@@ -12,3 +12,6 @@ class Model(Protocol):
 
     def revision(self) -> str:
         ...
+
+    def settings(self) -> dict[str, object]:
+        ...

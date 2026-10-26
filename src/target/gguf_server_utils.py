@@ -7,7 +7,7 @@ import subprocess
 import sys
 import time
 from collections.abc import Generator
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
 from pathlib import Path
 from urllib.request import urlopen
 
@@ -158,6 +158,24 @@ def gguf_server(host: str, port: int, path: Path, gpu: int, *, expected: str) ->
         )
     finally:
         stop(process)
+
+
+def gguf_service(host: str, port: int, path: Path, gpu: int, *, expected: str) -> AbstractContextManager[bool]:
+    """Return a context that owns only the server started at this address.
+
+    Args:
+        host (str): Service host.
+        port (int): Service port.
+        path (Path): Prepared model file.
+        gpu (int): Selected CUDA device.
+        expected (str): Required identity.
+
+    Returns:
+        AbstractContextManager[bool]: Server ownership within a context.
+    """
+    return gguf_server(
+        host, port, path, gpu, expected=expected
+    )
 
 
 def serve(address: str, host: str, port: int, process: subprocess.Popen[bytes], *, expected: str) -> Generator[bool]:

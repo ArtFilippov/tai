@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import override
 
 from journal.journal import Journal
+from target.model import Model
 
 START = "start"
 
@@ -14,19 +15,26 @@ class ConfiguredJournal(Journal):
 
     Attributes:
         journal (Journal): Destination of all events.
-        models (dict[str, object]): Role-specific model metadata.
+        target (Model): Target model shared with the judge.
+        attacker (Model): Selected Attacker model.
     """
 
     journal: Journal
-    models: dict[str, object]
+    target: Model
+    attacker: Model
 
     @override
     def record(self, event: dict[str, object]) -> None:
         if event.get("event") == START:
+            shared = self.target.settings()
             self.journal.record(
                 {
                     **event,
-                    "models": self.models
+                    "models": {
+                        "target": shared,
+                        "judge": shared,
+                        "attacker": self.attacker.settings()
+                    }
                 }
             )
         else:

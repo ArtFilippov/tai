@@ -11,15 +11,42 @@ from unittest.mock import patch
 from garak.attempt import Conversation, Message, Turn
 
 from target.gguf_model import GGUFModel
+from target.gguf_location import GGUFLocation
+from target.gguf_server import GGUFServer
 from target.gguf_server_utils import gguf_server, start
 from target.model_chat import ModelChat
-from target.gguf_assets_utils import gguf_path
+from target.gguf_file import GGUFFile
 
 from .gguf_fixture_utils import failed_start, owned, service
 
 
 class TestGGUFModel(unittest.TestCase):
     """Check real local HTTP exchanges and owned child-process lifetimes."""
+
+    def model(self, port: int, tokens: int) -> GGUFModel:
+        """Configure a model for an existing local test service.
+
+        Args:
+            port (int): Service port.
+            tokens (int): Generation limit.
+
+        Returns:
+            GGUFModel: Model backed by the test service.
+        """
+        file = GGUFFile(
+            "custom/repository", "commit", "pinned.gguf"
+        )
+        return GGUFModel(
+            file,
+            GGUFServer(
+                file,
+                GGUFLocation(
+                    "127.0.0.1", port
+                ),
+                0, gguf_server
+            ),
+            tokens
+        )
 
     def port(self) -> int:
         """Choose a vacant loopback port for a local service.
@@ -151,15 +178,15 @@ class TestGGUFModel(unittest.TestCase):
 
     def test_offline_missing_file_fails_clearly(self) -> None:
         with patch(
-            "target.gguf_assets_utils.snapshot_download",
+            "target.gguf_file.snapshot_download",
             side_effect=OSError("not cached")
         ):
             with self.assertRaisesRegex(
                 FileNotFoundError, "tai-qwen prepare --attacker gguf"
             ):
-                gguf_path(
-                    True, "custom/repository", "custom-commit", "chosen.Q4_K_M.gguf"
-                )
+                GGUFFile(
+                    "custom/repository", "custom-commit", "chosen.Q4_K_M.gguf"
+                ).local()
 
     def test_preparation_selects_only_pinned_quantization(self) -> None:
         with TemporaryDirectory() as directory:
@@ -167,11 +194,11 @@ class TestGGUFModel(unittest.TestCase):
             path = Path(directory) / name
             path.write_bytes(b"prepared")
             with patch(
-                "target.gguf_assets_utils.snapshot_download", return_value=directory
+                "target.gguf_file.snapshot_download", return_value=directory
             ) as download:
-                _ = gguf_path(
-                    False, "custom/repository", "custom-commit", name
-                )
+                _ = GGUFFile(
+                    "custom/repository", "custom-commit", name
+                ).prepare()
                 download.assert_called_once_with(
                     repo_id="custom/repository", revision="custom-commit",
                     allow_patterns=name, local_files_only=False
@@ -195,8 +222,8 @@ class TestGGUFModel(unittest.TestCase):
         with service(
             port, "pinned", "normal"
         ):
-            model = GGUFModel(
-                f"http://127.0.0.1:{port}", 24, "pinned", "commit"
+            model = self.model(
+                port, 24
             )
             target = ModelChat(model)
             attacker = ModelChat(model)
@@ -230,15 +257,17 @@ class TestGGUFModel(unittest.TestCase):
             with self.assertRaisesRegex(
                 RuntimeError, "GGUF completion failed"
             ):
-                GGUFModel(
-                    f"http://127.0.0.1:{port}", 24, "pinned", "commit"
-                ).generate(
-                    [
-                        {
-                            "role": "user",
-                            "content": "Hello"
-                        }
-                    ]
+                (
+                    self.model(
+                        port, 24
+                    ).generate(
+                        [
+                            {
+                                "role": "user",
+                                "content": "Hello"
+                            }
+                        ]
+                    )
                 )
 
     def test_reports_malformed_completion(self) -> None:
@@ -249,13 +278,15 @@ class TestGGUFModel(unittest.TestCase):
             with self.assertRaisesRegex(
                 ValueError, "Malformed GGUF completion"
             ):
-                GGUFModel(
-                    f"http://127.0.0.1:{port}", 24, "pinned", "commit"
-                ).generate(
-                    [
-                        {
-                            "role": "user",
-                            "content": "Hello"
-                        }
-                    ]
+                (
+                    self.model(
+                        port, 24
+                    ).generate(
+                        [
+                            {
+                                "role": "user",
+                                "content": "Hello"
+                            }
+                        ]
+                    )
                 )

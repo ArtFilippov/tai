@@ -8,6 +8,7 @@ from journal.configured_journal import ConfiguredJournal
 from journal.disk_journal import DiskJournal
 from journal.memory_journal import MemoryJournal
 from journal.parsed_journal import ParsedJournal
+from target.scripted_model import ScriptedModel
 
 
 class TestConfiguredJournal(unittest.TestCase):
@@ -16,7 +17,9 @@ class TestConfiguredJournal(unittest.TestCase):
     def test_includes_selected_model_in_start_event(self) -> None:
         memory = MemoryJournal()
         journal = ConfiguredJournal(
-            memory, {"attacker": {"id": "custom-gguf"}}
+            memory,
+            ScriptedModel([]),
+            ScriptedModel([])
         )
         journal.record(
             {
@@ -24,14 +27,28 @@ class TestConfiguredJournal(unittest.TestCase):
                 "base": "Custom request"
             }
         )
-        assert memory.events()[0]["models"] == {"attacker": {"id": "custom-gguf"}}, "The start event omitted the selected model"
+        assert memory.events()[0]["models"] == {
+            "target": {
+                "id": "scripted",
+                "revision": "scripted"
+            },
+            "judge": {
+                "id": "scripted",
+                "revision": "scripted"
+            },
+            "attacker": {
+                "id": "scripted",
+                "revision": "scripted"
+            }
+        }, "The start event omitted a model's settings"
 
     def test_recovers_outcome_with_model_metadata(self) -> None:
         with TemporaryDirectory() as directory:
             path = Path(directory) / "run.jsonl"
             journal = ConfiguredJournal(
                 DiskJournal(path),
-                {"attacker": {"id": "pinned"}}
+                ScriptedModel([]),
+                ScriptedModel([])
             )
             journal.record(
                 {

@@ -26,3 +26,10 @@ class ScriptedModel(Model):
     @override
     def revision(self) -> str:
         return "scripted"
+
+    @override
+    def settings(self) -> dict[str, object]:
+        return {
+            "id": "scripted",
+            "revision": self.revision()
+        }

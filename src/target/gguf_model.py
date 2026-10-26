@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from typing import override
 from urllib.request import Request, urlopen
 
+from target.gguf_asset import GGUFAsset
+from target.gguf_service import GGUFService
 from target.model import Model
 
 
@@ -14,16 +16,14 @@ class GGUFModel(Model):
     """Send each complete Attacker conversation to one verified model identity.
 
     Attributes:
-        address (str): HTTP address of the verified local server.
+        file (GGUFAsset): Pinned model identity and revision.
+        service (GGUFService): Address and effective runtime settings.
         tokens (int): Generation limit for each response.
-        identity (str): Expected server model identity.
-        commit (str): Pinned repository revision.
     """
 
-    address: str
+    file: GGUFAsset
+    service: GGUFService
     tokens: int
-    identity: str
-    commit: str
 
     def __post_init__(self) -> None:
         if self.tokens < 1:
@@ -34,16 +34,41 @@ class GGUFModel(Model):
         try:
             payload = self.completion(messages)
         except (OSError, ValueError) as exc:
-            raise RuntimeError(f"GGUF completion failed at {self.address}: {exc}") from exc
+            raise RuntimeError(f"GGUF completion failed at {self.service.address()}: {exc}") from exc
         match payload:
             case {"choices": [{"message": {"content": str() as text}}]}:
                 return text
             case _:
-                raise ValueError(f"Malformed GGUF completion at {self.address}")
+                raise ValueError(f"Malformed GGUF completion at {self.service.address()}")
 
     @override
     def revision(self) -> str:
-        return self.commit
+        return self.file.commit()
+
+    @override
+    def settings(self) -> dict[str, object]:
+        return {
+            "id": self.file.identity(),
+            "revision": self.revision(),
+            "generation": self.policy(),
+            **self.file.details(),
+            **self.service.settings()
+        }
+
+    def policy(self) -> dict[str, int]:
+        """Describe the generation options sent to the GGUF service.
+
+        Returns:
+            dict[str, int]: Request generation options.
+        """
+        return {
+            "max_tokens": self.tokens,
+            "temperature": 0,
+            "top_p": 1,
+            "top_k": 1,
+            "min_p": 0,
+            "repeat_penalty": 1
+        }
 
     def completion(self, messages: Sequence[dict[str, str]]) -> object:
         """Read one JSON completion from the selected HTTP endpoint.
@@ -55,17 +80,12 @@ class GGUFModel(Model):
             object: Decoded response.
         """
         request = Request(
-            f"{self.address}/v1/chat/completions",
+            f"{self.service.address()}/v1/chat/completions",
             data=json.dumps(
                 {
-                    "model": self.identity,
+                    "model": self.file.identity(),
                     "messages": list(messages),
-                    "max_tokens": self.tokens,
-                    "temperature": 0,
-                    "top_p": 1,
-                    "top_k": 1,
-                    "min_p": 0,
-                    "repeat_penalty": 1,
+                    **self.policy(),
                     "stream": False
                 }
             ).encode("utf-8"),

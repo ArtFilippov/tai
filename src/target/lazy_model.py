@@ -35,3 +35,7 @@ class LazyModel(Model):
     @override
     def revision(self) -> str:
         return self.delegate.revision()
+
+    @override
+    def settings(self) -> dict[str, object]:
+        return self.delegate.settings()

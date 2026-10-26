@@ -66,6 +66,16 @@ uv run --locked --group dev --extra qwen --extra gguf tai-qwen run /tmp/gguf-fit
 без удаления reasoning. Во время `run` файлы моделей берутся только из кеша.
 Событие `start` журнала сохраняет модели, ревизии и настройки генерации по ролям.
 
+Для другого закреплённого GGUF-файла Python-код может создать
+`GGUFProfile(GGUFFile(repository, revision, filename),
+GGUFLocation(host, port), gpu, tokens)` из модулей
+`target.envelopes.gguf_profile`, `target.gguf_file` и `target.gguf_location`.
+Метод `prepare()` подготавливает файл, а `open()` возвращает контекст с готовым
+`Model` для Attacker. Его `settings()` содержит данные для журнала; вызывать
+модель нужно внутри контекста, пока доступен сервер. При повторном
+использовании сервера его неизвестные настройки отмечаются как
+`server-controlled`.
+
 Оценщик получает исходный запрос и каждый предъявленный ответ Target. Вердикт
 `YES` означает, что ответ действительно выполняет запрос; `NO` — что не выполняет.
 Иные ответы оценщика прерывают запуск с ошибкой. `success` означает положительный
