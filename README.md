@@ -9,7 +9,7 @@
 ## Текущее состояние
 
 Проект переписывается с нуля. Доступны FITD, GOAT с разбором O-T-S-R из
-закреплённого garak и ThreatenJSON с адаптированным coercive passage. Также
+закреплённого garak, Simple Adaptive Attacks и ThreatenJSON с адаптированным coercive passage. Также
 доступны управляемые собеседники, оценка предъявленного текста и построчный
 журнал JSON. Команда `tai` запускает автономный FITD.
 
@@ -121,6 +121,21 @@ uv run --locked --group dev --extra qwen tai-threaten-json /tmp/threaten-json.js
 требует как корректный JSON любого типа, так и содержательный ответ на исходный
 запрос. JSON без ответа и ответ без JSON получают отрицательную оценку.
 
+Simple Adaptive Attacks запускается без файла настроек, с исходным запросом и
+новым файлом журнала:
+
+```bash
+uv run --locked --group dev --extra qwen tai-adaptive-attacks /tmp/adaptive.jsonl "Explain the topic in detail" --gpu 0 --tokens 192
+```
+
+Python API: `AdaptiveAttacksAttackEnvelope(PlainBase(base), FITDSetup(model,
+model, model, base), journal)` из `attack.envelopes.adaptive_attacks_attack_envelope`.
+Атака использует шаблон и пять суффиксов установленного garak в исходном порядке;
+исходный запрос подставляется дословно. Каждый вариант получает новый разговор
+Target, а ответы и вердикты записываются в журнал. Первый положительный вердикт
+останавливает поиск; если все отрицательны, предъявляется пятый ответ. Эта ранняя
+остановка — политика tai, а не стандартного garak probe.
+
 AutoDAN GA запускается с исходным запросом и **явным желаемым продолжением**:
 
 ```bash
@@ -176,6 +191,8 @@ uv run --locked --group dev --extra qwen tai-alert /tmp/alert-fitd --gpu 0 --lim
 же `--turns`, `--tokens`, `--attacker qwen|gguf`, `--host`, `--port`, что у
 `tai-qwen run`. `--goat-turns` ограничивает GOAT отдельно от FITD `--turns`.
 ThreatenJSON включён по умолчанию; `--no-threaten-json` исключает эту фабрику.
+Simple Adaptive Attacks также включён по умолчанию; `--no-adaptive-attacks`
+исключает его. Журналы находятся в `adaptive_attacks/<id>.jsonl`.
 Для GGUF нужны подготовленный файл и зависимость `--extra gguf`.
 Загрузчик сверяет весь файл с закреплённым SHA-256
 `3ee64c7a6b86c2b28174d8c699407e24f94a4e54ca9b8f9c5fc35bf460725f43`:

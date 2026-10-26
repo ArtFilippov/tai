@@ -59,3 +59,21 @@ def threaten_json() -> Model:
     model.revision.return_value = "controlled"
     model.settings.return_value = {"revision": "controlled"}
     return model
+
+
+def adaptive() -> Model:
+    """Answer adaptive Target prompts and independent judge prompts offline.
+
+    Returns:
+        Model: Shared, history-free controlled model resource.
+    """
+    def respond(messages: Sequence[dict[str, str]]) -> str:
+        if messages[0]["role"] == "system":
+            return "NO"
+        return "Controlled adaptive reply"
+
+    model = Mock(spec=Model)
+    model.generate.side_effect = respond
+    model.revision.return_value = "controlled"
+    model.settings.return_value = {"revision": "controlled"}
+    return model

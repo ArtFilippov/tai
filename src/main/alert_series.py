@@ -7,6 +7,7 @@ from pathlib import Path
 
 from attack.attack import Attack
 from attack.envelopes.fitd_attack_envelope import FITDAttackEnvelope
+from attack.envelopes.adaptive_attacks_attack_envelope import AdaptiveAttacksAttackEnvelope
 from attack.envelopes.goat_attack_envelope import GOATAttackEnvelope
 from attack.envelopes.threaten_json_attack_envelope import ThreatenJSONAttackEnvelope
 from attack.autodan_budget import AutoDANBudget
@@ -61,6 +62,10 @@ def main() -> None:
     _ = parser.add_argument(
         "--no-threaten-json", action="store_true",
         help="omit the ThreatenJSON variant"
+    )
+    _ = parser.add_argument(
+        "--no-adaptive-attacks", action="store_true",
+        help="omit the Simple Adaptive Attacks variant"
     )
     _ = parser.add_argument(
         "--autodan", action="store_true", help="include local AutoDAN GA"
@@ -341,6 +346,10 @@ def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[B
                 journal(directory / "threaten_json" / f"{base.metadata()['id']}.jsonl")
             )
         ]
+        if not getattr(
+            arguments, "no_adaptive_attacks", False
+        ):
+            attacks.append(lambda base: AdaptiveAttacksAttackEnvelope( base, FITDSetup(attacker, target, target, base.text()), journal(directory / "adaptive_attacks" / f"{base.metadata()['id']}.jsonl") ))
         if arguments.autodan or arguments.autodan_hga:
             device = cuda_device(arguments.gpu)
             scorer = QwenLogits(

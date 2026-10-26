@@ -10,15 +10,17 @@ from unittest.mock import Mock, patch
 
 from attack.attack import Attack
 from attack.envelopes.fitd_attack_envelope import FITDAttackEnvelope
+from attack.envelopes.adaptive_attacks_attack_envelope import AdaptiveAttacksAttackEnvelope
 from attack.envelopes.goat_attack_envelope import GOATAttackEnvelope
 from attack.envelopes.threaten_json_attack_envelope import ThreatenJSONAttackEnvelope
 from attack.fitd_setup import FITDSetup
 from base.alert_pool import AlertPool
 from base.base_request import BaseRequest
+from base.plain_base import PlainBase
 from benchmark.alert_series import AlertSeries
 from journal.parsed_journal import ParsedJournal
 from main.alert_series import journal, prepare, series
-from ..attack.model_fixture_utils import goat, refusal, threaten_json
+from ..attack.model_fixture_utils import adaptive, goat, refusal, threaten_json
 from ..target import test_logits, test_model
 
 
@@ -315,3 +317,50 @@ class TestAlertSeries(unittest.TestCase):
                 0
             )
             assert summary.report()["complete"] is True, "An empty plan was marked incomplete"
+
+    def test_adaptive_series_covers_every_category_offline(self) -> None:
+        bases = AlertPool(
+            Path("examples/alert-manifest-640.json")
+        ).requests(1)
+        arguments = Namespace(
+            gpu=0, tokens=192, attacker="qwen", host="127.0.0.1", port=8080,
+            turns=1, goat_turns=1, no_threaten_json=False,
+            no_adaptive_attacks=False, autodan=False, autodan_hga=False
+        )
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "main.alert_series.LazyQwenModel", return_value=adaptive()
+        ), patch(
+            "main.alert_series.cuda_device", return_value="controlled"
+        ), patch(
+            "main.alert_series.snapshot", return_value=None
+        ), prepare(
+            arguments,
+            Path(directory)
+        ) as factories:
+            series(
+                bases, factories[-1:],
+                Path(directory),
+                Path("examples/alert-manifest-640.json")
+            )
+            report = self.report(directory)
+            assert (
+                report["attempted"], report["complete"],
+                len({run["base_metadata"]["microcategory"] for run in report["runs"]}),
+                all(( ParsedJournal(Path(directory) / "adaptive_attacks" / f"{base.identity}.jsonl").read()["assessment"] is False for base in bases ))
+            ) == (32, True, 32, True), "The offline adaptive series lost a category, journal, or assessment"
+
+    def test_adaptive_envelope_repeated_runs_keep_separate_bases(self) -> None:
+        model = adaptive()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for base in ("First request", "Second request"):
+                _ = AdaptiveAttacksAttackEnvelope(
+                    PlainBase(base),
+                    FITDSetup(
+                        model, model, model, base
+                    ),
+                    journal(root / f"{base}.jsonl")
+                ).run()
+            assert [list(ParsedJournal(root / f"{base}.jsonl").events())[0]["base"] for base in ("First request", "Second request")] == [
+                "First request", "Second request"
+            ], "Repeated adaptive runs mixed bases or journals"

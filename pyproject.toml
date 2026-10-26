@@ -38,6 +38,7 @@ tai-alert = "main.alert_series:main"
 tai-goat = "main.goat_cli:main"
 tai-threaten-json = "main.threaten_json_cli:main"
 tai-autodan = "main.autodan_cli:main"
+tai-adaptive-attacks = "main.adaptive_attacks_cli:main"
 tai-qwen-observe = "main.qwen_observe:main"
 tai-qwen-search = "main.qwen_observe:search_main"
 
