@@ -4,12 +4,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from attack.envelopes.fitd_attack_envelope import FITDAttackEnvelope
+from attack.fitd_setup import FITDSetup
 from base.plain_base import PlainBase
 from journal.disk_journal import DiskJournal
 from journal.parsed_journal import ParsedJournal
 from journal.versioned_journal import VersionedJournal
-from main.alert_series import FITDAttackEnvelope
-from ..attack.model_fixture_utils import refusal
+from ..model_fixture_utils import refusal
 
 
 class TestFITDAttackEnvelope(unittest.TestCase):
@@ -21,7 +22,9 @@ class TestFITDAttackEnvelope(unittest.TestCase):
             model = refusal()
             _ = FITDAttackEnvelope(
                 PlainBase("Original request"),
-                model, model, model,
+                FITDSetup(
+                    model, model, model, "Original request"
+                ),
                 VersionedJournal(
                     DiskJournal(path)
                 ),

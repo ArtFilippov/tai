@@ -3,13 +3,11 @@
 from argparse import ArgumentParser, Namespace
 from collections.abc import Callable, Generator, Sequence
 from contextlib import AbstractContextManager, contextmanager, nullcontext
-from dataclasses import dataclass
 from pathlib import Path
-from typing import override
 
 from attack.attack import Attack
-from attack.fitd_attack import FITDAttack
-from attack.fitd_probe import FITDProbe
+from attack.envelopes.fitd_attack_envelope import FITDAttackEnvelope
+from attack.fitd_setup import FITDSetup
 from attack.run_capture import RunCapture
 from base.alert_identity import AlertIdentity
 from base.alert_pool import AlertPool
@@ -18,94 +16,16 @@ from benchmark.alert_series import AlertSeries
 from journal.disk_journal import DiskJournal
 from journal.journal import Journal
 from journal.versioned_journal import VersionedJournal
-from judge.qwen_judge import QwenJudge
-from judge.recorded_judge import RecordedJudge
-from target.continuing_chat import ContinuingChat
 from target.gguf.envelopes.gguf_profile import GGUFProfile
 from target.gguf.envelopes.alert_gguf_file import AlertGGUFFile
 from target.envelopes.lazy_qwen_model import LazyQwenModel
 from target.qwen_snapshot_utils import snapshot
 from target.gguf.gguf_location import GGUFLocation
 from target.model import Model
-from target.model_chat import ModelChat
 from target.qwen_device_utils import cuda_device
 
 GGUF = "gguf"
 OUTCOME = "outcome"
-
-
-def text(base: BaseRequest) -> str:
-    """Read the request shared by the independent FITD roles.
-
-    Args:
-        base (BaseRequest): Bound source request.
-
-    Returns:
-        str: Original text.
-    """
-    return base.text()
-
-
-@dataclass(eq=False)
-class FITDAttackEnvelope(Attack):
-    """Bind one request and fresh role conversations to shared model resources.
-
-    Attributes:
-        base (BaseRequest): Original request.
-        attacker (Model): Shared Attacker resource.
-        target (Model): Shared Target resource.
-        judge (Model): Shared assessment resource.
-        journal (Journal): Attempt event sink.
-        turns (int): Maximum Target exchanges.
-    """
-
-    base: BaseRequest
-    attacker: Model
-    target: Model
-    judge: Model
-    journal: Journal
-    turns: int
-
-    def attack(self) -> Attack:
-        """Assemble isolated FITD conversations for this attempt.
-
-        Returns:
-            Attack: Bound strategy with a recorded assessment.
-        """
-        return FITDAttack(
-            self.base,
-            ModelChat(self.target),
-            RecordedJudge(
-                QwenJudge(
-                    text(self.base),
-                    ModelChat(self.judge)
-                ),
-                self.journal,
-                text(self.base)
-            ),
-            self.journal,
-            probe=FITDProbe(
-                text(self.base),
-                ContinuingChat(
-                    ModelChat(self.attacker)
-                ),
-                self.journal, self.turns
-            )
-        )
-
-    @override
-    def description(self) -> dict[str, object]:
-        return (
-            self.attack()
-            .description()
-        )
-
-    @override
-    def run(self) -> str | None:
-        return (
-            self.attack()
-            .run()
-        )
 
 
 def main() -> None:
@@ -324,7 +244,7 @@ def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[B
     def factories(attacker: Model, target: Model) -> list[Callable[[BaseRequest], Attack]]:
         return [
             lambda base: FITDAttackEnvelope(
-                base, attacker, target, target,
+                base, FITDSetup(attacker, target, target, base.text()),
                 journal(directory / "fitd" / f"{base.metadata()['id']}.jsonl"),
                 arguments.turns
             )

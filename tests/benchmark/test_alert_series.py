@@ -8,11 +8,13 @@ from typing import Any
 from unittest.mock import Mock
 
 from attack.attack import Attack
+from attack.envelopes.fitd_attack_envelope import FITDAttackEnvelope
+from attack.fitd_setup import FITDSetup
 from base.alert_pool import AlertPool
 from base.base_request import BaseRequest
 from benchmark.alert_series import AlertSeries
 from journal.parsed_journal import ParsedJournal
-from main.alert_series import FITDAttackEnvelope, journal, series
+from main.alert_series import journal, series
 from ..attack.model_fixture_utils import refusal
 
 
@@ -154,7 +156,7 @@ class TestAlertSeries(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             series(
-                bases, [lambda base: FITDAttackEnvelope( base, model, model, model, journal(root / "fitd" / f"{base.metadata()['id']}.jsonl"), 1 )], root,
+                bases, [lambda base: FITDAttackEnvelope( base, FITDSetup(model, model, model, base.text()), journal(root / "fitd" / f"{base.metadata()['id']}.jsonl"), 1 )], root,
                 Path("manifest.json")
             )
             path = root / "fitd" / f"{bases[1].identity}.jsonl"
