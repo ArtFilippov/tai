@@ -325,7 +325,7 @@ class TestAlertSeries(unittest.TestCase):
         arguments = Namespace(
             gpu=0, tokens=192, attacker="qwen", host="127.0.0.1", port=8080,
             turns=1, goat_turns=1, no_threaten_json=False,
-            no_adaptive_attacks=False, autodan=False, autodan_hga=False
+            no_adaptive_attacks=False, no_dra=True, autodan=False, autodan_hga=False
         )
         with tempfile.TemporaryDirectory() as directory, patch(
             "main.alert_series.LazyQwenModel", return_value=adaptive()
@@ -364,3 +364,43 @@ class TestAlertSeries(unittest.TestCase):
             assert [list(ParsedJournal(root / f"{base}.jsonl").events())[0]["base"] for base in ("First request", "Second request")] == [
                 "First request", "Second request"
             ], "Repeated adaptive runs mixed bases or journals"
+
+    def test_dra_series_covers_every_category_offline(self) -> None:
+        bases = AlertPool(
+            Path("examples/alert-manifest-640.json")
+        ).requests(1)
+        arguments = Namespace(
+            gpu=0, tokens=192, attacker="qwen", host="127.0.0.1", port=8080,
+            turns=1, goat_turns=1, no_threaten_json=False, no_adaptive_attacks=False,
+            no_dra=False, dra_candidates=2, dra_seed=13, autodan=False, autodan_hga=False
+        )
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "main.alert_series.LazyQwenModel", return_value=adaptive()
+        ), patch(
+            "main.alert_series.cuda_device", return_value="controlled"
+        ), patch(
+            "main.alert_series.snapshot", return_value=None
+        ), prepare(
+            arguments,
+            Path(directory)
+        ) as factories:
+            series(
+                bases, factories[-1:],
+                Path(directory),
+                Path("examples/alert-manifest-640.json")
+            )
+            report = self.report(directory)
+            expected = {
+                "candidates": 2,
+                "seed": 13,
+                "toxic_trunc": 0.5,
+                "benign_trunc": 0.5,
+                "benign_full_token_prob": 0.33
+            }
+            assert (
+                report["attempted"], report["complete"],
+                len({run["base_metadata"]["microcategory"] for run in report["runs"]}),
+                all(
+                    '"budget": ' + json.dumps(expected) in json.dumps(next(ParsedJournal(Path(directory) / "dra" / f"{base.identity}.jsonl").events())["attack"]) for base in bases
+                )
+            ) == (32, True, 32, True), "The offline DRA series lost a category, journal, or effective parameters"

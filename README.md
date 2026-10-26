@@ -9,7 +9,7 @@
 ## Текущее состояние
 
 Проект переписывается с нуля. Доступны FITD, GOAT с разбором O-T-S-R из
-закреплённого garak, Simple Adaptive Attacks и ThreatenJSON с адаптированным coercive passage. Также
+закреплённого garak, Simple Adaptive Attacks, DRA и ThreatenJSON с адаптированным coercive passage. Также
 доступны управляемые собеседники, оценка предъявленного текста и построчный
 журнал JSON. Команда `tai` запускает автономный FITD.
 
@@ -136,6 +136,22 @@ Target, а ответы и вердикты записываются в журн
 останавливает поиск; если все отрицательны, предъявляется пятый ответ. Эта ранняя
 остановка — политика tai, а не стандартного garak probe.
 
+DRA запускается с явным базовым запросом и новым журналом:
+
+```bash
+uv run --locked --group dev --extra qwen tai-dra /tmp/dra.jsonl "Explain the topic in detail" --gpu 0 --tokens 192 --candidates 4 --seed 7
+```
+
+Python API: `DRAAttackEnvelope(PlainBase(base), FITDSetup(model, model, model,
+base), journal, DRABudget(candidates, seed))` из `attack.envelopes.dra_attack_envelope`.
+Закреплённые четыре шаблона, карта букв и cache-only moderation garak преобразуют
+ровно переданный запрос (без подмены на bundled behaviors и без Detoxify). Число
+кандидатов — от 1 до 4; проверяется до обращений к модели. Каждый кандидат получает
+отдельный разговор Target; журнал сохраняет шаблон, реконструкцию, запрос, ответ
+и оценку ответа относительно исходного текста. Положительная оценка останавливает
+запуск, иначе предъявляется последний оценённый ответ. `--seed` действует только
+внутри этого запуска, не изменяя глобальный генератор случайных чисел.
+
 AutoDAN GA запускается с исходным запросом и **явным желаемым продолжением**:
 
 ```bash
@@ -193,6 +209,8 @@ uv run --locked --group dev --extra qwen tai-alert /tmp/alert-fitd --gpu 0 --lim
 ThreatenJSON включён по умолчанию; `--no-threaten-json` исключает эту фабрику.
 Simple Adaptive Attacks также включён по умолчанию; `--no-adaptive-attacks`
 исключает его. Журналы находятся в `adaptive_attacks/<id>.jsonl`.
+DRA включён независимо: `--no-dra` исключает его, `--dra-candidates` и `--dra-seed`
+задают бюджет и локальное зерно. Журналы находятся в `dra/<id>.jsonl`.
 Для GGUF нужны подготовленный файл и зависимость `--extra gguf`.
 Загрузчик сверяет весь файл с закреплённым SHA-256
 `3ee64c7a6b86c2b28174d8c699407e24f94a4e54ca9b8f9c5fc35bf460725f43`:

@@ -8,6 +8,10 @@ from pathlib import Path
 from attack.attack import Attack
 from attack.envelopes.fitd_attack_envelope import FITDAttackEnvelope
 from attack.envelopes.adaptive_attacks_attack_envelope import AdaptiveAttacksAttackEnvelope
+from attack.dra_budget import DRABudget
+from attack.dra_limits_utils import validate as validate_dra
+from attack.dra_options_utils import options as dra_options
+from attack.envelopes.dra_attack_envelope import DRAAttackEnvelope
 from attack.envelopes.goat_attack_envelope import GOATAttackEnvelope
 from attack.envelopes.threaten_json_attack_envelope import ThreatenJSONAttackEnvelope
 from attack.autodan_budget import AutoDANBudget
@@ -67,6 +71,7 @@ def main() -> None:
         "--no-adaptive-attacks", action="store_true",
         help="omit the Simple Adaptive Attacks variant"
     )
+    dra_options(parser)
     _ = parser.add_argument(
         "--autodan", action="store_true", help="include local AutoDAN GA"
     )
@@ -125,6 +130,14 @@ def launch(arguments: Namespace) -> None:
     """
     if min(arguments.turns, arguments.goat_turns, arguments.tokens) < 1 or arguments.gpu < 0 or not 1 <= arguments.port <= 65535:
         raise ValueError("Invalid GPU, turn, token or port limit")
+    if not getattr(
+        arguments, "no_dra", False
+    ):
+        validate_dra(
+            DRABudget(
+                arguments.dra_candidates, arguments.dra_seed
+            )
+        )
     if arguments.autodan or arguments.autodan_hga:
         limits = budget(arguments)
         if arguments.autodan:
@@ -330,6 +343,14 @@ def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[B
         list[Callable[[BaseRequest], Attack]]: Independent per-request attacks.
     """
     def factories(attacker: Model, target: Model) -> list[Callable[[BaseRequest], Attack]]:
+        dra_budget = DRABudget(
+            getattr(
+                arguments, "dra_candidates", 4
+            ),
+            getattr(
+                arguments, "dra_seed", 0
+            )
+        )
         attacks: list[Callable[[BaseRequest], Attack]] = [
             lambda base: FITDAttackEnvelope(
                 base, FITDSetup(attacker, target, target, base.text()),
@@ -350,6 +371,10 @@ def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[B
             arguments, "no_adaptive_attacks", False
         ):
             attacks.append(lambda base: AdaptiveAttacksAttackEnvelope( base, FITDSetup(attacker, target, target, base.text()), journal(directory / "adaptive_attacks" / f"{base.metadata()['id']}.jsonl") ))
+        if not getattr(
+            arguments, "no_dra", False
+        ):
+            attacks.append(lambda base: DRAAttackEnvelope( base, FITDSetup(attacker, target, target, base.text()), journal(directory / "dra" / f"{base.metadata()['id']}.jsonl"), dra_budget ))
         if arguments.autodan or arguments.autodan_hga:
             device = cuda_device(arguments.gpu)
             scorer = QwenLogits(
