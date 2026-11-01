@@ -20,7 +20,7 @@ from attack.envelopes.threaten_json_attack_envelope import ThreatenJSONAttackEnv
 from attack.autodan_budget import AutoDANBudget
 from attack.autodan_budget_utils import validate
 from attack.envelopes.autodan_attack_envelope import AutoDANAttackEnvelope
-from attack.fitd_setup import FITDSetup
+from attack.explicit_attack_setup import ExplicitAttackSetup
 from attack.alert_attempt_utils import invoke
 from attack.run_capture import RunCapture
 from base.alert_identity import AlertIdentity
@@ -272,7 +272,7 @@ def budget(arguments: Namespace) -> AutoDANBudget:
     )
 
 
-def ga_setup(attacker: Model, target: Model, base: BaseRequest) -> FITDSetup:
+def ga_setup(attacker: Model, target: Model, base: BaseRequest) -> ExplicitAttackSetup:
     """Bind an independent Attacker and pinned Target to one request.
 
     Args:
@@ -281,9 +281,9 @@ def ga_setup(attacker: Model, target: Model, base: BaseRequest) -> FITDSetup:
         base (BaseRequest): Selected source request.
 
     Returns:
-        FITDSetup: Complete GA role binding.
+        ExplicitAttackSetup: Complete GA role binding.
     """
-    return FITDSetup(
+    return ExplicitAttackSetup(
         attacker, target, target,
         base.text()
     )
@@ -333,32 +333,32 @@ def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[B
         deletion_limits = deletion_budget(arguments)
         attacks: list[Callable[[BaseRequest], Attack]] = [
             lambda base: FITDAttackEnvelope(
-                base, FITDSetup(attacker, target, target, base.text()),
+                base, ExplicitAttackSetup(attacker, target, target, base.text()),
                 journal(directory / "fitd" / f"{base.metadata()['id']}.jsonl"),
                 arguments.turns
             ),
             lambda base: GOATAttackEnvelope(
-                base, FITDSetup(attacker, target, target, base.text()),
+                base, ExplicitAttackSetup(attacker, target, target, base.text()),
                 journal(directory / "goat" / f"{base.metadata()['id']}.jsonl"),
                 arguments.goat_turns
             ),
             lambda base: ThreatenJSONAttackEnvelope(
-                base, FITDSetup(attacker, target, target, base.text()),
+                base, ExplicitAttackSetup(attacker, target, target, base.text()),
                 journal(directory / "threaten_json" / f"{base.metadata()['id']}.jsonl")
             )
         ]
         if not getattr(
             arguments, "no_adaptive_attacks", False
         ):
-            attacks.append(lambda base: AdaptiveAttacksAttackEnvelope( base, FITDSetup(attacker, target, target, base.text()), journal(directory / "adaptive_attacks" / f"{base.metadata()['id']}.jsonl") ))
+            attacks.append(lambda base: AdaptiveAttacksAttackEnvelope( base, ExplicitAttackSetup(attacker, target, target, base.text()), journal(directory / "adaptive_attacks" / f"{base.metadata()['id']}.jsonl") ))
         if not getattr(
             arguments, "no_dra", False
         ):
-            attacks.append(lambda base: DRAAttackEnvelope( base, FITDSetup(attacker, target, target, base.text()), journal(directory / "dra" / f"{base.metadata()['id']}.jsonl"), dra_budget ))
+            attacks.append(lambda base: DRAAttackEnvelope( base, ExplicitAttackSetup(attacker, target, target, base.text()), journal(directory / "dra" / f"{base.metadata()['id']}.jsonl"), dra_budget ))
         if not getattr(
             arguments, "no_deletion", False
         ):
-            attacks.append(lambda base: DeletionAttackEnvelope( base, FITDSetup(attacker, target, target, base.text()), journal(directory / "deletion" / f"{base.metadata()['id']}.jsonl"), deletion_limits ))
+            attacks.append(lambda base: DeletionAttackEnvelope( base, ExplicitAttackSetup(attacker, target, target, base.text()), journal(directory / "deletion" / f"{base.metadata()['id']}.jsonl"), deletion_limits ))
         if arguments.autodan or arguments.autodan_hga:
             device = cuda_device(arguments.gpu)
             scorer = QwenLogits(

@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from attack.envelopes.fitd_attack_envelope import FITDAttackEnvelope
-from attack.fitd_setup import FITDSetup
+from attack.shared_model_attack_setup import SharedModelAttackSetup
 from base.plain_base import PlainBase
 from journal.disk_journal import DiskJournal
 from journal.parsed_journal import ParsedJournal
@@ -22,8 +22,8 @@ class TestFITDAttackEnvelope(unittest.TestCase):
             model = refusal()
             _ = FITDAttackEnvelope(
                 PlainBase("Original request"),
-                FITDSetup(
-                    model, model, model, "Original request"
+                SharedModelAttackSetup(
+                    model, "Original request"
                 ),
                 VersionedJournal(
                     DiskJournal(path)

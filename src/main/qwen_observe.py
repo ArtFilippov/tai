@@ -4,18 +4,14 @@ import json
 from argparse import ArgumentParser, Namespace
 from collections.abc import Mapping
 
-from attack.fitd_attack import FITDAttack
-from attack.fitd_probe import FITDProbe
+from attack.envelopes.fitd_attack_envelope import FITDAttackEnvelope
+from attack.shared_model_attack_setup import SharedModelAttackSetup
 from base.plain_base import PlainBase
 from journal.memory_journal import MemoryJournal
 from journal.versioned_journal import VersionedJournal
-from judge.qwen_judge import QwenJudge
-from judge.recorded_judge import RecordedJudge
-from target.continuing_chat import ContinuingChat
 from target.envelopes.lazy_qwen_model import LazyQwenModel
 from target.model import Model
 from target.qwen_device_utils import cuda_device
-from target.model_chat import ModelChat
 
 # Micro-category identifiers follow ALERT_taxonomy.md, Figure 2.
 BASES = (
@@ -87,23 +83,12 @@ def observe(base: str, model: Model, turns: int) -> MemoryJournal:
     request = PlainBase(base)
     journal = MemoryJournal()
     recorded = VersionedJournal(journal)
-    target = ModelChat(model)
-    judge = RecordedJudge(
-        QwenJudge(
-            base,
-            ModelChat(model)
-        ),
-        recorded, base
-    )
-    probe = FITDProbe(
-        base,
-        ContinuingChat(
-            ModelChat(model)
+    _ = FITDAttackEnvelope(
+        request,
+        SharedModelAttackSetup(
+            model, base
         ),
         recorded, turns
-    )
-    _ = FITDAttack(
-        request, target, judge, recorded, probe=probe
     ).run()
     return journal
 

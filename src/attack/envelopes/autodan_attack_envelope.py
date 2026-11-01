@@ -4,10 +4,10 @@ from attack.autodan_attack import AutoDANAttack
 from attack.autodan_limits import AutoDANLimits
 from attack.autodan_mutation import AutoDANMutation
 from attack.autodan_probe import AutoDANProbe
+from attack.attack_setup import AttackSetup
 from attack.envelopes.attack_envelope import AttackEnvelope
-from attack.envelopes.bound_attack_envelope import BoundAttackEnvelope
+from attack.envelopes.qwen_attack_envelope import QwenAttackEnvelope
 from attack.autodan_reference import AutoDANReference
-from attack.fitd_setup import FITDSetup
 from base.base_request import BaseRequest
 from journal.journal import Journal
 from target.logits import Logits
@@ -17,13 +17,13 @@ from target.model_chat import ModelChat
 class AutoDANAttackEnvelope(AttackEnvelope):
     """Reject incompatible Target/scorer profiles before a genetic run."""
 
-    def __init__(self, base: BaseRequest, setup: FITDSetup, journal: Journal,
+    def __init__(self, base: BaseRequest, setup: AttackSetup, journal: Journal,
                  *, logits: Logits, budget: AutoDANLimits) -> None:
         """Bind native GA fitness and a separate Attacker to one request.
 
         Args:
             base (BaseRequest): Original request.
-            setup (FITDSetup): Three role resources and bound request.
+            setup (AttackSetup): Three role resources and bound request.
             journal (Journal): Independent run journal.
             logits (Logits): Local Qwen scoring capability.
             budget (AutoDANLimits): Validated search limits.
@@ -31,7 +31,7 @@ class AutoDANAttackEnvelope(AttackEnvelope):
         """
         super().__init__(
             AutoDANAttack(
-                BoundAttackEnvelope(
+                QwenAttackEnvelope(
                     base, setup, journal,
                     AutoDANProbe(
                         logits,

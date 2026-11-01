@@ -1,4 +1,4 @@
-"""Composition of FITD, judgment and a durable run journal."""
+"""Composition of a probe, judgment and a durable run journal."""
 
 from dataclasses import dataclass
 from typing import override
@@ -14,7 +14,7 @@ SUCCESS = "success"
 
 
 @dataclass(eq=False)
-class FITDAttack(Attack):
+class AttackRun(Attack):
     """One attack run that owns selection before requesting judgment.
 
     Attributes:
@@ -22,7 +22,7 @@ class FITDAttack(Attack):
         target (Chat): Conversation being attacked.
         judge (Judge): Assessment of the presented result.
         journal (Journal): Destination for all run events.
-        probe (Probe): Configured FITD strategy.
+        probe (Probe): Configured attack strategy.
         failures (list[str]): Assessment failures during this run.
     """
 

@@ -14,7 +14,7 @@ from attack.autodan_corpus import AutoDANCorpus
 from attack.autodan_mutation import AutoDANMutation
 from attack.autodan_probe import AutoDANProbe
 from attack.autodan_reference import AutoDANReference
-from attack.fitd_attack import FITDAttack
+from attack.attack_run import AttackRun
 from base.plain_base import PlainBase
 from journal.disk_journal import DiskJournal
 from journal.parsed_journal import ParsedJournal
@@ -37,7 +37,7 @@ class TestAutoDANAttack(unittest.TestCase):
         journal = VersionedJournal(
             DiskJournal(path)
         )
-        return FITDAttack(
+        return AttackRun(
             PlainBase("Base request"),
             ScriptedChat(responses),
             RecordedJudge(
@@ -122,7 +122,7 @@ class TestAutoDANAttack(unittest.TestCase):
     def test_unsupported_backend_is_rejected_before_inference(self) -> None:
         journal = MemoryJournal()
         attack = AutoDANAttack(
-            FITDAttack(
+            AttackRun(
                 PlainBase("Base request"),
                 ScriptedChat([]),
                 EqualJudge("Detailed answer"),
@@ -181,7 +181,7 @@ class TestAutoDANAttack(unittest.TestCase):
         ), patch(
             "garak.resources.autodan.genetic.nltk.word_tokenize", side_effect=str.split
         ):
-            return FITDAttack(
+            return AttackRun(
                 PlainBase("Base request"),
                 ScriptedChat(responses),
                 RecordedJudge(

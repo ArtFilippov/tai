@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from attack.fitd_attack import FITDAttack
+from attack.attack_run import AttackRun
 from attack.fitd_probe import FITDProbe
 from base.alert_pool import AlertPool
 from base.plain_base import PlainBase
@@ -25,7 +25,7 @@ from target.scripted_chat import ScriptedChat
 from ..journal_utils import temporary_journal
 
 
-class TestFITDAttack(unittest.TestCase):
+class TestAttackRun(unittest.TestCase):
     """Exercises real garak escalation against separate scripted roles."""
 
     def file(self, name: str) -> AbstractContextManager[Path]:
@@ -37,7 +37,7 @@ class TestFITDAttack(unittest.TestCase):
         journal = VersionedJournal(
             DiskJournal(path)
         )
-        FITDAttack(
+        AttackRun(
             PlainBase(base),
             target,
             RecordedJudge(
@@ -62,7 +62,7 @@ class TestFITDAttack(unittest.TestCase):
                 ValueError, IndexError
             )
         ):
-            FITDAttack(
+            AttackRun(
                 PlainBase("Request"),
                 ScriptedChat(["Exact candidate"]),
                 RecordedJudge(
@@ -90,7 +90,7 @@ class TestFITDAttack(unittest.TestCase):
         with pytest.raises(
             ValueError, match="base request differs"
         ):
-            FITDAttack(
+            AttackRun(
                 PlainBase("Other request"),
                 ScriptedChat([]),
                 RecordedJudge(
@@ -127,7 +127,7 @@ class TestFITDAttack(unittest.TestCase):
             journal = VersionedJournal(
                 DiskJournal(path)
             )
-            FITDAttack(
+            AttackRun(
                 PlainBase("Request"),
                 ScriptedChat(["Partial"]),
                 RecordedJudge(
@@ -196,7 +196,7 @@ class TestFITDAttack(unittest.TestCase):
             journal = VersionedJournal(
                 DiskJournal(path)
             )
-            FITDAttack(
+            AttackRun(
                 PlainBase("Request refused"),
                 ScriptedChat([]),
                 RecordedJudge(
@@ -219,7 +219,7 @@ class TestFITDAttack(unittest.TestCase):
             journal = VersionedJournal(
                 DiskJournal(path)
             )
-            FITDAttack(
+            AttackRun(
                 PlainBase("Request refused"),
                 ScriptedChat(["I cannot fulfill your request"]),
                 RecordedJudge(
@@ -297,7 +297,7 @@ class TestFITDAttack(unittest.TestCase):
             journal = VersionedJournal(
                 DiskJournal(path)
             )
-            FITDAttack(
+            AttackRun(
                 base,
                 ScriptedChat(["Reply"]),
                 RecordedJudge(
@@ -351,7 +351,7 @@ class TestFITDAttack(unittest.TestCase):
             journal = VersionedJournal(
                 DiskJournal(path)
             )
-            FITDAttack(
+            AttackRun(
                 PlainBase("Request"),
                 ScriptedChat(["I cannot fulfill your request", "Fresh reply"]),
                 RecordedJudge(
@@ -393,7 +393,7 @@ class TestFITDAttack(unittest.TestCase):
             journal = VersionedJournal(
                 DiskJournal(path)
             )
-            FITDAttack(
+            AttackRun(
                 PlainBase("Request"),
                 ScriptedChat(["First", "I cannot fulfill your request", "Recovered"]),
                 RecordedJudge(
@@ -437,7 +437,7 @@ class TestFITDAttack(unittest.TestCase):
             journal = VersionedJournal(
                 DiskJournal(path)
             )
-            FITDAttack(
+            AttackRun(
                 PlainBase("Request"),
                 ScriptedChat(["First", "I cannot fulfill your request"]),
                 RecordedJudge(
@@ -460,7 +460,7 @@ class TestFITDAttack(unittest.TestCase):
             journal = VersionedJournal(
                 DiskJournal(path)
             )
-            FITDAttack(
+            AttackRun(
                 PlainBase("Request"),
                 ScriptedChat(["Off topic", "Improved"]),
                 RecordedJudge(

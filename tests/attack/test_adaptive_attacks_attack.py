@@ -11,7 +11,7 @@ from garak.probes.adaptive_attacks import ADAPTIVE_TEMPLATE, SUFFIXES_PATH
 
 from attack.adaptive_attacks_probe import AdaptiveAttacksProbe
 from attack.assessed_candidates import AssessedCandidates
-from attack.fitd_attack import FITDAttack
+from attack.attack_run import AttackRun
 from base.plain_base import PlainBase
 from journal.disk_journal import DiskJournal
 from journal.parsed_journal import ParsedJournal
@@ -41,7 +41,7 @@ class TestAdaptiveAttacksAttack(unittest.TestCase):
             DiskJournal(path)
         )
         target = ScriptedChat(replies)
-        _ = FITDAttack(
+        _ = AttackRun(
             PlainBase(BASE),
             target,
             RecordedJudge(

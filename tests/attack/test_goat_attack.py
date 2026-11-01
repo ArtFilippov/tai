@@ -9,7 +9,7 @@ import pytest
 
 from attack.goat_attack import GOATAttack
 from attack.goat_probe import GOATProbe
-from attack.fitd_attack import FITDAttack
+from attack.attack_run import AttackRun
 from base.plain_base import PlainBase
 from journal.disk_journal import DiskJournal
 from journal.parsed_journal import ParsedJournal
@@ -29,7 +29,7 @@ class TestGOATAttack(unittest.TestCase):
             DiskJournal(path)
         )
         return GOATAttack(
-            FITDAttack(
+            AttackRun(
                 PlainBase("Specific request"),
                 target,
                 RecordedJudge(

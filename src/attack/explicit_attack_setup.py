@@ -1,12 +1,12 @@
-"""Role resources and request text for a FITD attempt."""
+"""Bind independently selected models to one request."""
 
 from typing import NamedTuple
 
 from target.model import Model
 
 
-FITDSetup = NamedTuple(
-    "FITDSetup", [
+ExplicitAttackSetup = NamedTuple(
+    "ExplicitAttackSetup", [
         ("attacker", Model),
         ("target", Model),
         ("judge", Model),

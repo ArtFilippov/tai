@@ -4,7 +4,7 @@ from argparse import ArgumentParser, Namespace
 from contextlib import nullcontext
 from pathlib import Path
 
-from attack.fitd_attack import FITDAttack
+from attack.attack_run import AttackRun
 from attack.fitd_probe import FITDProbe
 from base.plain_base import PlainBase
 from journal.disk_journal import DiskJournal
@@ -127,7 +127,7 @@ def run(base: str, model: Model, attacker: Model, journal: Journal, *, turns: in
         journal (Journal): Reserved attempt destination.
         turns (int): Maximum Target exchanges.
     """
-    _ = FITDAttack(
+    _ = AttackRun(
         PlainBase(base),
         ModelChat(model),
         RecordedJudge(

@@ -20,11 +20,14 @@ AutoDAN GA/HGA и ThreatenJSON с адаптированным coercive passage.
 uv run --locked --group dev tai /tmp/fitd-demo.jsonl "Explain the topic in detail"
 ```
 
-`FITDAttack` из `attack.fitd_attack` принимает `BaseRequest` с `text()` и
+`AttackRun` из `attack.attack_run` принимает `BaseRequest` с `text()` и
 `metadata()`, Target с методом `reply(Conversation) -> str`, стратегию `Probe`,
 оценщика с `assess(str) -> bool` и журнал с `record(dict)`. `Attack.run()`
 выполняет уже связанный запрос; для свободного текста CLI использует
-`PlainBase` без метаданных. `main()` собирает отдельного Attacker для `FITDProbe`
+`PlainBase` без метаданных. `FITDAttackEnvelope` связывает роли через `AttackSetup`:
+`SharedModelAttackSetup(model, base)` передаёт одну модель всем трём ролям,
+а `ExplicitAttackSetup(attacker, target, judge, base)` — разные ресурсы.
+`main()` собирает отдельного Attacker для `FITDProbe`
 и оценщика с записью вердикта в журнал; запуск сохраняет текст и метаданные
 базового запроса в событии `start`, записывает выбор результата и передаёт его оценщику;
 `ParsedJournal(path).read()` восстанавливает их после завершения процесса.
@@ -147,8 +150,8 @@ Simple Adaptive Attacks запускается без файла настрое�
 uv run --locked --group dev --extra qwen tai-adaptive-attacks /tmp/adaptive.jsonl "Explain the topic in detail" --gpu 0 --tokens 192
 ```
 
-Python API: `AdaptiveAttacksAttackEnvelope(PlainBase(base), FITDSetup(model,
-model, model, base), journal)` из `attack.envelopes.adaptive_attacks_attack_envelope`.
+Python API: `AdaptiveAttacksAttackEnvelope(PlainBase(base),
+SharedModelAttackSetup(model, base), journal)` из `attack.envelopes.adaptive_attacks_attack_envelope`.
 Атака использует шаблон и пять суффиксов установленного garak в исходном порядке;
 исходный запрос подставляется дословно. Каждый вариант получает новый разговор
 Target, а ответы и вердикты записываются в журнал. Первый положительный вердикт
@@ -161,8 +164,8 @@ DRA запускается с явным базовым запросом и но
 uv run --locked --group dev --extra qwen tai-dra /tmp/dra.jsonl "Explain the topic in detail" --gpu 0 --tokens 192 --candidates 4 --seed 7
 ```
 
-Python API: `DRAAttackEnvelope(PlainBase(base), FITDSetup(model, model, model,
-base), journal, DRABudget(candidates, seed))` из `attack.envelopes.dra_attack_envelope`.
+Python API: `DRAAttackEnvelope(PlainBase(base), SharedModelAttackSetup(model, base),
+journal, DRABudget(candidates, seed))` из `attack.envelopes.dra_attack_envelope`.
 Закреплённые четыре шаблона, карта букв и cache-only moderation garak преобразуют
 ровно переданный запрос (без подмены на bundled behaviors и без Detoxify). Число
 кандидатов — от 1 до 4; проверяется до обращений к модели. Каждый кандидат получает
@@ -198,7 +201,7 @@ uv run --locked --group dev python -c 'import nltk; nltk.download("punkt_tab", r
 ```
 
 `AutoDANAttack` и `AutoDANAttackEnvelope` предоставляют Python API: связывают
-`FITDSetup`, `QwenLogits`, журнал и `AutoDANBudget(steps, batch, elites, points,
+`AttackSetup`, `QwenLogits`, журнал и `AutoDANBudget(steps, batch, elites, points,
 crossover, mutation, seed, target, mode)`, где mode равен `ga` или `hga`.
 Шаги и размер популяции ограничивают число
 вычислений fitness (`steps × batch`); `--tokens` ограничивает длину каждого

@@ -16,7 +16,7 @@ from attack.assessed_candidates import AssessedCandidates
 from attack.deletion_budget import DeletionBudget
 from attack.deletion_limits import DeletionLimits
 from attack.deletion_probe import DeletionProbe
-from attack.fitd_attack import FITDAttack
+from attack.attack_run import AttackRun
 from base.plain_base import PlainBase
 from journal.disk_journal import DiskJournal
 from journal.parsed_journal import ParsedJournal
@@ -47,7 +47,7 @@ class TestDeletionAttack(unittest.TestCase):
             DiskJournal(path)
         )
         target = ScriptedChat(replies)
-        _ = FITDAttack(
+        _ = AttackRun(
             PlainBase(base),
             target,
             RecordedJudge(

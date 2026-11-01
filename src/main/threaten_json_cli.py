@@ -4,30 +4,14 @@ from argparse import ArgumentParser, Namespace
 from pathlib import Path
 
 from attack.envelopes.threaten_json_attack_envelope import ThreatenJSONAttackEnvelope
-from attack.fitd_setup import FITDSetup
+from attack.shared_model_attack_setup import SharedModelAttackSetup
 from base.plain_base import PlainBase
 from journal.disk_journal import DiskJournal
 from journal.parsed_journal import ParsedJournal
 from journal.versioned_journal import VersionedJournal
 from target.envelopes.lazy_qwen_model import LazyQwenModel
-from target.model import Model
 from target.qwen_device_utils import cuda_device
 from target.qwen_snapshot_utils import snapshot
-
-
-def setup(model: Model, base: str) -> FITDSetup:
-    """Bind a shared model to independent Target and judgment roles.
-
-    Args:
-        model (Model): History-free local model.
-        base (str): Exact explicit request.
-
-    Returns:
-        FITDSetup: Bound role resources and request.
-    """
-    return FITDSetup(
-        model, model, model, base
-    )
 
 
 def main() -> None:
@@ -73,7 +57,7 @@ def launch(arguments: Namespace) -> None:
         raise ValueError("Invalid ThreatenJSON GPU or token limit")
     if arguments.journal.exists():
         raise FileExistsError(arguments.journal)
-    model: Model = LazyQwenModel(
+    model = LazyQwenModel(
         cuda_device(arguments.gpu),
         arguments.tokens
     )
@@ -84,7 +68,7 @@ def launch(arguments: Namespace) -> None:
     )
     _ = ThreatenJSONAttackEnvelope(
         PlainBase(arguments.base),
-        setup(
+        SharedModelAttackSetup(
             model, arguments.base
         ),
         journal

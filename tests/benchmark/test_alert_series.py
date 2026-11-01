@@ -13,7 +13,7 @@ from attack.envelopes.fitd_attack_envelope import FITDAttackEnvelope
 from attack.envelopes.adaptive_attacks_attack_envelope import AdaptiveAttacksAttackEnvelope
 from attack.envelopes.goat_attack_envelope import GOATAttackEnvelope
 from attack.envelopes.threaten_json_attack_envelope import ThreatenJSONAttackEnvelope
-from attack.fitd_setup import FITDSetup
+from attack.shared_model_attack_setup import SharedModelAttackSetup
 from base.alert_pool import AlertPool
 from base.base_request import BaseRequest
 from base.plain_base import PlainBase
@@ -163,7 +163,7 @@ class TestAlertSeries(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             series(
-                bases, [lambda base: FITDAttackEnvelope( base, FITDSetup(model, model, model, base.text()), journal(root / "fitd" / f"{base.metadata()['id']}.jsonl"), 1 )], root,
+                bases, [lambda base: FITDAttackEnvelope( base, SharedModelAttackSetup(model, base.text()), journal(root / "fitd" / f"{base.metadata()['id']}.jsonl"), 1 )], root,
                 Path("manifest.json")
             )
             path = root / "fitd" / f"{bases[1].identity}.jsonl"
@@ -186,7 +186,7 @@ class TestAlertSeries(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             series(
-                bases, [lambda base: GOATAttackEnvelope( base, FITDSetup(model, model, model, base.text()), journal(root / "goat" / f"{base.metadata()['id']}.jsonl"), 1 )], root,
+                bases, [lambda base: GOATAttackEnvelope( base, SharedModelAttackSetup(model, base.text()), journal(root / "goat" / f"{base.metadata()['id']}.jsonl"), 1 )], root,
                 Path("manifest.json")
             )
             events = list(
@@ -227,7 +227,7 @@ class TestAlertSeries(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             series(
-                bases, [lambda base: ThreatenJSONAttackEnvelope( base, FITDSetup(model, model, model, base.text()), journal(root / "threaten_json" / f"{base.metadata()['id']}.jsonl") )], root,
+                bases, [lambda base: ThreatenJSONAttackEnvelope( base, SharedModelAttackSetup(model, base.text()), journal(root / "threaten_json" / f"{base.metadata()['id']}.jsonl") )], root,
                 Path("manifest.json")
             )
             path = root / "threaten_json" / f"{bases[1].identity}.jsonl"
@@ -363,8 +363,8 @@ class TestAlertSeries(unittest.TestCase):
             for base in ("First request", "Second request"):
                 _ = AdaptiveAttacksAttackEnvelope(
                     PlainBase(base),
-                    FITDSetup(
-                        model, model, model, base
+                    SharedModelAttackSetup(
+                        model, base
                     ),
                     journal(root / f"{base}.jsonl")
                 ).run()

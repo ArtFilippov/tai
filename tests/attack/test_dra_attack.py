@@ -17,9 +17,9 @@ from garak.probes.dra import DRA
 from attack.assessed_candidates import AssessedCandidates
 from attack.dra_budget import DRABudget
 from attack.envelopes.dra_attack_envelope import DRAAttackEnvelope
-from attack.fitd_setup import FITDSetup
+from attack.explicit_attack_setup import ExplicitAttackSetup
 from attack.dra_probe import DRAProbe
-from attack.fitd_attack import FITDAttack
+from attack.attack_run import AttackRun
 from base.plain_base import PlainBase
 from journal.disk_journal import DiskJournal
 from journal.parsed_journal import ParsedJournal
@@ -52,7 +52,7 @@ class TestDRAAttack(unittest.TestCase):
             DiskJournal(path)
         )
         target = ScriptedChat(replies)
-        _ = FITDAttack(
+        _ = AttackRun(
             PlainBase(BASE),
             target,
             RecordedJudge(
@@ -206,7 +206,7 @@ class TestDRAAttack(unittest.TestCase):
                 path = Path(directory) / f"{base}.jsonl"
                 _ = DRAAttackEnvelope(
                     PlainBase(base),
-                    FITDSetup(
+                    ExplicitAttackSetup(
                         model, model, model, base
                     ),
                     VersionedJournal(

@@ -1,13 +1,13 @@
 """Bind deletion to a supplied base and independent journal."""
 
 from attack.assessed_candidates import AssessedCandidates
+from attack.attack_setup import AttackSetup
 from attack.deletion_attack import DeletionAttack
 from attack.deletion_limits import DeletionLimits
 from attack.deletion_native import NativeDeletion
 from attack.deletion_probe import DeletionProbe
 from attack.envelopes.attack_envelope import AttackEnvelope
-from attack.envelopes.bound_attack_envelope import BoundAttackEnvelope
-from attack.fitd_setup import FITDSetup
+from attack.envelopes.qwen_attack_envelope import QwenAttackEnvelope
 from base.base_request import BaseRequest
 from journal.journal import Journal
 
@@ -15,18 +15,18 @@ from journal.journal import Journal
 class DeletionAttackEnvelope(AttackEnvelope):
     """Compose separate Target and judgment conversations for deletion."""
 
-    def __init__(self, base: BaseRequest, setup: FITDSetup, journal: Journal, budget: DeletionLimits) -> None:
+    def __init__(self, base: BaseRequest, setup: AttackSetup, journal: Journal, budget: DeletionLimits) -> None:
         """Bind shared role resources to a single original request.
 
         Args:
             base (BaseRequest): Supplied request.
-            setup (FITDSetup): History-free role resources.
+            setup (AttackSetup): History-free role resources.
             journal (Journal): Independent run sink.
             budget (DeletionLimits): Native generation limits.
         """
         super().__init__(
             DeletionAttack(
-                BoundAttackEnvelope(
+                QwenAttackEnvelope(
                     base, setup, journal,
                     DeletionProbe(
                         setup.text,

@@ -5,13 +5,12 @@ from pathlib import Path
 
 from attack.deletion_budget import DeletionBudget
 from attack.envelopes.deletion_attack_envelope import DeletionAttackEnvelope
-from attack.fitd_setup import FITDSetup
+from attack.shared_model_attack_setup import SharedModelAttackSetup
 from base.plain_base import PlainBase
 from journal.disk_journal import DiskJournal
 from journal.parsed_journal import ParsedJournal
 from journal.versioned_journal import VersionedJournal
 from target.envelopes.lazy_qwen_model import LazyQwenModel
-from target.model import Model
 from target.qwen_device_utils import cuda_device
 from target.qwen_snapshot_utils import snapshot
 
@@ -30,21 +29,6 @@ def bounds(arguments: Namespace) -> DeletionBudget:
     )
     budget.validate()
     return budget
-
-
-def setup(model: Model, base: str) -> FITDSetup:
-    """Give Target and judge independent histories on one model resource.
-
-    Args:
-        model (Model): Shared history-free resource.
-        base (str): Exact request for judgment.
-
-    Returns:
-        FITDSetup: Bound roles.
-    """
-    return FITDSetup(
-        model, model, model, base
-    )
 
 
 def launch(arguments: Namespace) -> None:
@@ -68,7 +52,7 @@ def launch(arguments: Namespace) -> None:
     model = LazyQwenModel(
         device, arguments.tokens
     )
-    roles = setup(
+    roles = SharedModelAttackSetup(
         model, arguments.base
     )
     _ = DeletionAttackEnvelope(

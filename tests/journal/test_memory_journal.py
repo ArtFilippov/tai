@@ -2,7 +2,7 @@
 
 import unittest
 
-from attack.fitd_attack import FITDAttack
+from attack.attack_run import AttackRun
 from attack.fitd_probe import FITDProbe
 from base.plain_base import PlainBase
 from journal.memory_journal import MemoryJournal
@@ -184,7 +184,7 @@ class TestMemoryJournal(unittest.TestCase):
         target = ScriptedChat(["First", "Second"])
         chat = ScriptedChat(["Opening", "One", "Two", "Three", "yes", "yes", "yes"])
         attacker = ContinuingChat(chat)
-        _ = FITDAttack(
+        _ = AttackRun(
             PlainBase("Request"),
             target,
             RecordedJudge(

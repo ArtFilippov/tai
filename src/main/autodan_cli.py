@@ -7,7 +7,7 @@ from attack.autodan_budget import AutoDANBudget
 from attack.autodan_budget_utils import validate
 from attack.autodan_limits import AutoDANLimits
 from attack.envelopes.autodan_attack_envelope import AutoDANAttackEnvelope
-from attack.fitd_setup import FITDSetup
+from attack.shared_model_attack_setup import SharedModelAttackSetup
 from base.base_request import BaseRequest
 from base.plain_base import PlainBase
 from journal.disk_journal import DiskJournal
@@ -90,21 +90,6 @@ def bounds(arguments: Namespace) -> AutoDANLimits:
     return limits
 
 
-def setup(model: Model, base: str) -> FITDSetup:
-    """Bind separate roles to the same history-free local model.
-
-    Args:
-        model (Model): Pinned Qwen role resource.
-        base (str): Original request.
-
-    Returns:
-        FITDSetup: Independently conversational roles.
-    """
-    return FITDSetup(
-        model, model, model, base
-    )
-
-
 def launch(arguments: Namespace) -> None:
     """Validate all bounds before reserving the journal and loading weights.
 
@@ -136,7 +121,7 @@ def launch(arguments: Namespace) -> None:
     )
     _ = AutoDANAttackEnvelope(
         base,
-        setup(
+        SharedModelAttackSetup(
             model, arguments.base
         ),
         journal, logits=logits,

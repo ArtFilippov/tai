@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from attack.fitd_attack import FITDAttack
+from attack.attack_run import AttackRun
 from attack.threaten_json_probe import JSON_ONLY, PRESSURE, ThreatenJSONProbe
 from base.plain_base import PlainBase
 from journal.disk_journal import DiskJournal
@@ -43,7 +43,7 @@ class TestThreatenJSONAttack(unittest.TestCase):
         )
         target = ScriptedChat(replies)
         judge = ScriptedChat(verdicts)
-        FITDAttack(
+        AttackRun(
             PlainBase(BASE),
             target,
             RecordedJudge(

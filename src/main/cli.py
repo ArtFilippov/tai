@@ -3,7 +3,7 @@
 from argparse import ArgumentParser
 from pathlib import Path
 
-from attack.fitd_attack import FITDAttack
+from attack.attack_run import AttackRun
 from attack.fitd_probe import FITDProbe
 from base.plain_base import PlainBase
 from journal.disk_journal import DiskJournal
@@ -28,7 +28,7 @@ def main() -> None:
         DiskJournal(arguments.journal)
     )
     base = PlainBase(arguments.base)
-    _ = FITDAttack(
+    _ = AttackRun(
         base,
         ScriptedChat(["Historical context.", "Social context.", "A fictional account.", "A more detailed fictional account.", "The requested account."]),
         RecordedJudge(
