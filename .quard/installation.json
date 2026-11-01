@@ -14,6 +14,6 @@
     "qwen"
   ],
   "mode": "strict",
-  "quard_version": "1.6.1",
+  "quard_version": "1.7.0",
   "source_layout": "src"
 }
