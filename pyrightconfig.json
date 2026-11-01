@@ -60,7 +60,63 @@
       ],
       "reportImplicitOverride": "none",
       "reportMissingSuperCall": "none",
+      "root": "src/attack/adaptive_attacks/envelopes"
+    },
+    {
+      "extraPaths": [
+        "src"
+      ],
+      "reportImplicitOverride": "none",
+      "reportMissingSuperCall": "none",
+      "root": "src/attack/threaten_json/envelopes"
+    },
+    {
+      "extraPaths": [
+        "src"
+      ],
+      "reportImplicitOverride": "none",
+      "reportMissingSuperCall": "none",
+      "root": "src/attack/deletion/envelopes"
+    },
+    {
+      "extraPaths": [
+        "src"
+      ],
+      "reportImplicitOverride": "none",
+      "reportMissingSuperCall": "none",
+      "root": "src/attack/autodan/envelopes"
+    },
+    {
+      "extraPaths": [
+        "src"
+      ],
+      "reportImplicitOverride": "none",
+      "reportMissingSuperCall": "none",
+      "root": "src/attack/fitd/envelopes"
+    },
+    {
+      "extraPaths": [
+        "src"
+      ],
+      "reportImplicitOverride": "none",
+      "reportMissingSuperCall": "none",
+      "root": "src/attack/goat/envelopes"
+    },
+    {
+      "extraPaths": [
+        "src"
+      ],
+      "reportImplicitOverride": "none",
+      "reportMissingSuperCall": "none",
       "root": "src/target/gguf/envelopes"
+    },
+    {
+      "extraPaths": [
+        "src"
+      ],
+      "reportImplicitOverride": "none",
+      "reportMissingSuperCall": "none",
+      "root": "src/attack/dra/envelopes"
     },
     {
       "extraPaths": [

@@ -1,0 +1,1 @@
+"""FITD attack variant."""

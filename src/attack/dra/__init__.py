@@ -1,0 +1,1 @@
+"""DRA attack variant."""

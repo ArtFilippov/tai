@@ -3,7 +3,7 @@
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
 
-from attack.envelopes.goat_attack_envelope import GOATAttackEnvelope
+from attack.goat.envelopes.goat_attack_envelope import GOATAttackEnvelope
 from attack.shared_model_attack_setup import SharedModelAttackSetup
 from base.plain_base import PlainBase
 from journal.disk_journal import DiskJournal

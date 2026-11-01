@@ -201,7 +201,49 @@ reportPrivateUsage = "none"
 reportUnusedCallResult = "none"
 
 [[tool.pyright.executionEnvironments]]
+root = "src/attack/adaptive_attacks/envelopes"
+extraPaths = ["src"]
+reportMissingSuperCall = "none"
+reportImplicitOverride = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "src/attack/threaten_json/envelopes"
+extraPaths = ["src"]
+reportMissingSuperCall = "none"
+reportImplicitOverride = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "src/attack/deletion/envelopes"
+extraPaths = ["src"]
+reportMissingSuperCall = "none"
+reportImplicitOverride = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "src/attack/autodan/envelopes"
+extraPaths = ["src"]
+reportMissingSuperCall = "none"
+reportImplicitOverride = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "src/attack/fitd/envelopes"
+extraPaths = ["src"]
+reportMissingSuperCall = "none"
+reportImplicitOverride = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "src/attack/goat/envelopes"
+extraPaths = ["src"]
+reportMissingSuperCall = "none"
+reportImplicitOverride = "none"
+
+[[tool.pyright.executionEnvironments]]
 root = "src/target/gguf/envelopes"
+extraPaths = ["src"]
+reportMissingSuperCall = "none"
+reportImplicitOverride = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "src/attack/dra/envelopes"
 extraPaths = ["src"]
 reportMissingSuperCall = "none"
 reportImplicitOverride = "none"

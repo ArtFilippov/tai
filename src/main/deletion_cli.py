@@ -3,8 +3,8 @@
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
 
-from attack.deletion_budget import DeletionBudget
-from attack.envelopes.deletion_attack_envelope import DeletionAttackEnvelope
+from attack.deletion.deletion_budget import DeletionBudget
+from attack.deletion.envelopes.deletion_attack_envelope import DeletionAttackEnvelope
 from attack.shared_model_attack_setup import SharedModelAttackSetup
 from base.plain_base import PlainBase
 from journal.disk_journal import DiskJournal

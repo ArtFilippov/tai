@@ -2,7 +2,7 @@
 
 from attack.attack_run import AttackRun
 from attack.attack_setup import AttackSetup
-from attack.envelopes.attack_envelope import AttackEnvelope
+from attack.attack_envelope import AttackEnvelope
 from attack.probe import Probe
 from base.base_request import BaseRequest
 from journal.journal import Journal

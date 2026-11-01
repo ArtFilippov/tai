@@ -1,0 +1,1 @@
+"""Bad Characters deletion variant."""

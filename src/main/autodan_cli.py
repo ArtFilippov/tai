@@ -3,10 +3,10 @@
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
 
-from attack.autodan_budget import AutoDANBudget
-from attack.autodan_budget_utils import validate
-from attack.autodan_limits import AutoDANLimits
-from attack.envelopes.autodan_attack_envelope import AutoDANAttackEnvelope
+from attack.autodan.autodan_budget import AutoDANBudget
+from attack.autodan.autodan_budget_utils import validate
+from attack.autodan.autodan_limits import AutoDANLimits
+from attack.autodan.envelopes.autodan_attack_envelope import AutoDANAttackEnvelope
 from attack.shared_model_attack_setup import SharedModelAttackSetup
 from base.base_request import BaseRequest
 from base.plain_base import PlainBase

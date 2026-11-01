@@ -9,10 +9,10 @@ from typing import Any
 from unittest.mock import Mock, patch
 
 from attack.attack import Attack
-from attack.envelopes.fitd_attack_envelope import FITDAttackEnvelope
-from attack.envelopes.adaptive_attacks_attack_envelope import AdaptiveAttacksAttackEnvelope
-from attack.envelopes.goat_attack_envelope import GOATAttackEnvelope
-from attack.envelopes.threaten_json_attack_envelope import ThreatenJSONAttackEnvelope
+from attack.fitd.envelopes.fitd_attack_envelope import FITDAttackEnvelope
+from attack.adaptive_attacks.envelopes.adaptive_attacks_attack_envelope import AdaptiveAttacksAttackEnvelope
+from attack.goat.envelopes.goat_attack_envelope import GOATAttackEnvelope
+from attack.threaten_json.envelopes.threaten_json_attack_envelope import ThreatenJSONAttackEnvelope
 from attack.shared_model_attack_setup import SharedModelAttackSetup
 from base.alert_pool import AlertPool
 from base.base_request import BaseRequest

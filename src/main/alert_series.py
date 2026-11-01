@@ -6,20 +6,20 @@ from contextlib import AbstractContextManager, contextmanager, nullcontext
 from pathlib import Path
 
 from attack.attack import Attack
-from attack.envelopes.fitd_attack_envelope import FITDAttackEnvelope
-from attack.envelopes.adaptive_attacks_attack_envelope import AdaptiveAttacksAttackEnvelope
-from attack.dra_budget import DRABudget
-from attack.dra_limits_utils import validate as validate_dra
-from attack.dra_options_utils import options as dra_options
-from attack.envelopes.dra_attack_envelope import DRAAttackEnvelope
-from attack.deletion_budget import DeletionBudget
-from attack.deletion_options_utils import options as deletion_options
-from attack.envelopes.deletion_attack_envelope import DeletionAttackEnvelope
-from attack.envelopes.goat_attack_envelope import GOATAttackEnvelope
-from attack.envelopes.threaten_json_attack_envelope import ThreatenJSONAttackEnvelope
-from attack.autodan_budget import AutoDANBudget
-from attack.autodan_budget_utils import validate
-from attack.envelopes.autodan_attack_envelope import AutoDANAttackEnvelope
+from attack.fitd.envelopes.fitd_attack_envelope import FITDAttackEnvelope
+from attack.adaptive_attacks.envelopes.adaptive_attacks_attack_envelope import AdaptiveAttacksAttackEnvelope
+from attack.dra.dra_budget import DRABudget
+from attack.dra.dra_limits_utils import validate as validate_dra
+from attack.dra.dra_options_utils import options as dra_options
+from attack.dra.envelopes.dra_attack_envelope import DRAAttackEnvelope
+from attack.deletion.deletion_budget import DeletionBudget
+from attack.deletion.deletion_options_utils import options as deletion_options
+from attack.deletion.envelopes.deletion_attack_envelope import DeletionAttackEnvelope
+from attack.goat.envelopes.goat_attack_envelope import GOATAttackEnvelope
+from attack.threaten_json.envelopes.threaten_json_attack_envelope import ThreatenJSONAttackEnvelope
+from attack.autodan.autodan_budget import AutoDANBudget
+from attack.autodan.autodan_budget_utils import validate
+from attack.autodan.envelopes.autodan_attack_envelope import AutoDANAttackEnvelope
 from attack.explicit_attack_setup import ExplicitAttackSetup
 from attack.alert_attempt_utils import invoke
 from attack.run_capture import RunCapture

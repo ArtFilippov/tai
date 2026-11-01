@@ -4,7 +4,7 @@ import json
 from argparse import ArgumentParser, Namespace
 from collections.abc import Mapping
 
-from attack.envelopes.fitd_attack_envelope import FITDAttackEnvelope
+from attack.fitd.envelopes.fitd_attack_envelope import FITDAttackEnvelope
 from attack.shared_model_attack_setup import SharedModelAttackSetup
 from base.plain_base import PlainBase
 from journal.memory_journal import MemoryJournal

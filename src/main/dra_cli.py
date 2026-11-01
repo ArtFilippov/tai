@@ -3,9 +3,9 @@
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
 
-from attack.dra_budget import DRABudget
-from attack.dra_limits_utils import validate
-from attack.envelopes.dra_attack_envelope import DRAAttackEnvelope
+from attack.dra.dra_budget import DRABudget
+from attack.dra.dra_limits_utils import validate
+from attack.dra.envelopes.dra_attack_envelope import DRAAttackEnvelope
 from attack.shared_model_attack_setup import SharedModelAttackSetup
 from base.plain_base import PlainBase
 from journal.disk_journal import DiskJournal

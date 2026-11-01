@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from attack.attack_run import AttackRun
-from attack.fitd_probe import FITDProbe
+from attack.fitd.fitd_probe import FITDProbe
 from base.alert_pool import AlertPool
 from base.plain_base import PlainBase
 from journal.disk_journal import DiskJournal

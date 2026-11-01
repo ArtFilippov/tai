@@ -5,7 +5,7 @@ from contextlib import nullcontext
 from pathlib import Path
 
 from attack.attack_run import AttackRun
-from attack.fitd_probe import FITDProbe
+from attack.fitd.fitd_probe import FITDProbe
 from base.plain_base import PlainBase
 from journal.disk_journal import DiskJournal
 from journal.journal import Journal

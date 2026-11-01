@@ -122,7 +122,7 @@ GGUFLocation(host, port), gpu, tokens)` из модулей
 uv run --locked --group dev --extra qwen tai-goat /tmp/goat.jsonl "Explain the topic in detail" --gpu 0 --turns 2 --tokens 192
 ```
 
-`GOATAttack` из `attack.goat_attack` предоставляет границу Python `Attack`;
+`GOATAttack` из `attack.goat.goat_attack` предоставляет границу Python `Attack`;
 `GOATAttackEnvelope` связывает базовый запрос, роли и журнал. Attacker и Target
 ведут независимые истории; внутренний GOAT judge записывается как `decision`,
 а отдельный оценщик получает только выбранный ответ Target. Отсутствие первого
@@ -151,7 +151,7 @@ uv run --locked --group dev --extra qwen tai-adaptive-attacks /tmp/adaptive.json
 ```
 
 Python API: `AdaptiveAttacksAttackEnvelope(PlainBase(base),
-SharedModelAttackSetup(model, base), journal)` из `attack.envelopes.adaptive_attacks_attack_envelope`.
+SharedModelAttackSetup(model, base), journal)` из `attack.adaptive_attacks.envelopes.adaptive_attacks_attack_envelope`.
 Атака использует шаблон и пять суффиксов установленного garak в исходном порядке;
 исходный запрос подставляется дословно. Каждый вариант получает новый разговор
 Target, а ответы и вердикты записываются в журнал. Первый положительный вердикт
@@ -165,7 +165,7 @@ uv run --locked --group dev --extra qwen tai-dra /tmp/dra.jsonl "Explain the top
 ```
 
 Python API: `DRAAttackEnvelope(PlainBase(base), SharedModelAttackSetup(model, base),
-journal, DRABudget(candidates, seed))` из `attack.envelopes.dra_attack_envelope`.
+journal, DRABudget(candidates, seed))` из `attack.dra.envelopes.dra_attack_envelope`.
 Закреплённые четыре шаблона, карта букв и cache-only moderation garak преобразуют
 ровно переданный запрос (без подмены на bundled behaviors и без Detoxify). Число
 кандидатов — от 1 до 4; проверяется до обращений к модели. Каждый кандидат получает

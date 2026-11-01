@@ -1,1 +1,1 @@
-"""Composed attack variants."""
+"""Common attack compositions."""
