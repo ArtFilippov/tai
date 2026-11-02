@@ -21,7 +21,7 @@ from benchmark.alert_series import AlertSeries
 from journal.parsed_journal import ParsedJournal
 from main.alert_series import journal, prepare, series
 from target.model import Model
-from ..attack.model_fixture_utils import adaptive, goat, refusal, threaten_json
+from ..attack.model_fixture_utils import adaptive, goat, refusal, threaten_json, whois
 from ..target import test_logits, test_model
 
 
@@ -565,3 +565,71 @@ class TestAlertSeries(unittest.TestCase):
                 {outcomes[index]["reason"] for index in range(192, 256)}
             )
             assert observed == (32, 8, 256, 256, True, True, 256, {"search_exhausted"}), "The complete offline series lost a base, variant, journal, call or recorded outcome"
+
+    def test_whois_is_opt_in(self) -> None:
+        arguments = Namespace(
+            gpu=0, tokens=192, attacker="qwen", host="127.0.0.1", port=8080,
+            turns=1, goat_turns=1, no_threaten_json=False,
+            no_adaptive_attacks=False, no_dra=True, no_deletion=True,
+            deletion_perturbations=1, deletion_positions=2, deletion_ascii=2,
+            autodan=False, autodan_hga=False
+        )
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "main.alert_series.LazyQwenModel", return_value=whois()
+        ), patch(
+            "main.alert_series.cuda_device", return_value="controlled"
+        ), patch(
+            "main.alert_series.snapshot", return_value=None
+        ), prepare(
+            arguments,
+            Path(directory)
+        ) as factories:
+            assert len(factories) == 4, "The default ALERT selection unexpectedly included WHOIS"
+
+    def test_whois_series_covers_all_categories_with_independent_journals(self) -> None:
+        bases = AlertPool(
+            Path("examples/alert-manifest-640.json")
+        ).requests(1)
+        arguments = Namespace(
+            gpu=0, tokens=192, attacker="qwen", host="127.0.0.1", port=8080,
+            turns=1, goat_turns=1, no_threaten_json=False,
+            no_adaptive_attacks=False, no_dra=True, no_deletion=True,
+            deletion_perturbations=1, deletion_positions=2, deletion_ascii=2,
+            autodan=False, autodan_hga=False, whois=True
+        )
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "main.alert_series.LazyQwenModel", return_value=whois()
+        ), patch(
+            "main.alert_series.cuda_device", return_value="controlled"
+        ), patch(
+            "main.alert_series.snapshot", return_value=None
+        ), prepare(
+            arguments,
+            Path(directory)
+        ) as factories:
+            series(
+                bases, factories[-1:],
+                Path(directory),
+                Path("examples/alert-manifest-640.json")
+            )
+            report = self.report(directory)
+            expected = {
+                "target": 1,
+                "attacker": 0,
+                "judge": 1
+            }
+            checks: list[bool] = []
+            for base in bases:
+                path = Path(directory) / "whois" / f"{base.identity}.jsonl"
+                events = list(
+                    ParsedJournal(path).events()
+                )
+                checks.append(events[0]["base_metadata"] == dict(base.metadata()))
+                checks.append(ParsedJournal(path).read()["calls"] == expected)
+            observed = (
+                len(factories),
+                report["planned"], report["attempted"], report["complete"],
+                len({run["base_metadata"]["microcategory"] for run in report["runs"]}),
+                all(checks)
+            )
+            assert observed == (5, 32, 32, True, 32, True), "The WHOIS variant lost a category, provenance, or independent journal"

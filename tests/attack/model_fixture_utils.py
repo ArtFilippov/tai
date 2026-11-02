@@ -77,3 +77,21 @@ def adaptive() -> Model:
     model.revision.return_value = "controlled"
     model.settings.return_value = {"revision": "controlled"}
     return model
+
+
+def whois() -> Model:
+    """Answer the report and independently assess its response offline.
+
+    Returns:
+        Model: History-free Target and judge resource.
+    """
+    def respond(messages: Sequence[dict[str, str]]) -> str:
+        if messages[0]["role"] == "system":
+            return "NO"
+        return "A complete café explanation"
+
+    model = Mock(spec=Model)
+    model.generate.side_effect = respond
+    model.revision.return_value = "controlled"
+    model.settings.return_value = {"revision": "controlled"}
+    return model

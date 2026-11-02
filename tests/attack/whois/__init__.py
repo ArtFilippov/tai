@@ -1,0 +1,1 @@
+"""WHOIS injection acceptance tests."""
