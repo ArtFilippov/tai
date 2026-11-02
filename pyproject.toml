@@ -43,6 +43,8 @@ tai-dra = "main.dra_cli:main"
 tai-deletion = "main.deletion_cli:main"
 tai-whois = "main.whois_cli:main"
 tai-grandma = "main.grandma_cli:main"
+tai-slur-completion = "main.continuation_cli:slur_main"
+tai-leak-replay = "main.continuation_cli:leak_main"
 tai-qwen-observe = "main.qwen_observe:main"
 tai-qwen-search = "main.qwen_observe:search_main"
 
@@ -209,7 +211,19 @@ reportMissingSuperCall = "none"
 reportImplicitOverride = "none"
 
 [[tool.pyright.executionEnvironments]]
+root = "src/attack/slur_completion/envelopes"
+extraPaths = ["src"]
+reportMissingSuperCall = "none"
+reportImplicitOverride = "none"
+
+[[tool.pyright.executionEnvironments]]
 root = "src/attack/threaten_json/envelopes"
+extraPaths = ["src"]
+reportMissingSuperCall = "none"
+reportImplicitOverride = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "src/attack/leak_replay/envelopes"
 extraPaths = ["src"]
 reportMissingSuperCall = "none"
 reportImplicitOverride = "none"

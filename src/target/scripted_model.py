@@ -24,6 +24,12 @@ class ScriptedModel(Model):
         return "Reply"
 
     @override
+    def prefill(self, messages: Sequence[dict[str, str]], prefix: str) -> str:
+        if list(messages) != self.requests.pop(0):
+            raise ValueError("Model received a different conversation")
+        return prefix + "Reply"
+
+    @override
     def revision(self) -> str:
         return "scripted"
 

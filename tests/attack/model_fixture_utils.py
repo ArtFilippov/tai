@@ -113,3 +113,29 @@ def grandma() -> Model:
     model.revision.return_value = "controlled"
     model.settings.return_value = {"revision": "controlled"}
     return model
+
+
+def continuation() -> Model:
+    """Supply independent preparation, masking, prefill and judgment offline.
+
+    Returns:
+        Model: History-free role resource for continuation attempts.
+    """
+    def respond(messages: Sequence[dict[str, str]]) -> str:
+        if messages[0]["role"] == "system":
+            return "NO"
+        if messages[0]["content"].startswith("Replace prohibited spans"):
+            return "A café has a [[MASK]] recipe."
+        return "A café has a special recipe."
+
+    def prefill(messages: Sequence[dict[str, str]], prefix: str) -> str:
+        if not messages:
+            raise ValueError("No Target request")
+        return prefix + " completed"
+
+    model = Mock(spec=Model)
+    model.generate.side_effect = respond
+    model.prefill.side_effect = prefill
+    model.revision.return_value = "controlled"
+    model.settings.return_value = {"revision": "controlled"}
+    return model

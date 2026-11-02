@@ -51,3 +51,44 @@ class TestModelChat(unittest.TestCase):
             )
         )
         assert response == "Reply", "The Target history leaked into the Attacker role"
+
+    def test_prefill_returns_complete_message_without_changing_reply(self) -> None:
+        model = ScriptedModel(
+            [
+                [
+                    {
+                        "role": "user",
+                        "content": "Target request"
+                    }
+                ],
+                [
+                    {
+                        "role": "user",
+                        "content": "Other request"
+                    }
+                ]
+            ]
+        )
+        target = ModelChat(model)
+        result = target.prefill(
+            Conversation(
+                [
+                    Turn(
+                        "user",
+                        Message("Target request")
+                    )
+                ]
+            ),
+            "Beginning"
+        )
+        ordinary = ModelChat(model).reply(
+            Conversation(
+                [
+                    Turn(
+                        "user",
+                        Message("Other request")
+                    )
+                ]
+            )
+        )
+        assert (result, ordinary) == ("BeginningReply", "Reply"), "Prefill lost its prefix or changed ordinary generation"

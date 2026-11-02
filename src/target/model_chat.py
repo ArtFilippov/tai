@@ -37,3 +37,16 @@ class ModelChat(Chat):
                 for turn in conversation.turns
             ]
         )
+
+    @override
+    def prefill(self, conversation: Conversation, prefix: str) -> str:
+        return self.model.prefill(
+            [
+                {
+                    "role": turn.role,
+                    "content": turn.content.text
+                }
+                for turn in conversation.turns
+            ],
+            prefix
+        )

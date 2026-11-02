@@ -37,3 +37,31 @@ class TestContinuingChat(unittest.TestCase):
         assert [turn.content.text for turn in chat.transcript(1).turns] == [
             "First check", "First answer", "Second check"
         ], "The Attacker's prior check was lost"
+
+    def test_prefill_joins_history_without_changing_reply(self) -> None:
+        chat = ScriptedChat([" suffix", "Next answer"])
+        attacker = ContinuingChat(chat)
+        first = attacker.prefill(
+            Conversation(
+                [
+                    Turn(
+                        "user",
+                        Message("First check")
+                    )
+                ]
+            ),
+            "Opening"
+        )
+        second = attacker.reply(
+            Conversation(
+                [
+                    Turn(
+                        "user",
+                        Message("Second check")
+                    )
+                ]
+            )
+        )
+        assert (first, second, [turn.content.text for turn in chat.transcript(1).turns]) == (
+            "Opening suffix", "Next answer", ["First check", "Opening suffix", "Second check"]
+        ), "The prefilled assistant message was lost from the next conversation"

@@ -133,7 +133,7 @@ class ParsedJournal(JournalView):
             or (status == ROUND_LIMIT and text is not None and assessment is False)
             or (status == NO_RESULT and text is None and assessment is None)
             or (status == FAILURE and error is not None and assessment is None)
-            or (status == FAILURE and reason == EXECUTION_ERROR and error is None)
+            or (status == FAILURE and reason in (EXECUTION_ERROR, "preparation_error") and error is None)
         ):
             raise ValueError(f"Invalid run journal event in {self.path}")
 

@@ -48,6 +48,26 @@ class TestGGUFModel(unittest.TestCase):
             tokens
         )
 
+    def test_prefill_fails_explicitly(self) -> None:
+        with self.assertRaisesRegex(
+            NotImplementedError, "do not support verified assistant prefill"
+        ):
+            _ = ModelChat(
+                self.model(
+                    8765, 24
+                )
+            ).prefill(
+                Conversation(
+                    [
+                        Turn(
+                            "user",
+                            Message("Hi")
+                        )
+                    ]
+                ),
+                "Hello"
+            )
+
     def port(self) -> int:
         """Choose a vacant loopback port for a local service.
 

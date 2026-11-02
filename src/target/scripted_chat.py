@@ -15,10 +15,12 @@ class ScriptedChat(Chat):
     Attributes:
         replies (list[str]): Responses for successive requests.
         histories (list[Conversation]): Conversations supplied to this role.
+        prefixes (list[str]): Assistant openings supplied for prefilled requests.
     """
 
     replies: list[str]
     histories: list[Conversation]
+    prefixes: list[str]
 
     def __init__(self, replies: list[str]) -> None:
         """Keep the provided replies in order.
@@ -29,6 +31,7 @@ class ScriptedChat(Chat):
         super().__init__()
         self.replies = replies
         self.histories = []
+        self.prefixes = []
 
     @override
     def description(self) -> dict[str, object]:
@@ -41,6 +44,12 @@ class ScriptedChat(Chat):
     def reply(self, conversation: Conversation) -> str:
         self.histories.append(conversation)
         return self.replies.pop(0)
+
+    @override
+    def prefill(self, conversation: Conversation, prefix: str) -> str:
+        self.histories.append(conversation)
+        self.prefixes.append(prefix)
+        return prefix + self.replies.pop(0)
 
     def transcript(self, index: int) -> Conversation:
         """Inspect one supplied conversation in a controlled test.

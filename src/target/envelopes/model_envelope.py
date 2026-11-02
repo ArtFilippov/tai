@@ -22,6 +22,12 @@ class ModelEnvelope(Model):
         return self.delegate.generate(messages)
 
     @override
+    def prefill(self, messages: Sequence[dict[str, str]], prefix: str) -> str:
+        return self.delegate.prefill(
+            messages, prefix
+        )
+
+    @override
     def revision(self) -> str:
         return self.delegate.revision()
 

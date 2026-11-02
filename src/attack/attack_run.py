@@ -80,7 +80,7 @@ class AttackRun(Attack):
                 {
                     "event": "end",
                     "status": "failure",
-                    "reason": "assessment_error" if self.failures else "execution_error"
+                    "reason": "assessment_error" if self.failures else "preparation_error" if self.probe.kind() in ("slur_completion", "leak_replay") and isinstance(exc, ValueError) else "execution_error"
                 }
             )
             raise

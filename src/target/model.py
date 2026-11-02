@@ -10,6 +10,18 @@ class Model(Protocol):
     def generate(self, messages: Sequence[dict[str, str]]) -> str:
         ...
 
+    def prefill(self, messages: Sequence[dict[str, str]], prefix: str) -> str:
+        """Continue a partial assistant response.
+
+        Args:
+            messages (Sequence[dict[str, str]]): Complete request history.
+            prefix (str): Assistant text already supplied.
+
+        Returns:
+            str: Complete assistant message including prefix.
+        """
+        ...
+
     def revision(self) -> str:
         ...
 

@@ -42,6 +42,10 @@ class GGUFModel(Model):
                 raise ValueError(f"Malformed GGUF completion at {self.service.address()}")
 
     @override
+    def prefill(self, messages: Sequence[dict[str, str]], prefix: str) -> str:
+        raise NotImplementedError("GGUF chat completions do not support verified assistant prefill")
+
+    @override
     def revision(self) -> str:
         return self.file.commit()
 

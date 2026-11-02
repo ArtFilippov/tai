@@ -14,6 +14,10 @@ class TestModel(Model):
         return "YES" if messages[0]["role"] == "system" else "Detailed answer"
 
     @override
+    def prefill(self, messages: Sequence[dict[str, str]], prefix: str) -> str:
+        return prefix + self.generate(messages)
+
+    @override
     def revision(self) -> str:
         return "7ae557604adf67be50417f59c2c2f167def9a775"
 

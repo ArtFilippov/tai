@@ -54,6 +54,37 @@ class QwenModel(Model):
         )
 
     @override
+    def prefill(self, messages: Sequence[dict[str, str]], prefix: str) -> str:
+        if not prefix:
+            raise ValueError("Assistant prefill must not be empty")
+        prompt = self.tokenizer.apply_chat_template(
+            [
+                *messages,
+                {
+                    "role": "assistant",
+                    "content": prefix
+                }
+            ],
+            tokenize=False, continue_final_message=True
+        )
+        if not prompt.endswith(prefix):
+            raise ValueError("Chat template did not preserve the assistant prefill")
+        batch = (
+            self.tokenizer(
+                prompt, return_tensors="pt"
+            ).to(self.device)
+        )
+        with torch.inference_mode():
+            output = self.model.generate(
+                **batch, max_new_tokens=self.tokens, do_sample=False,
+                pad_token_id=self.tokenizer.eos_token_id
+            )
+        return (prefix +
+                self.tokenizer.decode(
+                    output[0][batch["input_ids"].shape[-1]:], skip_special_tokens=True
+                ))
+
+    @override
     def revision(self) -> str:
         return "7ae557604adf67be50417f59c2c2f167def9a775"
 

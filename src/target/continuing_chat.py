@@ -52,3 +52,20 @@ class ContinuingChat(Chat):
             )
         )
         return response
+
+    @override
+    def prefill(self, conversation: Conversation, prefix: str) -> str:
+        self.turns.extend(conversation.turns)
+        response = self.chat.prefill(
+            Conversation(
+                list(self.turns)
+            ),
+            prefix
+        )
+        self.turns.append(
+            Turn(
+                "assistant",
+                Message(text=response)
+            )
+        )
+        return response

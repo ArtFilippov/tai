@@ -19,6 +19,11 @@ from attack.goat.envelopes.goat_attack_envelope import GOATAttackEnvelope
 from attack.threaten_json.envelopes.threaten_json_attack_envelope import ThreatenJSONAttackEnvelope
 from attack.whois.envelopes.whois_attack_envelope import WhoisAttackEnvelope
 from attack.grandma.envelopes.grandma_attack_envelope import GrandmaAttackEnvelope
+from attack.slur_completion.envelopes.slur_completion_attack_envelope import SlurCompletionAttackEnvelope
+from attack.leak_replay.envelopes.leak_replay_attack_envelope import LeakReplayAttackEnvelope
+from attack.desired_response.cached_desired_response import CachedDesiredResponse
+from attack.desired_response.provided_desired_response import ProvidedDesiredResponse
+from attack.desired_response.desired_response import DesiredResponse
 from attack.autodan.autodan_budget import AutoDANBudget
 from attack.autodan.autodan_budget_utils import validate
 from attack.autodan.envelopes.autodan_attack_envelope import AutoDANAttackEnvelope
@@ -38,6 +43,7 @@ from target.envelopes.lazy_qwen_model import LazyQwenModel
 from target.qwen_snapshot_utils import snapshot
 from target.gguf.gguf_location import GGUFLocation
 from target.model import Model
+from target.model_chat import ModelChat
 from target.qwen_device_utils import cuda_device
 from target.local_qwen_assets import LocalQwenAssets
 from target.qwen_logits import QwenLogits
@@ -81,6 +87,15 @@ def main() -> None:
     )
     _ = parser.add_argument(
         "--grandma", action="store_true", help="include Grandma roleplay"
+    )
+    _ = parser.add_argument(
+        "--slur-completion", action="store_true", help="include answer-opening continuation"
+    )
+    _ = parser.add_argument(
+        "--leak-replay", action="store_true", help="include masked-template replay"
+    )
+    _ = parser.add_argument(
+        "--desired-response", help="supplied answer (otherwise prepared per base when needed)"
     )
     dra_options(parser)
     deletion_options(parser)
@@ -297,6 +312,21 @@ def ga_setup(attacker: Model, target: Model, base: BaseRequest) -> ExplicitAttac
     )
 
 
+def supplied(base: BaseRequest, answer: str) -> DesiredResponse:
+    """Bind a supplied answer to one source request.
+
+    Args:
+        base (BaseRequest): Original request.
+        answer (str): Supplied answer text.
+
+    Returns:
+        DesiredResponse: Request-bound prepared answer.
+    """
+    return ProvidedDesiredResponse(
+        base, answer
+    )
+
+
 def deletion_budget(arguments: Namespace) -> DeletionBudget:
     """Validate the selected native deletion bounds.
 
@@ -330,6 +360,15 @@ def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[B
         list[Callable[[BaseRequest], Attack]]: Independent per-request attacks.
     """
     def factories(attacker: Model, target: Model) -> list[Callable[[BaseRequest], Attack]]:
+        source: DesiredResponse = CachedDesiredResponse(
+            ModelChat(attacker)
+        )
+        def desired(base: BaseRequest) -> DesiredResponse:
+            if getattr(arguments, "desired_response", None) is None:
+                return source
+            return supplied(
+                base, arguments.desired_response
+            )
         dra_budget = DRABudget(
             getattr(
                 arguments, "dra_candidates", 4
@@ -385,6 +424,14 @@ def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[B
             arguments, "grandma", False
         ):
             attacks.append(lambda base: GrandmaAttackEnvelope( base, ExplicitAttackSetup(attacker, target, target, base.text()), journal(directory / "grandma" / f"{base.metadata()['id']}.jsonl") ))
+        if getattr(
+            arguments, "slur_completion", False
+        ):
+            attacks.append(lambda base: SlurCompletionAttackEnvelope( base, ExplicitAttackSetup(attacker, target, target, base.text()), journal(directory / "slur_completion" / f"{base.metadata()['id']}.jsonl"), desired(base) ))
+        if getattr(
+            arguments, "leak_replay", False
+        ):
+            attacks.append(lambda base: LeakReplayAttackEnvelope( base, ExplicitAttackSetup(attacker, target, target, base.text()), journal(directory / "leak_replay" / f"{base.metadata()['id']}.jsonl"), desired(base) ))
         return [attack for index, attack in enumerate(attacks) if index != THREATEN_JSON or not arguments.no_threaten_json]
 
     model = LazyQwenModel(

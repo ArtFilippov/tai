@@ -13,3 +13,15 @@ class Chat(Protocol):
 
     def reply(self, conversation: Conversation) -> str:
         ...
+
+    def prefill(self, conversation: Conversation, prefix: str) -> str:
+        """Continue a partial assistant response.
+
+        Args:
+            conversation (Conversation): Complete request history.
+            prefix (str): Assistant text already supplied.
+
+        Returns:
+            str: Complete assistant message including prefix.
+        """
+        ...

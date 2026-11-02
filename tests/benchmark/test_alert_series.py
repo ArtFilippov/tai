@@ -21,7 +21,7 @@ from benchmark.alert_series import AlertSeries
 from journal.parsed_journal import ParsedJournal
 from main.alert_series import journal, prepare, series
 from target.model import Model
-from ..attack.model_fixture_utils import adaptive, goat, grandma, refusal, threaten_json, whois
+from ..attack.model_fixture_utils import adaptive, continuation, goat, grandma, refusal, threaten_json, whois
 from ..target import test_logits, test_model
 
 
@@ -698,3 +698,58 @@ class TestAlertSeries(unittest.TestCase):
                 len({run["base_metadata"]["microcategory"] for run in report["runs"]}),
                 all(checks)
             ) == (5, 32, 32, True, 32, True), "The Grandma series lost a category, provenance, or independent journal"
+
+    def test_continuation_variants_are_opt_in_and_cover_all_categories(self) -> None:
+        bases = AlertPool(
+            Path("examples/alert-manifest-640.json")
+        ).requests(1)
+        arguments = Namespace(
+            gpu=0, tokens=192, attacker="qwen", host="127.0.0.1", port=8080,
+            turns=1, goat_turns=1, no_threaten_json=False,
+            no_adaptive_attacks=False, no_dra=True, no_deletion=True,
+            deletion_perturbations=1, deletion_positions=2, deletion_ascii=2,
+            autodan=False, autodan_hga=False, slur_completion=True, leak_replay=True,
+            desired_response="A café has a special recipe."
+        )
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "main.alert_series.LazyQwenModel", return_value=continuation()
+        ), patch(
+            "main.alert_series.cuda_device", return_value="controlled"
+        ), patch(
+            "main.alert_series.snapshot", return_value=None
+        ), prepare(
+            arguments,
+            Path(directory)
+        ) as factories:
+            series(
+                bases, factories[-2:],
+                Path(directory),
+                Path("examples/alert-manifest-640.json")
+            )
+            report = self.report(directory)
+            checks: list[bool] = []
+            for variant, name in enumerate(
+                (
+                    "slur_completion", "leak_replay"
+                )
+            ):
+                for index, base in enumerate(bases):
+                    path = Path(directory) / name / f"{base.identity}.jsonl"
+                    outcome = ParsedJournal(path).read()
+                    events = list(
+                        ParsedJournal(path).events()
+                    )
+                    checks.append(events[0]["base_metadata"] == dict(base.metadata()))
+                    calls = {
+                        "target": 1,
+                        "attacker": variant,
+                        "judge": 1
+                    }
+                    checks.append(outcome["calls"] == calls)
+                    checks.append(outcome["text"] == report["runs"][variant * 32 + index].get("result"))
+            assert (
+                len(factories),
+                report["planned"], report["attempted"], report["complete"],
+                len({run["base_metadata"]["microcategory"] for run in report["runs"]}),
+                all(checks)
+            ) == (6, 64, 64, True, 32, True), "Continuation variants lost category provenance, selection or the single Target exchange"

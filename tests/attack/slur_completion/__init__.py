@@ -1,0 +1,1 @@
+"""Controlled assistant-opening attempts."""
