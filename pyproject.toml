@@ -13,6 +13,7 @@ dependencies = [
     "huggingface-hub==0.30.2",
     "numpy>=1.26,<3",
     "qraft==0.1.0",
+    "wn==1.1.1",
     "transformers==4.51.3",
     "torch==2.5.1+cu121; sys_platform == 'linux' and platform_machine == 'x86_64'",
 ]
@@ -45,6 +46,8 @@ tai-whois = "main.whois_cli:main"
 tai-grandma = "main.grandma_cli:main"
 tai-slur-completion = "main.continuation_cli:slur_main"
 tai-leak-replay = "main.continuation_cli:leak_main"
+tai-wordnet = "main.wordnet_cli:main"
+tai-wordnet-prepare = "main.wordnet_cli:prepare"
 tai-qwen-observe = "main.qwen_observe:main"
 tai-qwen-search = "main.qwen_observe:search_main"
 
@@ -242,6 +245,12 @@ reportImplicitOverride = "none"
 
 [[tool.pyright.executionEnvironments]]
 root = "src/attack/grandma/envelopes"
+extraPaths = ["src"]
+reportMissingSuperCall = "none"
+reportImplicitOverride = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "src/attack/wordnet/envelopes"
 extraPaths = ["src"]
 reportMissingSuperCall = "none"
 reportImplicitOverride = "none"

@@ -17,6 +17,7 @@ class Conversation:
     def last_message(self, role: str | None = ...) -> Message: ...
 
 class Attempt:
+    def __init__(self, prompt: Conversation) -> None: ...
     prompt: Conversation
     conversations: list[Conversation]
     notes: dict[str, object]

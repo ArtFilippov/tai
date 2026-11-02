@@ -21,6 +21,10 @@ from attack.whois.envelopes.whois_attack_envelope import WhoisAttackEnvelope
 from attack.grandma.envelopes.grandma_attack_envelope import GrandmaAttackEnvelope
 from attack.slur_completion.envelopes.slur_completion_attack_envelope import SlurCompletionAttackEnvelope
 from attack.leak_replay.envelopes.leak_replay_attack_envelope import LeakReplayAttackEnvelope
+from attack.wordnet.envelopes.wordnet_attack_envelope import WordnetAttackEnvelope
+from attack.wordnet.prepared_wordnet import PreparedWordnet
+from attack.wordnet.wordnet_source_utils import open_wordnet
+from attack.wordnet.wordnet_budget import WordnetBudget
 from attack.desired_response.cached_desired_response import CachedDesiredResponse
 from attack.desired_response.provided_desired_response import ProvidedDesiredResponse
 from attack.desired_response.desired_response import DesiredResponse
@@ -93,6 +97,21 @@ def main() -> None:
     )
     _ = parser.add_argument(
         "--leak-replay", action="store_true", help="include masked-template replay"
+    )
+    _ = parser.add_argument(
+        "--wordnet", action="store_true", help="include bounded lexical exploration"
+    )
+    _ = parser.add_argument(
+        "--wordnet-dir", type=Path, help="prepared wn data directory"
+    )
+    _ = parser.add_argument(
+        "--wordnet-nodes", type=int, default=4
+    )
+    _ = parser.add_argument(
+        "--wordnet-calls", type=int, default=8
+    )
+    _ = parser.add_argument(
+        "--wordnet-seed", type=int, default=0
     )
     _ = parser.add_argument(
         "--desired-response", help="supplied answer (otherwise prepared per base when needed)"
@@ -181,6 +200,15 @@ def launch(arguments: Namespace) -> None:
             validate(
                 limits._replace(mode="hga")
             )
+    if getattr(
+        arguments, "wordnet", False
+    ):
+        WordnetBudget(
+            arguments.wordnet_nodes, arguments.wordnet_calls, arguments.wordnet_seed
+        ).validate()
+        if arguments.wordnet_dir is None:
+            raise ValueError("WordNet requires --wordnet-dir (run tai-wordnet-prepare first)")
+        _ = open_wordnet(arguments.wordnet_dir)
     pool = AlertPool(arguments.manifest)
     bases = pool.requests(arguments.limit)
     arguments.output_dir.mkdir(
@@ -432,6 +460,16 @@ def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[B
             arguments, "leak_replay", False
         ):
             attacks.append(lambda base: LeakReplayAttackEnvelope( base, ExplicitAttackSetup(attacker, target, target, base.text()), journal(directory / "leak_replay" / f"{base.metadata()['id']}.jsonl"), desired(base) ))
+        if getattr(
+            arguments, "wordnet", False
+        ):
+            lexicon = PreparedWordnet(
+                open_wordnet(arguments.wordnet_dir)
+            )
+            bounds = WordnetBudget(
+                arguments.wordnet_nodes, arguments.wordnet_calls, arguments.wordnet_seed
+            )
+            attacks.append(lambda base: WordnetAttackEnvelope( base, ExplicitAttackSetup(attacker, target, target, base.text()), journal(directory / "wordnet" / f"{base.metadata()['id']}.jsonl"), lexicon, budget=bounds ))
         return [attack for index, attack in enumerate(attacks) if index != THREATEN_JSON or not arguments.no_threaten_json]
 
     model = LazyQwenModel(

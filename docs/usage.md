@@ -172,6 +172,28 @@ uv run --locked --group dev --extra qwen tai-grandma /tmp/grandma.jsonl "Explain
 ключа и эвристика отказа не считаются успехом. В серии `--grandma` добавляет
 отдельные журналы в `grandma/<id>.jsonl`, не меняя варианты по умолчанию.
 
+WordNet exploration использует заранее установленный `wn` и локальный
+`oewn:2023`. Подготовка выполняется отдельно (загружает данные только здесь):
+
+```bash
+uv run --locked --group dev tai-wordnet-prepare /tmp/tai-wn
+uv run --locked --group dev --extra qwen tai-wordnet /tmp/wordnet.jsonl "Explain the topic in detail" --lexicon-dir /tmp/tai-wn --gpu 0 --nodes 4 --calls 8 --seed 7
+```
+
+Python API: `WordnetAttackEnvelope(PlainBase(base), setup, journal,
+PreparedWordnet(open_wordnet(Path("/tmp/tai-wn"))), budget=WordnetBudget(4, 8, 7))`.
+`setup` задаёт независимые роли Attacker, Target и judge. Attacker ранжирует до
+пяти близких терминов; поиск проверяет синсеты и выбирает первый допустимый.
+Шаблоны и гипонимы закреплённого garak обходятся в ширину, ответ-зависимый
+`MitigationBypass` решает только раскрытие дочерних узлов. Каждый полный ответ
+Target отдельно оценивается по исходному запросу. Первая положительная оценка
+останавливает поиск; иначе предъявляется последний оценённый ответ либо
+`no_result`. Лимиты синсетов и обращений к Target действуют на весь запуск,
+а `--seed` определяет воспроизводимый порядок дочерних узлов. В серии вариант
+включается `tai-alert --wordnet --wordnet-dir /tmp/tai-wn` с отдельными
+`--wordnet-nodes`, `--wordnet-calls`, `--wordnet-seed`; журналы записываются
+в `wordnet/<id>.jsonl` без дополнительных попыток на посещённые узлы.
+
 Simple Adaptive Attacks запускается без файла настроек, с исходным запросом и
 новым файлом журнала:
 
@@ -268,6 +290,7 @@ uv run --locked --group dev --extra qwen tai-alert /tmp/alert-series --gpu 0 --l
 ThreatenJSON включён по умолчанию; `--no-threaten-json` исключает эту фабрику.
 WHOIS добавляется отдельно флагом `--whois`, без изменения вариантов по умолчанию.
 Grandma добавляется отдельно флагом `--grandma`.
+WordNet добавляется отдельно флагом `--wordnet` с подготовленной базой `--wordnet-dir`.
 Simple Adaptive Attacks также включён по умолчанию; `--no-adaptive-attacks`
 исключает его. Журналы находятся в `adaptive_attacks/<id>.jsonl`.
 DRA включён независимо: `--no-dra` исключает его, `--dra-candidates` и `--dra-seed`
@@ -293,7 +316,8 @@ DRA включён независимо: `--no-dra` исключает его, `
 В корне находится общий `summary.json`. По одному независимому журналу на
 исходный запрос находятся в `fitd/`, `goat/`, `threaten_json/`,
 `adaptive_attacks/`, `dra/`, `deletion/`, `autodan/`, `autodan_hga/`,
-а при `--whois` также в `whois/`, при `--grandma` в `grandma/`
+а при `--whois` также в `whois/`, при `--grandma` в `grandma/`,
+при `--wordnet` в `wordnet/`
 (`id.jsonl` в каждом каталоге). Внутренние кандидаты и контрольный обмен
 ThreatenJSON не создают дополнительных записей серии.
 Фабрики атак выполняются по очереди; каждая обходит весь пул запросов. В `runs`

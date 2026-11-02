@@ -139,3 +139,23 @@ def continuation() -> Model:
     model.revision.return_value = "controlled"
     model.settings.return_value = {"revision": "controlled"}
     return model
+
+
+def wordnet() -> Model:
+    """Propose a known term and return independently judged offline replies.
+
+    Returns:
+        Model: History-free role resource for lexical exploration.
+    """
+    def respond(messages: Sequence[dict[str, str]]) -> str:
+        if messages[0]["role"] == "system":
+            return "NO"
+        if messages[0]["content"].startswith("For the exact request"):
+            return "cafe"
+        return "A café answer"
+
+    model = Mock(spec=Model)
+    model.generate.side_effect = respond
+    model.revision.return_value = "controlled"
+    model.settings.return_value = {"revision": "controlled"}
+    return model
