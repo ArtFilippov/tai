@@ -78,12 +78,12 @@ xformers = { index = "pytorch-cu121", extra = "vllm" }
 
 [tool.uv.sources.quard-clones]
 git = "ssh://git@github.com/ArtFilippov/quard.git"
-rev = "a4e0b15de3470152a919db9366936ea440f11e86"
+rev = "72e787f65728e5a984b2e74cb2fc22399ae5bfff"
 subdirectory = "rust/quard-clones"
 
 [tool.uv.sources.qraft]
 git = "ssh://git@github.com/ArtFilippov/quard.git"
-rev = "a4e0b15de3470152a919db9366936ea440f11e86"
+rev = "72e787f65728e5a984b2e74cb2fc22399ae5bfff"
 subdirectory = "runtime/qraft"
 [[tool.uv.index]]
 name = "pytorch-cu121"
