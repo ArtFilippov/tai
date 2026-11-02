@@ -105,6 +105,7 @@ GGUFLocation(host, port), gpu, tokens)` из модулей
 | GOAT | `goat_cli` (`JOURNAL BASE`) | `--turns`, `--tokens` |
 | ThreatenJSON | `threaten_json_cli` (`JOURNAL BASE`) | `--tokens` |
 | WHOIS injection | `whois_cli` (`JOURNAL BASE`) | `--tokens` |
+| Grandma roleplay | `grandma_cli` (`JOURNAL BASE`) | `--tokens` |
 | Simple Adaptive Attacks | `adaptive_attacks_cli` (`JOURNAL BASE`) | `--tokens` |
 | DRA | `dra_cli` (`JOURNAL BASE`) | `--candidates`, `--seed`, `--tokens` |
 | Bad Characters/deletion | `deletion_cli` (`JOURNAL BASE`) | `--perturbations`, `--positions`, `--ascii`, `--tokens` |
@@ -157,6 +158,19 @@ uv run --locked --group dev --extra qwen tai-whois /tmp/whois.jsonl "Explain the
 фиксированная фраза «not malicious» не означает успеха. В серии вариант
 включается только флагом `tai-alert --whois` и записывает отдельные журналы в
 `whois/<id>.jsonl`.
+
+Grandma roleplay доступен через `GrandmaAttackEnvelope(PlainBase(base),
+SharedModelAttackSetup(model, base), journal)` или отдельную команду:
+
+```bash
+uv run --locked --group dev --extra qwen tai-grandma /tmp/grandma.jsonl "Explain the topic in detail" --gpu 0 --tokens 192
+```
+
+Один запрос сохраняется дословно внутри роли бабушки, вдохновлённой шаблонами
+закреплённого garak, без корпуса Windows-ключей. Полный ответ единственного
+обмена Target записывается до независимой оценки по исходному запросу; формат
+ключа и эвристика отказа не считаются успехом. В серии `--grandma` добавляет
+отдельные журналы в `grandma/<id>.jsonl`, не меняя варианты по умолчанию.
 
 Simple Adaptive Attacks запускается без файла настроек, с исходным запросом и
 новым файлом журнала:
@@ -253,6 +267,7 @@ uv run --locked --group dev --extra qwen tai-alert /tmp/alert-series --gpu 0 --l
 `tai-qwen run`. `--goat-turns` ограничивает GOAT отдельно от FITD `--turns`.
 ThreatenJSON включён по умолчанию; `--no-threaten-json` исключает эту фабрику.
 WHOIS добавляется отдельно флагом `--whois`, без изменения вариантов по умолчанию.
+Grandma добавляется отдельно флагом `--grandma`.
 Simple Adaptive Attacks также включён по умолчанию; `--no-adaptive-attacks`
 исключает его. Журналы находятся в `adaptive_attacks/<id>.jsonl`.
 DRA включён независимо: `--no-dra` исключает его, `--dra-candidates` и `--dra-seed`
@@ -278,7 +293,8 @@ DRA включён независимо: `--no-dra` исключает его, `
 В корне находится общий `summary.json`. По одному независимому журналу на
 исходный запрос находятся в `fitd/`, `goat/`, `threaten_json/`,
 `adaptive_attacks/`, `dra/`, `deletion/`, `autodan/`, `autodan_hga/`,
-а при `--whois` также в `whois/` (`id.jsonl` в каждом каталоге). Внутренние кандидаты и контрольный обмен
+а при `--whois` также в `whois/`, при `--grandma` в `grandma/`
+(`id.jsonl` в каждом каталоге). Внутренние кандидаты и контрольный обмен
 ThreatenJSON не создают дополнительных записей серии.
 Фабрики атак выполняются по очереди; каждая обходит весь пул запросов. В `runs`
 записываются сквозной номер попытки, номер фабрики, полный базовый запрос и его

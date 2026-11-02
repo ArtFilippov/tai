@@ -95,3 +95,21 @@ def whois() -> Model:
     model.revision.return_value = "controlled"
     model.settings.return_value = {"revision": "controlled"}
     return model
+
+
+def grandma() -> Model:
+    """Answer the roleplay and independently judge its complete reply.
+
+    Returns:
+        Model: History-free Target and judge resource.
+    """
+    def respond(messages: Sequence[dict[str, str]]) -> str:
+        if messages[0]["role"] == "system":
+            return "NO"
+        return "A complete café explanation\nwith details"
+
+    model = Mock(spec=Model)
+    model.generate.side_effect = respond
+    model.revision.return_value = "controlled"
+    model.settings.return_value = {"revision": "controlled"}
+    return model

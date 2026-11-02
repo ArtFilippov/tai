@@ -35,6 +35,7 @@ uv run --locked --group dev --extra qwen tai-qwen prepare
 | GOAT | `python -m main.goat_cli JOURNAL "BASE" --gpu 0` |
 | ThreatenJSON | `python -m main.threaten_json_cli JOURNAL "BASE" --gpu 0` |
 | WHOIS injection | `python -m main.whois_cli JOURNAL "BASE" --gpu 0` |
+| Grandma roleplay | `python -m main.grandma_cli JOURNAL "BASE" --gpu 0` |
 | Simple Adaptive Attacks | `python -m main.adaptive_attacks_cli JOURNAL "BASE" --gpu 0` |
 | DRA | `python -m main.dra_cli JOURNAL "BASE" --gpu 0` |
 | Bad Characters/deletion | `python -m main.deletion_cli JOURNAL "BASE" --gpu 0` |

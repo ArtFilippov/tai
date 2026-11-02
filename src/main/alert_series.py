@@ -18,6 +18,7 @@ from attack.deletion.envelopes.deletion_attack_envelope import DeletionAttackEnv
 from attack.goat.envelopes.goat_attack_envelope import GOATAttackEnvelope
 from attack.threaten_json.envelopes.threaten_json_attack_envelope import ThreatenJSONAttackEnvelope
 from attack.whois.envelopes.whois_attack_envelope import WhoisAttackEnvelope
+from attack.grandma.envelopes.grandma_attack_envelope import GrandmaAttackEnvelope
 from attack.autodan.autodan_budget import AutoDANBudget
 from attack.autodan.autodan_budget_utils import validate
 from attack.autodan.envelopes.autodan_attack_envelope import AutoDANAttackEnvelope
@@ -77,6 +78,9 @@ def main() -> None:
     )
     _ = parser.add_argument(
         "--whois", action="store_true", help="include WHOIS report injection"
+    )
+    _ = parser.add_argument(
+        "--grandma", action="store_true", help="include Grandma roleplay"
     )
     dra_options(parser)
     deletion_options(parser)
@@ -377,6 +381,10 @@ def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[B
             arguments, "whois", False
         ):
             attacks.append(lambda base: WhoisAttackEnvelope( base, ExplicitAttackSetup(attacker, target, target, base.text()), journal(directory / "whois" / f"{base.metadata()['id']}.jsonl") ))
+        if getattr(
+            arguments, "grandma", False
+        ):
+            attacks.append(lambda base: GrandmaAttackEnvelope( base, ExplicitAttackSetup(attacker, target, target, base.text()), journal(directory / "grandma" / f"{base.metadata()['id']}.jsonl") ))
         return [attack for index, attack in enumerate(attacks) if index != THREATEN_JSON or not arguments.no_threaten_json]
 
     model = LazyQwenModel(

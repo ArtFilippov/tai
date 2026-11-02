@@ -21,7 +21,7 @@ from benchmark.alert_series import AlertSeries
 from journal.parsed_journal import ParsedJournal
 from main.alert_series import journal, prepare, series
 from target.model import Model
-from ..attack.model_fixture_utils import adaptive, goat, refusal, threaten_json, whois
+from ..attack.model_fixture_utils import adaptive, goat, grandma, refusal, threaten_json, whois
 from ..target import test_logits, test_model
 
 
@@ -633,3 +633,68 @@ class TestAlertSeries(unittest.TestCase):
                 all(checks)
             )
             assert observed == (5, 32, 32, True, 32, True), "The WHOIS variant lost a category, provenance, or independent journal"
+
+    def test_grandma_is_opt_in(self) -> None:
+        arguments = Namespace(
+            gpu=0, tokens=192, attacker="qwen", host="127.0.0.1", port=8080,
+            turns=1, goat_turns=1, no_threaten_json=False,
+            no_adaptive_attacks=False, no_dra=True, no_deletion=True,
+            deletion_perturbations=1, deletion_positions=2, deletion_ascii=2,
+            autodan=False, autodan_hga=False
+        )
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "main.alert_series.LazyQwenModel", return_value=grandma()
+        ), patch(
+            "main.alert_series.cuda_device", return_value="controlled"
+        ), patch(
+            "main.alert_series.snapshot", return_value=None
+        ), prepare(
+            arguments, Path(directory)
+        ) as factories:
+            assert len(factories) == 4, "The default ALERT selection unexpectedly included Grandma"
+
+    def test_grandma_series_preserves_all_categories_in_separate_journals(self) -> None:
+        bases = AlertPool(
+            Path("examples/alert-manifest-640.json")
+        ).requests(1)
+        arguments = Namespace(
+            gpu=0, tokens=192, attacker="qwen", host="127.0.0.1", port=8080,
+            turns=1, goat_turns=1, no_threaten_json=False,
+            no_adaptive_attacks=False, no_dra=True, no_deletion=True,
+            deletion_perturbations=1, deletion_positions=2, deletion_ascii=2,
+            autodan=False, autodan_hga=False, grandma=True
+        )
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "main.alert_series.LazyQwenModel", return_value=grandma()
+        ), patch(
+            "main.alert_series.cuda_device", return_value="controlled"
+        ), patch(
+            "main.alert_series.snapshot", return_value=None
+        ), prepare(
+            arguments, Path(directory)
+        ) as factories:
+            series(
+                bases, factories[-1:], Path(directory),
+                Path("examples/alert-manifest-640.json")
+            )
+            report = self.report(directory)
+            checks: list[bool] = []
+            expected = {
+                "target": 1,
+                "attacker": 0,
+                "judge": 1
+            }
+            for base in bases:
+                path = Path(directory) / "grandma" / f"{base.identity}.jsonl"
+                events = list(
+                    ParsedJournal(path).events()
+                )
+                checks.append(events[0]["base_metadata"] == dict(base.metadata()))
+                checks.append(events[1]["base"] == base.text())
+                checks.append(ParsedJournal(path).read()["calls"] == expected)
+            assert (
+                len(factories),
+                report["planned"], report["attempted"], report["complete"],
+                len({run["base_metadata"]["microcategory"] for run in report["runs"]}),
+                all(checks)
+            ) == (5, 32, 32, True, 32, True), "The Grandma series lost a category, provenance, or independent journal"
