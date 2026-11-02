@@ -7,7 +7,6 @@
 ## Куда смотреть
 
 - Реализации стратегий: [`src/attack/`](src/attack/); команды запуска: [`src/main/`](src/main/).
-- Тесты стратегий: [`tests/attack/`](tests/attack/); тест серии: [`tests/benchmark/test_alert_series.py`](tests/benchmark/test_alert_series.py).
 - Тексты 640 базовых запросов: [`examples/alert-manifest-640.json`](examples/alert-manifest-640.json)
   (поле `requests[].prompt`); состав и происхождение пула — в
   [`examples/alert-pool.md`](examples/alert-pool.md).
