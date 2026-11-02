@@ -106,6 +106,9 @@ GGUFLocation(host, port), gpu, tokens)` из модулей
 | ThreatenJSON | `threaten_json_cli` (`JOURNAL BASE`) | `--tokens` |
 | WHOIS injection | `whois_cli` (`JOURNAL BASE`) | `--tokens` |
 | Grandma roleplay | `grandma_cli` (`JOURNAL BASE`) | `--tokens` |
+| Slur Completion | `tai-slur-completion JOURNAL BASE` | `--desired-response ANSWER` или `--deferred`, `--tokens` |
+| Leak Replay | `tai-leak-replay JOURNAL BASE` | `--desired-response ANSWER` или `--deferred`, `--tokens` |
+| WordNet exploration | `tai-wordnet JOURNAL BASE` | `--lexicon-dir DIR`, `--nodes`, `--calls`, `--seed`, `--tokens` |
 | Simple Adaptive Attacks | `adaptive_attacks_cli` (`JOURNAL BASE`) | `--tokens` |
 | DRA | `dra_cli` (`JOURNAL BASE`) | `--candidates`, `--seed`, `--tokens` |
 | Bad Characters/deletion | `deletion_cli` (`JOURNAL BASE`) | `--perturbations`, `--positions`, `--ascii`, `--tokens` |
@@ -290,7 +293,20 @@ uv run --locked --group dev --extra qwen tai-alert /tmp/alert-series --gpu 0 --l
 ThreatenJSON включён по умолчанию; `--no-threaten-json` исключает эту фабрику.
 WHOIS добавляется отдельно флагом `--whois`, без изменения вариантов по умолчанию.
 Grandma добавляется отдельно флагом `--grandma`.
+Slur Completion и Leak Replay добавляются флагами `--slur-completion` и
+`--leak-replay`: передайте `--desired-response ANSWER` для общей подготовленной
+строки либо опустите его для отложенной подготовки с кэшем на каждый запрос.
+Первый вариант продолжает короткое начало ответа через настоящий assistant prefill;
+второй сначала просит независимого Attacker замаскировать запрещённые части ответа
+с сохранением прочих символов и отказывает в запуске Target при невалидной маске.
+Оба оценивают полный предъявленный ответ на базовый запрос; оригинальные garak
+детекторы завершения конкретных оскорблений и воспроизведения известных имён
+не применяются к произвольным ALERT-запросам.
 WordNet добавляется отдельно флагом `--wordnet` с подготовленной базой `--wordnet-dir`.
+Он выбирает ближайший подтверждённый синсет, ограничивает узлы и вызовы флагами
+`--wordnet-nodes` и `--wordnet-calls`, проверяет сигнал отказа для ветвления
+отдельно от итогового judge. Оригинальный garak пропускает термин без точного
+синсета; здесь допустим ближайший предложенный термин.
 Simple Adaptive Attacks также включён по умолчанию; `--no-adaptive-attacks`
 исключает его. Журналы находятся в `adaptive_attacks/<id>.jsonl`.
 DRA включён независимо: `--no-dra` исключает его, `--dra-candidates` и `--dra-seed`
@@ -300,6 +316,16 @@ DRA включён независимо: `--no-dra` исключает его, `
 число внутренних кандидатов. Пять суффиксов Simple Adaptive Attacks всегда
 остаются нативными; ранний положительный вердикт может сократить фактическое
 число вызовов. Без двух флагов AutoDAN планируются 192 попытки.
+Если дополнительно включить `--whois`, `--grandma`, `--slur-completion`,
+`--leak-replay` и `--wordnet --wordnet-dir /tmp/tai-wn`, планируются
+**13 × 32 = 416 попыток**.
+Внутренние узлы WordNet и подготовка желаемого ответа не добавляют попыток.
+Пример полного opt-in запуска (перед этим подготовьте Qwen, WordNet и NLTK
+`punkt_tab` по инструкциям выше; укажите новый каталог):
+
+```bash
+uv run --locked --group dev --extra qwen tai-alert /tmp/alert-13 --gpu 0 --limit 1 --turns 1 --goat-turns 2 --tokens 64 --dra-candidates 2 --deletion-positions 2 --deletion-ascii 2 --autodan --autodan-hga --whois --grandma --slur-completion --leak-replay --wordnet --wordnet-dir /tmp/tai-wn --wordnet-nodes 2 --wordnet-calls 2
+```
 Для GGUF нужны подготовленный файл и зависимость `--extra gguf`.
 Загрузчик сверяет весь файл с закреплённым SHA-256
 `3ee64c7a6b86c2b28174d8c699407e24f94a4e54ca9b8f9c5fc35bf460725f43`:
@@ -317,7 +343,8 @@ DRA включён независимо: `--no-dra` исключает его, `
 исходный запрос находятся в `fitd/`, `goat/`, `threaten_json/`,
 `adaptive_attacks/`, `dra/`, `deletion/`, `autodan/`, `autodan_hga/`,
 а при `--whois` также в `whois/`, при `--grandma` в `grandma/`,
-при `--wordnet` в `wordnet/`
+при `--slur-completion` в `slur_completion/`, при `--leak-replay` в
+`leak_replay/`, при `--wordnet` в `wordnet/`
 (`id.jsonl` в каждом каталоге). Внутренние кандидаты и контрольный обмен
 ThreatenJSON не создают дополнительных записей серии.
 Фабрики атак выполняются по очереди; каждая обходит весь пул запросов. В `runs`

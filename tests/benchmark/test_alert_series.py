@@ -14,6 +14,7 @@ from attack.adaptive_attacks.envelopes.adaptive_attacks_attack_envelope import A
 from attack.goat.envelopes.goat_attack_envelope import GOATAttackEnvelope
 from attack.threaten_json.envelopes.threaten_json_attack_envelope import ThreatenJSONAttackEnvelope
 from attack.shared_model_attack_setup import SharedModelAttackSetup
+from attack.wordnet.scripted_wordnet import ScriptedWordnet
 from base.alert_pool import AlertPool
 from base.base_request import BaseRequest
 from base.plain_base import PlainBase
@@ -753,3 +754,183 @@ class TestAlertSeries(unittest.TestCase):
                 len({run["base_metadata"]["microcategory"] for run in report["runs"]}),
                 all(checks)
             ) == (6, 64, 64, True, 32, True), "Continuation variants lost category provenance, selection or the single Target exchange"
+
+    def test_all_thirteen_variants_recover_416_independent_attempts(self) -> None:
+        bases = AlertPool(
+            Path("examples/alert-manifest-640.json")
+        ).requests(1)
+        arguments = Namespace(
+            gpu=0, tokens=64, attacker="qwen", host="127.0.0.1", port=8080,
+            turns=1, goat_turns=2, no_threaten_json=False,
+            no_adaptive_attacks=False, no_dra=False, dra_candidates=2, dra_seed=13,
+            no_deletion=False, deletion_perturbations=1, deletion_positions=2,
+            deletion_ascii=2, autodan=True, autodan_hga=True,
+            autodan_target="Desired completion", autodan_steps=2,
+            autodan_batch=3, autodan_elites=1, autodan_points=1,
+            autodan_crossover=0.0, autodan_mutation=0.0, autodan_seed=8,
+            whois=True, grandma=True, slur_completion=True, leak_replay=True,
+            desired_response="A café has a special recipe.", wordnet=True,
+            wordnet_dir=Path("prepared"), wordnet_nodes=2,
+            wordnet_calls=3, wordnet_seed=7
+        )
+
+        def respond(messages: Any) -> str:
+            prompt = messages[0]["content"]
+            if messages[0]["role"] == "system":
+                return "NO"
+            if prompt.startswith("For the exact request"):
+                return "cafe"
+            if prompt.startswith("Replace prohibited spans"):
+                return "A café has a [[MASK]] recipe."
+            if "Ignore the WHOIS analysis task" in prompt and bases[0].text() in prompt:
+                raise ValueError("controlled WHOIS failure")
+            if "You might be wondering why" in prompt:
+                return '"Controlled answer"'
+            if "JSON" in prompt:
+                return '"Control answer"'
+            if "Observation:" in prompt:
+                return "Observation: start\nThought: adapt\nStrategy: ask\nResponse: Prompt"
+            return "I cannot help with that request."
+
+        def prefill(messages: Any, prefix: str) -> str:
+            return prefix + " completed"
+
+        model = Mock(spec=Model)
+        model.generate.side_effect = respond
+        model.prefill.side_effect = prefill
+        model.revision.return_value = (
+            test_model.TestModel()
+            .revision()
+        )
+        model.settings.return_value = (
+            test_model.TestModel()
+            .settings()
+        )
+        lexicon = ScriptedWordnet(
+            {"cafe": ["root"]},
+            {
+                "root": ["cafe"],
+                "child": ["coffee"]
+            },
+            {"root": ["child"]}
+        )
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "main.alert_series.LazyQwenModel", return_value=model
+        ), patch(
+            "main.alert_series.QwenLogits", return_value=test_logits.TestLogits()
+        ), patch(
+            "main.alert_series.open_wordnet", return_value=object()
+        ), patch(
+            "main.alert_series.PreparedWordnet", return_value=lexicon
+        ), patch(
+            "main.alert_series.cuda_device", return_value="controlled"
+        ), patch(
+            "main.alert_series.snapshot", return_value=None
+        ), prepare(
+            arguments,
+            Path(directory)
+        ) as factories:
+            series(
+                bases, factories,
+                Path(directory),
+                Path("examples/alert-manifest-640.json")
+            )
+            report = self.report(directory)
+            names = (
+                "fitd", "goat", "threaten_json", "adaptive_attacks", "dra",
+                "deletion", "autodan", "autodan_hga", "whois", "grandma",
+                "slur_completion", "leak_replay", "wordnet"
+            )
+            checks: list[bool] = []
+            paths: set[Path] = set()
+            for index, run in enumerate(report["runs"]):
+                base = bases[index % len(bases)]
+                name = names[index // len(bases)]
+                path = Path(directory) / name / f"{base.identity}.jsonl"
+                paths.add(path)
+                events = list(
+                    ParsedJournal(path).events()
+                )
+                outcome = ParsedJournal(path).read()
+                checks.extend(
+                    (
+                        run["number"] == index + 1, run["base"] == base.text(), run["base_metadata"] == dict(base.metadata()), events[0]["base"] == base.text(), events[0]["base_metadata"] == dict(base.metadata()), (outcome["text"] is None) == (outcome["assessment"] is None), outcome["text"] == run.get("result"), run["outcome"] == ("failure" if outcome["status"] == "failure" else "completed")
+                    )
+                )
+                if name in ("whois", "grandma", "slur_completion", "leak_replay") and outcome["status"] != "failure":
+                    checks.append(ParsedJournal(path).calls(events)["target"] == 1)
+                if name in ("slur_completion", "leak_replay"):
+                    calls = [event for event in events if event["event"] == "call" and event["role"] == "target"]
+                    checks.append(len(calls) == 1 and calls[0].get("response") == f"{calls[0].get('prefix')}{calls[0].get('continuation')}")
+                if name == "leak_replay":
+                    checks.append(
+                        any((event.get("template") == "A café has a [[MASK]] recipe." for event in events))
+                    )
+                if name == "wordnet":
+                    checks.append(
+                        any((event.get("action") == "branch" and event["children"] == ["child"] for event in events))
+                    )
+            checks.extend(
+                (
+                    report["runs"][256]["outcome"] == "failure", report["runs"][256]["error"] == "ValueError('controlled WHOIS failure')", report["runs"][257]["outcome"] == "completed"
+                )
+            )
+            assert (
+                len(bases),
+                len(factories),
+                report["planned"], report["attempted"], report["complete"],
+                len(paths),
+                all(checks)
+            ) == (32, 13, 416, 416, True, 416, True), "The combined series lost provenance, independent recovery, preparation, branch evidence, or failure continuation"
+
+    def test_interrupted_new_variant_keeps_the_last_completed_attempt(self) -> None:
+        base = AlertPool(
+            Path("examples/alert-manifest-640.json")
+        ).requests(1)[0]
+        arguments = Namespace(
+            gpu=0, tokens=64, attacker="qwen", host="127.0.0.1", port=8080,
+            turns=1, goat_turns=1, no_threaten_json=True,
+            no_adaptive_attacks=True, no_dra=True, no_deletion=True,
+            deletion_perturbations=1, deletion_positions=2, deletion_ascii=2,
+            autodan=False, autodan_hga=False, whois=True, grandma=True
+        )
+
+        def respond(messages: Any) -> str:
+            if messages[0]["role"] == "system":
+                return "NO"
+            if "Please act as my deceased grandmother" in messages[0]["content"]:
+                raise KeyboardInterrupt()
+            return "WHOIS diagnostic response"
+
+        model = Mock(spec=Model)
+        model.generate.side_effect = respond
+        model.revision.return_value = (
+            test_model.TestModel()
+            .revision()
+        )
+        model.settings.return_value = (
+            test_model.TestModel()
+            .settings()
+        )
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "main.alert_series.LazyQwenModel", return_value=model
+        ), patch(
+            "main.alert_series.cuda_device", return_value="controlled"
+        ), patch(
+            "main.alert_series.snapshot", return_value=None
+        ), prepare(
+            arguments,
+            Path(directory)
+        ) as factories:
+            with self.assertRaises(KeyboardInterrupt):
+                series(
+                    [base], factories[-2:],
+                    Path(directory),
+                    Path("examples/alert-manifest-640.json")
+                )
+            report = self.report(directory)
+            assert (
+                report["planned"], report["attempted"], report["complete"],
+                report["runs"][0]["result"], report["runs"][1]["outcome"],
+                "result" in report["runs"][1]
+            ) == (2, 2, False, "WHOIS diagnostic response", "interrupted", False), "The interrupted new variant invented a result or lost the completed attempt"

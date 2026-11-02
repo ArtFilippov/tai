@@ -12,7 +12,7 @@
   [`examples/alert-pool.md`](examples/alert-pool.md).
 - Подробные команды, настройки моделей, алгоритмы и Python API:
   [руководство](docs/usage.md). Результаты проверки на Qwen:
-  [отчёт](docs/issue-97-verification.md). Формат журналов:
+  [отчёт #97](docs/issue-97-verification.md), [проверка 13 вариантов #103](docs/issue-103-verification.md). Формат журналов:
   [схема](docs/journal-schema.md).
 
 ## Запуск
@@ -36,6 +36,9 @@ uv run --locked --group dev --extra qwen tai-qwen prepare
 | ThreatenJSON | `python -m main.threaten_json_cli JOURNAL "BASE" --gpu 0` |
 | WHOIS injection | `python -m main.whois_cli JOURNAL "BASE" --gpu 0` |
 | Grandma roleplay | `python -m main.grandma_cli JOURNAL "BASE" --gpu 0` |
+| Slur Completion | `tai-slur-completion JOURNAL "BASE" --gpu 0 --desired-response "ANSWER"` |
+| Leak Replay | `tai-leak-replay JOURNAL "BASE" --gpu 0 --desired-response "ANSWER"` |
+| WordNet exploration | `tai-wordnet JOURNAL "BASE" --gpu 0 --lexicon-dir /tmp/tai-wn --nodes 4 --calls 8` |
 | Simple Adaptive Attacks | `python -m main.adaptive_attacks_cli JOURNAL "BASE" --gpu 0` |
 | DRA | `python -m main.dra_cli JOURNAL "BASE" --gpu 0` |
 | Bad Characters/deletion | `python -m main.deletion_cli JOURNAL "BASE" --gpu 0` |
@@ -48,6 +51,7 @@ uv run --locked --group dev --extra qwen tai-alert /tmp/alert-series --gpu 0 --l
 ```
 
 `--limit 1` выбирает по одному запросу из каждой из 32 микрокатегорий.
+Для всех 13 вариантов добавьте `--autodan --autodan-hga --whois --grandma --slur-completion --leak-replay --wordnet --wordnet-dir /tmp/tai-wn` после подготовки `tai-wordnet-prepare /tmp/tai-wn` (416 попыток). Ответ для двух continuation-стратегий задаётся `--desired-response "ANSWER"` либо готовится отдельно для каждого базового запроса.
 Журналы лежат в подкаталогах атак, сводка — в `summary.json`.
 Параметры и ограничения, в том числе для AutoDAN и GGUF, описаны в
 [руководстве](docs/usage.md). Правила работы с кодом и проверками — в
