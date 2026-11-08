@@ -26,6 +26,12 @@ from attack.wordnet.prepared_wordnet import PreparedWordnet
 from attack.wordnet.wordnet_source_utils import open_wordnet
 from attack.wordnet.wordnet_budget import WordnetBudget
 from attack.false_assertion.envelopes.false_assertion_attack_envelope import FalseAssertionAttackEnvelope
+from attack.beast.beast_options_utils import options as beast_options
+from attack.beast.beast_probe import BeastProbe
+from attack.beast.beam_search import BeamSearch
+from attack.beast.configured_beast_budget import ConfiguredBeastBudget
+from attack.beast.beast_search import BeastSearch
+from attack.beast.envelopes.beast_attack_envelope import BeastAttackEnvelope
 from attack.desired_response.cached_desired_response import CachedDesiredResponse
 from attack.desired_response.provided_desired_response import ProvidedDesiredResponse
 from attack.desired_response.desired_response import DesiredResponse
@@ -52,6 +58,7 @@ from target.model_chat import ModelChat
 from target.qwen_device_utils import cuda_device
 from target.local_qwen_assets import LocalQwenAssets
 from target.qwen_logits import QwenLogits
+from target.envelopes.qwen_token_probabilities import QwenTokenProbabilities
 
 GGUF = "gguf"
 THREATEN_JSON = 2
@@ -105,6 +112,10 @@ def main() -> None:
     _ = parser.add_argument(
         "--false-assertion", action="store_true", help="include refusal-only FalseAssertion adaptation"
     )
+    _ = parser.add_argument(
+        "--beast", action="store_true", help="include request-bound local BEAST search"
+    )
+    beast_options(parser)
     _ = parser.add_argument(
         "--wordnet-dir", type=Path, help="prepared wn data directory"
     )
@@ -213,6 +224,13 @@ def launch(arguments: Namespace) -> None:
         if arguments.wordnet_dir is None:
             raise ValueError("WordNet requires --wordnet-dir (run tai-wordnet-prepare first)")
         _ = open_wordnet(arguments.wordnet_dir)
+    if getattr(
+        arguments, "beast", False
+    ):
+        ConfiguredBeastBudget(
+            arguments.beast_beams, arguments.beast_samples,
+            arguments.beast_suffix_len, arguments.beast_trials
+        ).validate()
     pool = AlertPool(arguments.manifest)
     bases = pool.requests(arguments.limit)
     arguments.output_dir.mkdir(
@@ -291,6 +309,30 @@ def journal(path: Path) -> Journal:
     path.touch(exist_ok=False)
     return VersionedJournal(
         DiskJournal(path)
+    )
+
+
+def beast_run(base: BaseRequest, setup: ExplicitAttackSetup, source: DesiredResponse,
+              search: BeastSearch, *, path: Path) -> Attack:
+    """Reserve one journal for both BEAST search and final assessment.
+
+    Args:
+        base (BaseRequest): Selected source request.
+        setup (ExplicitAttackSetup): Bound Target and judge roles.
+        source (DesiredResponse): Per-request prepared answer.
+        search (BeastSearch): Local search for this attempt.
+        path (Path): Independent journal destination.
+
+    Returns:
+        Attack: Journaled BEAST attempt.
+    """
+    sink = journal(path)
+    return BeastAttackEnvelope(
+        base, setup, sink,
+        BeastProbe(
+            setup.text,
+            source, search, sink
+        )
     )
 
 
@@ -478,6 +520,19 @@ def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[B
             arguments, "false_assertion", False
         ):
             attacks.append(lambda base: FalseAssertionAttackEnvelope( base, ExplicitAttackSetup(attacker, target, target, base.text()), journal(directory / "false_assertion" / f"{base.metadata()['id']}.jsonl"), desired(base) ))
+        if getattr(
+            arguments, "beast", False
+        ):
+            device = cuda_device(arguments.gpu)
+            tokens = QwenTokenProbabilities(
+                LocalQwenAssets(device),
+                device
+            )
+            limits = ConfiguredBeastBudget(
+                arguments.beast_beams, arguments.beast_samples,
+                arguments.beast_suffix_len, arguments.beast_trials
+            )
+            attacks.append(lambda base: beast_run( base, ExplicitAttackSetup(attacker, target, target, base.text()), desired(base), BeamSearch(tokens, limits), path=directory / "beast" / f"{base.metadata()['id']}.jsonl" ))
         return [attack for index, attack in enumerate(attacks) if index != THREATEN_JSON or not arguments.no_threaten_json]
 
     model = LazyQwenModel(

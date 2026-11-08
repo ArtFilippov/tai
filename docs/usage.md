@@ -113,11 +113,33 @@ GGUFLocation(host, port), gpu, tokens)` из модулей
 | DRA | `dra_cli` (`JOURNAL BASE`) | `--candidates`, `--seed`, `--tokens` |
 | Bad Characters/deletion | `deletion_cli` (`JOURNAL BASE`) | `--perturbations`, `--positions`, `--ascii`, `--tokens` |
 | AutoDAN GA/HGA | `autodan_cli` (`JOURNAL BASE`) | `--mode ga|hga`, `--target`, `--steps`, `--batch`, `--elites`, `--points`, `--crossover`, `--mutation`, `--seed`, `--tokens` |
+| BEAST | `tai-beast JOURNAL BASE` | `--desired-response ANSWER` или `--deferred`, `--beast-beams`, `--beast-samples`, `--beast-suffix-len`, `--beast-trials`, `--tokens` |
 
 Каждый автономный запуск требует `--gpu N` и **новый** путь `JOURNAL`.
 Существующие команды `tai` и `tai-qwen run` для FITD остаются доступны.
 Например, `uv run --locked --group dev --extra qwen python -m main.deletion_cli /tmp/deletion.jsonl "Explain the topic in detail" --gpu 0 --positions 2 --ascii 2`.
 Настройки выбираются аргументами команды, без отдельного файла конфигурации.
+
+BEAST ищет суффикс для **данного** базового запроса и оценивает только один
+итоговый ответ Target. Нужен закреплённый локальный Qwen; подготовка желаемого
+ответа может быть отложена. По умолчанию: 15 лучей, 15 продолжений на луч,
+40 токенов за trial и один trial. Для короткой проверки:
+
+```bash
+uv run --locked --group dev --extra qwen tai-beast /tmp/beast.jsonl "Describe a café." --gpu 0 --desired-response "A café serves coffee." --beast-beams 1 --beast-samples 1 --beast-suffix-len 1
+```
+
+`tai-alert --beast` добавляет независимый запуск на каждый базовый запрос и
+хранит журнал в `beast/`; флаги бюджета совпадают с автономной командой.
+`--desired-response` задаёт общий текст, а без него ответы подготавливаются
+для каждого базового запроса и кэшируются между вариантами серии.
+Python API: `BeastProbe` принимает `DesiredResponse` и `BeamSearch` с общим
+`TokenProbabilities`; `ComputedTokenProbabilities` применяет тот же расчёт к
+`TokenSource` (контекст токенов и пакетный `TokenInference`). Для моделей из
+Transformers доступны `TransformersTokenInference` и `TransformersTokenContext`;
+текущие команды собирают их в `QwenTokenProbabilities` из `target/envelopes/`.
+`BeastAttackEnvelope` связывает поиск с Target, оценщиком и журналом. Оценка
+поиска и эвристика отказа — диагностика, не вердикт оценщика.
 
 Для отдельного GOAT без конфигурационного файла укажите новый путь журнала,
 исходный запрос и лимит ходов; модель и токенизатор Qwen должны быть заранее

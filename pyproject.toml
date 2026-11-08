@@ -48,6 +48,7 @@ tai-slur-completion = "main.continuation_cli:slur_main"
 tai-leak-replay = "main.continuation_cli:leak_main"
 tai-wordnet = "main.wordnet_cli:main"
 tai-false-assertion = "main.false_assertion_cli:main"
+tai-beast = "main.beast_cli:main"
 tai-wordnet-prepare = "main.wordnet_cli:prepare"
 tai-qwen-observe = "main.qwen_observe:main"
 tai-qwen-search = "main.qwen_observe:search_main"
@@ -259,6 +260,12 @@ reportImplicitOverride = "none"
 
 [[tool.pyright.executionEnvironments]]
 root = "src/attack/wordnet/envelopes"
+extraPaths = ["src"]
+reportMissingSuperCall = "none"
+reportImplicitOverride = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "src/attack/beast/envelopes"
 extraPaths = ["src"]
 reportMissingSuperCall = "none"
 reportImplicitOverride = "none"

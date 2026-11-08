@@ -1,12 +1,15 @@
 """A root summary keeps only known outcomes across attack factories."""
 
 import json
+from collections.abc import Sequence
 from argparse import Namespace
 import tempfile
 import unittest
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock, patch
+
+import torch
 
 from attack.attack import Attack
 from attack.fitd.envelopes.fitd_attack_envelope import FITDAttackEnvelope
@@ -22,6 +25,7 @@ from benchmark.alert_series import AlertSeries
 from journal.parsed_journal import ParsedJournal
 from main.alert_series import journal, prepare, series
 from target.model import Model
+from target.token_probabilities import TokenProbabilities
 from ..attack.model_fixture_utils import adaptive, continuation, false_assertion, goat, grandma, refusal, threaten_json, whois
 from ..target import test_logits, test_model
 
@@ -71,6 +75,60 @@ class TestAlertSeries(unittest.TestCase):
                 ] * 2,
                 [dict(base.metadata()) for base in bases]
             ), "The opt-in variant lost per-base provenance or reused a journal"
+
+    def test_opt_in_beast_isolates_failures_and_counts_requests(self) -> None:
+        bases = AlertPool(
+            Path("examples/alert-manifest-640.json")
+        ).requests(1)[:2]
+        arguments = Namespace(
+            gpu=0, tokens=32, attacker="qwen", host="127.0.0.1", port=8080,
+            turns=1, goat_turns=1, no_threaten_json=True,
+            no_adaptive_attacks=True, no_dra=True, no_deletion=True,
+            deletion_perturbations=1, deletion_positions=2, deletion_ascii=2,
+            autodan=False, autodan_hga=False, beast=True, false_assertion=False,
+            beast_beams=1, beast_samples=1, beast_suffix_len=1, beast_trials=1,
+            desired_response="An example answer"
+        )
+        model = Mock(spec=Model)
+        model.settings.return_value = {
+            "id": "Qwen/Qwen2.5-0.5B-Instruct",
+            "revision": "7ae557604adf67be50417f59c2c2f167def9a775"
+        }
+        def respond(messages: Sequence[dict[str, str]]) -> str:
+            return "NO" if messages[0]["role"] == "system" else "A Target reply"
+        model.generate.side_effect = respond
+        tokens = Mock(spec=TokenProbabilities)
+        tokens.profile.return_value = model.settings()
+        tokens.decode.return_value = " suffix"
+        distribution = torch.tensor([0.0, 1.0])
+        tokens.distribution.return_value = [distribution]
+        tokens.loss.side_effect = [
+            ValueError("scoring failed"),
+            [0.5]
+        ]
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "main.alert_series.LazyQwenModel", return_value=model
+        ), patch(
+            "main.alert_series.QwenTokenProbabilities", return_value=tokens
+        ), patch(
+            "main.alert_series.cuda_device", return_value="controlled"
+        ), patch(
+            "main.alert_series.snapshot", return_value=None
+        ), prepare(
+            arguments,
+            Path(directory)
+        ) as factories:
+            series(
+                bases, factories[-1:],
+                Path(directory),
+                Path("examples/alert-manifest-640.json")
+            )
+            paths = [Path(directory) / "beast" / f"{base.identity}.jsonl" for base in bases]
+            assert (
+                self.report(directory)["planned"],
+                self.report(directory)["attempted"],
+                [ParsedJournal(path).read()["status"] for path in paths], [list(ParsedJournal(path).events())[0]["base_metadata"] for path in paths]
+            ) == (2, 2, ["failure", "completed"], [dict(base.metadata()) for base in bases]), "BEAST shared a journal, stopped at one failure, or miscounted requests"
 
     def example(self, base: BaseRequest, label: str) -> Attack:
         """Supply one controlled result for a factory and a request.
