@@ -14,6 +14,9 @@
   [руководство](docs/usage.md). Результаты проверки на Qwen:
   [отчёт #97](docs/issue-97-verification.md), [проверка 13 вариантов #103](docs/issue-103-verification.md). Формат журналов:
   [схема](docs/journal-schema.md).
+- Официальная документация сторонних проектов: [PyRIT](https://microsoft.github.io/PyRIT/),
+  [garak — руководство пользователя](https://docs.garak.ai/garak/) и
+  [garak — справочник по коду](https://reference.garak.ai/).
 
 ## Запуск
 

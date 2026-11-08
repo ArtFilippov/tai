@@ -22,12 +22,55 @@ from benchmark.alert_series import AlertSeries
 from journal.parsed_journal import ParsedJournal
 from main.alert_series import journal, prepare, series
 from target.model import Model
-from ..attack.model_fixture_utils import adaptive, continuation, goat, grandma, refusal, threaten_json, whois
+from ..attack.model_fixture_utils import adaptive, continuation, false_assertion, goat, grandma, refusal, threaten_json, whois
 from ..target import test_logits, test_model
 
 
 class TestAlertSeries(unittest.TestCase):
     """Check order, independent failures, and a recoverable root summary."""
+
+    def test_opt_in_false_assertion_keeps_independent_journals(self) -> None:
+        bases = AlertPool(
+            Path("examples/alert-manifest-640.json")
+        ).requests(1)[:2]
+        arguments = Namespace(
+            gpu=0, tokens=64, attacker="qwen", host="127.0.0.1", port=8080,
+            turns=1, goat_turns=1, no_threaten_json=True,
+            no_adaptive_attacks=True, no_dra=True, no_deletion=True,
+            deletion_perturbations=1, deletion_positions=2, deletion_ascii=2,
+            autodan=False, autodan_hga=False, false_assertion=True,
+            desired_response="An independently supplied answer"
+        )
+        with tempfile.TemporaryDirectory() as directory, patch(
+            "main.alert_series.LazyQwenModel", return_value=false_assertion()
+        ), patch(
+            "main.alert_series.cuda_device", return_value="controlled"
+        ), patch(
+            "main.alert_series.snapshot", return_value=None
+        ), prepare(
+            arguments,
+            Path(directory)
+        ) as factories:
+            series(
+                bases, factories[-1:],
+                Path(directory),
+                Path("examples/alert-manifest-640.json")
+            )
+            paths = [Path(directory) / "false_assertion" / f"{base.identity}.jsonl" for base in bases]
+            assert (
+                self.report(directory)["planned"],
+                [ParsedJournal(path).read()["calls"] for path in paths], [list(ParsedJournal(path).events())[0]["base_metadata"] for path in paths]
+            ) == (
+                2,
+                [
+                    {
+                        "target": 1,
+                        "attacker": 1,
+                        "judge": 1
+                    }
+                ] * 2,
+                [dict(base.metadata()) for base in bases]
+            ), "The opt-in variant lost per-base provenance or reused a journal"
 
     def example(self, base: BaseRequest, label: str) -> Attack:
         """Supply one controlled result for a factory and a request.

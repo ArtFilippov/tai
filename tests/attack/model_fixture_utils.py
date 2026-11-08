@@ -159,3 +159,23 @@ def wordnet() -> Model:
     model.revision.return_value = "controlled"
     model.settings.return_value = {"revision": "controlled"}
     return model
+
+
+def false_assertion() -> Model:
+    """Supply offline source, shortening and Target replies for the CLI.
+
+    Returns:
+        Model: History-free role resource.
+    """
+    def respond(messages: Sequence[dict[str, str]]) -> str:
+        if messages[0]["content"].startswith("Provide a complete example"):
+            return "A café serves coffee and pastries."
+        if messages[0]["content"].startswith("Write one self-contained sentence"):
+            return "A café serves coffee."
+        return "Coffee is served."
+
+    model = Mock(spec=Model)
+    model.generate.side_effect = respond
+    model.revision.return_value = "controlled"
+    model.settings.return_value = {"revision": "controlled"}
+    return model

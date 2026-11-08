@@ -68,6 +68,14 @@
       ],
       "reportImplicitOverride": "none",
       "reportMissingSuperCall": "none",
+      "root": "src/attack/false_assertion/envelopes"
+    },
+    {
+      "extraPaths": [
+        "src"
+      ],
+      "reportImplicitOverride": "none",
+      "reportMissingSuperCall": "none",
       "root": "src/attack/slur_completion/envelopes"
     },
     {

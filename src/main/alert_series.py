@@ -25,6 +25,7 @@ from attack.wordnet.envelopes.wordnet_attack_envelope import WordnetAttackEnvelo
 from attack.wordnet.prepared_wordnet import PreparedWordnet
 from attack.wordnet.wordnet_source_utils import open_wordnet
 from attack.wordnet.wordnet_budget import WordnetBudget
+from attack.false_assertion.envelopes.false_assertion_attack_envelope import FalseAssertionAttackEnvelope
 from attack.desired_response.cached_desired_response import CachedDesiredResponse
 from attack.desired_response.provided_desired_response import ProvidedDesiredResponse
 from attack.desired_response.desired_response import DesiredResponse
@@ -100,6 +101,9 @@ def main() -> None:
     )
     _ = parser.add_argument(
         "--wordnet", action="store_true", help="include bounded lexical exploration"
+    )
+    _ = parser.add_argument(
+        "--false-assertion", action="store_true", help="include refusal-only FalseAssertion adaptation"
     )
     _ = parser.add_argument(
         "--wordnet-dir", type=Path, help="prepared wn data directory"
@@ -470,6 +474,10 @@ def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[B
                 arguments.wordnet_nodes, arguments.wordnet_calls, arguments.wordnet_seed
             )
             attacks.append(lambda base: WordnetAttackEnvelope( base, ExplicitAttackSetup(attacker, target, target, base.text()), journal(directory / "wordnet" / f"{base.metadata()['id']}.jsonl"), lexicon, budget=bounds ))
+        if getattr(
+            arguments, "false_assertion", False
+        ):
+            attacks.append(lambda base: FalseAssertionAttackEnvelope( base, ExplicitAttackSetup(attacker, target, target, base.text()), journal(directory / "false_assertion" / f"{base.metadata()['id']}.jsonl"), desired(base) ))
         return [attack for index, attack in enumerate(attacks) if index != THREATEN_JSON or not arguments.no_threaten_json]
 
     model = LazyQwenModel(

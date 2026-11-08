@@ -47,6 +47,7 @@ tai-grandma = "main.grandma_cli:main"
 tai-slur-completion = "main.continuation_cli:slur_main"
 tai-leak-replay = "main.continuation_cli:leak_main"
 tai-wordnet = "main.wordnet_cli:main"
+tai-false-assertion = "main.false_assertion_cli:main"
 tai-wordnet-prepare = "main.wordnet_cli:prepare"
 tai-qwen-observe = "main.qwen_observe:main"
 tai-qwen-search = "main.qwen_observe:search_main"
@@ -57,6 +58,7 @@ sources = ["src"]
 
 [dependency-groups]
 dev = [
+    "jupyterlab>=4.6.6",
     "pytest>=8",
     "tach==0.35.1",
     "pylint==4.0.8",
@@ -209,6 +211,12 @@ reportUnusedCallResult = "none"
 
 [[tool.pyright.executionEnvironments]]
 root = "src/attack/adaptive_attacks/envelopes"
+extraPaths = ["src"]
+reportMissingSuperCall = "none"
+reportImplicitOverride = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "src/attack/false_assertion/envelopes"
 extraPaths = ["src"]
 reportMissingSuperCall = "none"
 reportImplicitOverride = "none"
