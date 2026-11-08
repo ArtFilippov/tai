@@ -540,6 +540,8 @@ class TestAlertSeries(unittest.TestCase):
             "main.alert_series.cuda_device", return_value="controlled"
         ), patch(
             "main.alert_series.snapshot", return_value=None
+        ), patch(
+            "garak.resources.autodan.genetic.nltk.word_tokenize", side_effect=str.split
         ), prepare(
             arguments,
             Path(directory)
