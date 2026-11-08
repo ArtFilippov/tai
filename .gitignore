@@ -6,6 +6,7 @@ __pycache__/
 dist/
 *.egg-info/
 /runs/
+/stuff/
 OPENCODE_ZEN_KEY.json
 
 # Local Quard reports, logs and native cache
