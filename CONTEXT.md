@@ -68,6 +68,11 @@ _Avoid_: Message (как синоним диалога)
 а положительная оценка означает лишь отсутствие обнаруженного отказа, не
 выполнение базового запроса.
 
+**DAN (garak adaptation)**:
+An attack that tries garak's role-adoption instructions in independent conversations
+with Target, presenting the base request after each instruction and its reply.
+Success means fulfillment of the base request, not acknowledgment of the DAN role.
+
 **Предъявленный результат атаки**:
 Выбранный самой атакой текст ответа Target для оценки. В FITD это последний принятый
 (не отклонённый Target) ответ завершённого обмена; отсутствие такого ответа не равно
