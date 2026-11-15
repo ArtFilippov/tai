@@ -26,6 +26,7 @@ from attack.wordnet.prepared_wordnet import PreparedWordnet
 from attack.wordnet.wordnet_source_utils import open_wordnet
 from attack.wordnet.wordnet_budget import WordnetBudget
 from attack.false_assertion.envelopes.false_assertion_attack_envelope import FalseAssertionAttackEnvelope
+from attack.dan.envelopes.dan_attack_envelope import DanAttackEnvelope
 from attack.beast.beast_options_utils import options as beast_options
 from attack.beast.beast_probe import BeastProbe
 from attack.beast.beam_search import BeamSearch
@@ -59,6 +60,7 @@ from target.qwen_device_utils import cuda_device
 from target.local_qwen_assets import LocalQwenAssets
 from target.qwen_logits import QwenLogits
 from target.envelopes.qwen_token_probabilities import QwenTokenProbabilities
+from attack.dan.dan_options_utils import options as dan_options, sections as dan_sections
 
 GGUF = "gguf"
 THREATEN_JSON = 2
@@ -112,6 +114,10 @@ def main() -> None:
     _ = parser.add_argument(
         "--false-assertion", action="store_true", help="include refusal-only FalseAssertion adaptation"
     )
+    _ = parser.add_argument(
+        "--dan", action="store_true", help="include request-bound named DAN"
+    )
+    dan_options(parser)
     _ = parser.add_argument(
         "--beast", action="store_true", help="include request-bound local BEAST search"
     )
@@ -191,6 +197,11 @@ def launch(arguments: Namespace) -> None:
     """
     if min(arguments.turns, arguments.goat_turns, arguments.tokens) < 1 or arguments.gpu < 0 or not 1 <= arguments.port <= 65535:
         raise ValueError("Invalid GPU, turn, token or port limit")
+    dan_sections(
+        getattr(
+            arguments, "dan_sections", ("named",)
+        )
+    )
     if not getattr(
         arguments, "no_dra", False
     ):
@@ -533,6 +544,10 @@ def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[B
                 arguments.beast_suffix_len, arguments.beast_trials
             )
             attacks.append(lambda base: beast_run( base, ExplicitAttackSetup(attacker, target, target, base.text()), desired(base), BeamSearch(tokens, limits), path=directory / "beast" / f"{base.metadata()['id']}.jsonl" ))
+        if getattr(
+            arguments, "dan", False
+        ):
+            attacks.append(lambda base: DanAttackEnvelope( base, ExplicitAttackSetup(attacker, target, target, base.text()), journal(directory / "dan" / f"{base.metadata()['id']}.jsonl"), sections=getattr(arguments, "dan_sections", ("named",)), ))
         return [attack for index, attack in enumerate(attacks) if index != THREATEN_JSON or not arguments.no_threaten_json]
 
     model = LazyQwenModel(

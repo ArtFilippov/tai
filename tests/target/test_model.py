@@ -9,9 +9,23 @@ from target.model import Model
 class TestModel(Model):
     """Answer Target and assessment calls without loading local weights."""
 
+    def __init__(self, answer: str = "Detailed answer", verdict: str = "YES", *,
+                 name: str = "Qwen/Qwen2.5-0.5B-Instruct") -> None:
+        """Bind independently controlled text, fulfillment verdict and identity.
+
+        Args:
+            answer (str, default="Detailed answer"): Target response.
+            verdict (str, default="YES"): Judgment response.
+            name (str, default="Qwen/Qwen2.5-0.5B-Instruct"): Configured Target identity.
+        """
+        super().__init__()
+        self.answer = answer
+        self.verdict = verdict
+        self.name = name
+
     @override
     def generate(self, messages: Sequence[dict[str, str]]) -> str:
-        return "YES" if messages[0]["role"] == "system" else "Detailed answer"
+        return self.verdict if messages[0]["role"] == "system" else self.answer
 
     @override
     def prefill(self, messages: Sequence[dict[str, str]], prefix: str) -> str:
@@ -24,6 +38,6 @@ class TestModel(Model):
     @override
     def settings(self) -> dict[str, object]:
         return {
-            "id": "Qwen/Qwen2.5-0.5B-Instruct",
+            "id": self.name,
             "revision": self.revision()
         }

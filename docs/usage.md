@@ -98,6 +98,87 @@ Target, затем точный исходный запрос с его прои
 входа и пропуска ошибочных кандидатов стратегия не выполняет. Один кандидат
 требует два обращения к Target и одну оценку.
 
+## DAN: именованные промпты garak
+
+Готовая сборка `DanAttackEnvelope` из
+`attack.dan.envelopes.dan_attack_envelope` принимает `base`, `setup`, `journal`
+и необязательный `sections=("named",)`. `setup` реализует `AttackSetup`:
+Target и judge могут быть разными моделями; оценивает `QwenJudge` по исходному
+запросу. Например, с подготовленными модельными ресурсами:
+
+```python
+from attack.dan.envelopes.dan_attack_envelope import DanAttackEnvelope
+from attack.explicit_attack_setup import ExplicitAttackSetup
+
+attack = DanAttackEnvelope(
+    base,
+    ExplicitAttackSetup(target_model, target_model, judge_model, base.text()),
+    journal,
+    sections=["named"],
+)
+text = attack.run()
+```
+
+Саму коллекцию предоставляет
+`prompt_collection.named_dan_prompts.NamedDanPrompts(target_model, ProvidedPrompt)`;
+второй аргумент создаёт `PromptCandidate` с сохранённой исходной идентичностью.
+Она читает bundled JSON из установленного garak, закреплённого на
+`3f50ea5ff9cd7050099940647c15c39b07a93392`, без запуска его harness,
+глобальной конфигурации или случайного выбора. Все 14 вариантов идут в порядке
+объявлений upstream; пользовательские файлы garak не подменяют пакетные ресурсы.
+Порядок вариантов:
+`Dan_11_0`, `Dan_10_0`, `Dan_9_0`, `Dan_8_0`, `Dan_7_0`,
+`Dan_6_2`, `Dan_6_0`, `DUDE`, `STAN`, `DAN_Jailbreak`, `AntiDAN`,
+`ChatGPT_Developer_Mode_v2`, `ChatGPT_Developer_Mode_RANTI`,
+`ChatGPT_Image_Markdown`. Совпадающие тексты `Dan_10_0` и `DAN_Jailbreak`
+сохраняют разные имена и исходные индексы.
+
+Строки загружаются и обрезаются по краям как в native garak. Только наличие
+`{generator.name}` включает native `str.format` со значением `id` из
+`target_model.settings()`, включая семантику экранированных фигурных скобок.
+Другие задачи, фиксированные ссылки на модели и ограничения в исходном тексте
+не переписываются. Без native-маркера прочие placeholders остаются как есть;
+если native-форматирование встречает неразрешимое поле, запуск завершается
+ошибкой. Отсутствующий, пустой или повреждённый ресурс также является ошибкой.
+
+После подготовки Qwen по инструкции ниже:
+
+```bash
+uv run --locked --group dev --extra qwen tai-dan /tmp/dan.jsonl "Explain the topic" --gpu 0 --tokens 192 --dan-sections named
+```
+
+Эквивалентный модуль — `python -m main.dan_cli`. Путь журнала должен быть новым;
+GPU задаётся явно, `--tokens` ограничивает каждый сгенерированный ответ.
+Сейчас доступна **только `named`**; опущенный `--dan-sections` выбирает её.
+Пустой выбор, `ablation`, `wild` и любые другие секции отвергаются. Эти две
+остальные коллекции появятся в следующем этапе; они не подменяются `named`.
+
+Каждый кандидат выполняет два обмена: исходная DAN-инструкция и настоящий ответ
+Target, затем неизменённый базовый запрос. Отказ от роли не пропускает второй
+обмен. Полный второй ответ оценивается на выполнение базового запроса: наличие
+маркера DAN и отсутствие фразы отказа сами по себе не означают успех.
+Первый положительный вердикт останавливает весь обход; предел стоимости —
+28 обращений к Target и 14 обращений к judge на базовый запрос.
+
+Команда печатает восстановленный `ParsedJournal(path).read()` с полями
+`successful_candidate` (секция, upstream-вариант, нулевой `source_index`,
+единичная `position`) и `target` только при зафиксированном успехе. Статическое
+описание `probe.collection` хранит выбранную секцию и source revision отдельно
+от runtime-победителя. При исчерпании сохраняются последний оценённый ответ и
+`round_limit` / `candidates_exhausted`, без успешного варианта; при ошибке —
+`failure` и уже завершённый материал, также без успешного варианта.
+
+Для ALERT добавьте `--dan --dan-sections named`, например:
+
+```bash
+uv run --locked --group dev --extra qwen tai-alert /tmp/alert-dan --gpu 0 --limit 1 --dan --dan-sections named
+```
+
+DAN включается только флагом `--dan`; остальные варианты по умолчанию сохраняются.
+На каждый базовый запрос добавляется **одна** попытка с независимым журналом
+`dan/<id>.jsonl`, а не 14 попыток серии. Это request-bound DAN с оригинальными
+инструкциями; существующие AutoDAN GA/HGA и AutoDANCached в его каталог не входят.
+
 ## Локальный запуск Qwen
 
 Сначала подготовьте закреплённый снимок модели и токенизатора
