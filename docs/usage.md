@@ -36,6 +36,68 @@ uv run --locked --group dev tai /tmp/fitd-demo.jsonl "Explain the topic in detai
 снимок сборки атаки и вложенные настройки участников. Формат описан в
 [схеме журнала](journal-schema.md).
 
+## Абстрактная DAN-атака из Python
+
+`DanProbe` из `attack.dan.dan_probe` принимает исходный `BaseRequest`,
+`PromptCollection` из независимого пакета `prompt_collection` и журнал.
+Коллекция предоставляет `description()` со
+статической конфигурацией источника и `candidates()` — ленивый обход
+`PromptCandidate`. `ProvidedPrompt(text, identity)` хранит готовый текст и
+произвольные координаты источника. Поля идентичности определяет коллекция:
+для DAN это секция, исходное название варианта и индекс источника
+(для ablation — номер комбинации). Общие контракты не зависят от DAN.
+Рендеринг текста принадлежит коллекции; стратегия не меняет её строки и
+добавляет позицию обхода отдельно от исходной идентичности.
+
+Минимальный пример без сети и GPU, с небольшим управляемым источником:
+
+```python
+from pathlib import Path
+
+from attack.attack_run import AttackRun
+from attack.dan.dan_probe import DanProbe
+from base.plain_base import PlainBase
+from journal.disk_journal import DiskJournal
+from journal.parsed_journal import ParsedJournal
+from journal.versioned_journal import VersionedJournal
+from judge.equal_judge import EqualJudge
+from judge.recorded_judge import RecordedJudge
+from prompt_collection.provided_prompt import ProvidedPrompt
+from prompt_collection.scripted_prompts import ScriptedPrompts
+from target.scripted_chat import ScriptedChat
+
+base = PlainBase("Explain the topic")
+path = Path("/tmp/dan-demo.jsonl")  # Новый файл для каждого запуска.
+journal = VersionedJournal(DiskJournal(path))
+prompts = ScriptedPrompts([
+    ProvidedPrompt("Adopt this role", {
+        "section": "example", "variant": "Example", "source_index": 17,
+    }),
+])
+attack = AttackRun(
+    base,
+    ScriptedChat(["I decline the role", "Complete answer"]),
+    RecordedJudge(EqualJudge("Complete answer"), journal, base.text()),
+    journal,
+    probe=DanProbe(base, prompts, journal),
+)
+text = attack.run()  # "Complete answer"; общий контракт остаётся str | None.
+outcome = ParsedJournal(path).read()
+print(outcome["successful_candidate"], outcome["target"])
+```
+
+Каждый кандидат получает независимый разговор: активация, настоящий ответ
+Target, затем точный исходный запрос с его происхождением. Даже отказ от роли
+не отменяет второй обмен. Оценщику передаётся весь второй ответ, без выделения
+секции DAN. Для модельной оценки выполнения запроса передавайте
+`QwenJudge(base.text(), judge_chat)` вместо управляемого `EqualJudge`.
+Первый положительный вердикт завершает обход; исчерпание сохраняет последний
+оценённый ответ с `round_limit` / `candidates_exhausted`. Пустая коллекция даёт
+`None` / `no_candidates`; ошибка источника, Target, контекста или оценки
+прерывает запуск с ошибкой, сохраняя завершённые обмены. Никаких сокращений
+входа и пропуска ошибочных кандидатов стратегия не выполняет. Один кандидат
+требует два обращения к Target и одну оценку.
+
 ## Локальный запуск Qwen
 
 Сначала подготовьте закреплённый снимок модели и токенизатора

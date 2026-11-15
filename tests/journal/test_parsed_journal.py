@@ -331,3 +331,68 @@ class TestParsedJournal(unittest.TestCase):
                 ValueError, match="Invalid"
             ):
                 ParsedJournal(path).read()
+
+    def test_historical_success_has_no_inferred_candidate(self) -> None:
+        with self.file("historical-success.jsonl") as path:
+            self.save(
+                path,
+                [
+                    {
+                        "event": "result",
+                        "text": "DAN persona enabled"
+                    },
+                    {
+                        "event": "judgment",
+                        "text": "DAN persona enabled",
+                        "assessment": True
+                    },
+                    {
+                        "event": "end",
+                        "status": "success"
+                    }
+                ]
+            )
+            outcome = ParsedJournal(path).read()
+            assert (outcome["text"], outcome["assessment"], "successful_candidate" in outcome, "target" in outcome) == (
+                "DAN persona enabled", True, False, False,
+            ), "A historical successful result acquired an inferred candidate or Target"
+
+    def test_rejects_candidate_success_without_a_linked_positive_verdict(self) -> None:
+        for verdict in (False, True):
+            with self.subTest(verdict=verdict), self.file("invalid-candidate.jsonl") as path:
+                self.save(
+                    path,
+                    [
+                        {
+                            "event": "result",
+                            "text": "Selected answer"
+                        },
+                        {
+                            "event": "judgment",
+                            "text": "Selected answer",
+                            "assessment": verdict
+                        },
+                        {
+                            "event": "decision",
+                            "action": "dan_success",
+                            "discarded": [],
+                            "kept": 1,
+                            "candidate": {
+                                "section": "fake",
+                                "variant": "Original",
+                                "source_index": 41,
+                                "position": 1
+                            },
+                            "target": {"model": "controlled"},
+                            "text": "Selected answer" if not verdict else "Different answer"
+                        },
+                        {
+                            "event": "end",
+                            "status": "success"
+                        }
+                    ]
+                )
+                with pytest.raises(
+                    ValueError, match="Invalid"
+                ):
+                    ParsedJournal(path).read()

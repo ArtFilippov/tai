@@ -58,20 +58,32 @@ class ParsedJournal(JournalView):
         text: str | None = None
         assessment: bool | None = None
         error: str | None = None
+        winner: dict[str, object] = {}
         for event in events:
             match event:
-                case {"event": "result", "text": str() as value} if assessment is not None or (text is None and error is None):
+                case {"event": "result", "text": str() as value} if not winner and (assessment is not None or (text is None and error is None)):
                     text = value
                     assessment = None
                 case {"event": "judgment", "text": str() as value, "assessment": bool() as verdict} if text is not None and assessment is None and error is None and value == text:
                     assessment = verdict
                 case {"event": "assessment_error", "text": str() as value, "error": str() as detail} if text is not None and assessment is None and error is None and value == text:
                     error = detail
+                case {"event": "decision", "action": "dan_success", "candidate": dict(), "target": dict(), "text": str() as value} if assessment is True and value == text and not winner:
+                    winner = {
+                        "successful_candidate": event["candidate"],
+                        "target": event["target"],
+                    }
                 case {"event": "end"}:
-                    return self.finish(
+                    outcome = self.finish(
                         event, text, assessment, error
                     )
-                case {"event": "result" | "judgment" | "assessment_error"}:
+                    if winner and outcome["status"] != SUCCESS:
+                        raise ValueError("Invalid successful candidate outcome")
+                    return {
+                        **outcome,
+                        **winner
+                    }
+                case {"event": "result" | "judgment" | "assessment_error"} | {"event": "decision", "action": "dan_success"}:
                     raise ValueError("Invalid run journal event")
                 case _:
                     continue
