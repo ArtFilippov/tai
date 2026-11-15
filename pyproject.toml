@@ -49,6 +49,7 @@ tai-leak-replay = "main.continuation_cli:leak_main"
 tai-wordnet = "main.wordnet_cli:main"
 tai-false-assertion = "main.false_assertion_cli:main"
 tai-dan = "main.dan_cli:main"
+tai-smuggling = "main.smuggling_cli:main"
 tai-beast = "main.beast_cli:main"
 tai-wordnet-prepare = "main.wordnet_cli:prepare"
 tai-qwen-observe = "main.qwen_observe:main"
@@ -237,6 +238,12 @@ reportImplicitOverride = "none"
 
 [[tool.pyright.executionEnvironments]]
 root = "src/attack/leak_replay/envelopes"
+extraPaths = ["src"]
+reportMissingSuperCall = "none"
+reportImplicitOverride = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "src/attack/smuggling/envelopes"
 extraPaths = ["src"]
 reportMissingSuperCall = "none"
 reportImplicitOverride = "none"

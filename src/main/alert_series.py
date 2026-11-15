@@ -27,6 +27,8 @@ from attack.wordnet.wordnet_source_utils import open_wordnet
 from attack.wordnet.wordnet_budget import WordnetBudget
 from attack.false_assertion.envelopes.false_assertion_attack_envelope import FalseAssertionAttackEnvelope
 from attack.dan.envelopes.dan_attack_envelope import DanAttackEnvelope
+from attack.smuggling.envelopes.smuggling_attack_envelope import SmugglingAttackEnvelope
+from attack.smuggling.smuggling_options_utils import options as smuggling_options, techniques as smuggling_techniques
 from attack.beast.beast_options_utils import options as beast_options
 from attack.beast.beast_probe import BeastProbe
 from attack.beast.beam_search import BeamSearch
@@ -119,6 +121,10 @@ def main() -> None:
     )
     dan_options(parser)
     _ = parser.add_argument(
+        "--smuggling", action="store_true", help="include request-bound Homoglyph Smuggling"
+    )
+    smuggling_options(parser)
+    _ = parser.add_argument(
         "--beast", action="store_true", help="include request-bound local BEAST search"
     )
     beast_options(parser)
@@ -200,6 +206,11 @@ def launch(arguments: Namespace) -> None:
     dan_sections(
         getattr(
             arguments, "dan_sections", ("named", "ablation", "wild")
+        )
+    )
+    smuggling_techniques(
+        getattr(
+            arguments, "smuggling_techniques", ("homoglyph",)
         )
     )
     if not getattr(
@@ -548,6 +559,13 @@ def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[B
             arguments, "dan", False
         ):
             attacks.append(lambda base: DanAttackEnvelope( base, ExplicitAttackSetup(attacker, target, target, base.text()), journal(directory / "dan" / f"{base.metadata()['id']}.jsonl"), sections=getattr(arguments, "dan_sections", ("named", "ablation", "wild")), ))
+        if getattr(
+            arguments, "smuggling", False
+        ):
+            selection = getattr(
+                arguments, "smuggling_techniques", ("homoglyph",)
+            )
+            attacks.append(lambda base: SmugglingAttackEnvelope( base, ExplicitAttackSetup(attacker, target, target, base.text()), journal(directory / "smuggling" / f"{base.metadata()['id']}.jsonl"), techniques=selection ))
         return [attack for index, attack in enumerate(attacks) if index != THREATEN_JSON or not arguments.no_threaten_json]
 
     model = LazyQwenModel(

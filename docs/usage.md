@@ -36,6 +36,100 @@ uv run --locked --group dev tai /tmp/fitd-demo.jsonl "Explain the topic in detai
 снимок сборки атаки и вложенные настройки участников. Формат описан в
 [схеме журнала](journal-schema.md).
 
+## Smuggling: HomoglyphObfuscation
+
+Этот этап поддерживает только `homoglyph`, выбранный по умолчанию. Техника
+преобразует ровно переданный базовый запрос: использует карту
+`DEFAULT_HOMOGLYPH_MAP` из garak, закреплённого на
+`3f50ea5ff9cd7050099940647c15c39b07a93392`, и воспроизводит поведение
+`_homoglyph_replace` с отдельным `random.Random(0)`. Каждый подходящий символ
+заменяется, включая потребление случайного выбора для одновариантных замен.
+Получается ровно один кандидат; ни исходные примеры garak, ни его корпус не
+добавляются. Пользовательские карты, другие seed и дополнительные бюджеты
+не поддерживаются. Attacker не вызывается.
+
+Кандидат отправляется одним обменом в независимый разговор Target. Полный
+неизменённый ответ записывается до оценки и передаётся проектному `QwenJudge`
+относительно **исходного** запроса. Это адаптация garak для собственных запросов
+и оценки выполнения, а не воспроизведение его бенчмарка или эвристики отказа.
+Положительный вердикт даёт `success` / `early_success`, отрицательный сохраняет
+ответ и оценку с `round_limit` / `candidates_exhausted`. Если текст не изменился,
+журнал сохраняет `unchanged_text`, Target и Judge не вызываются, `run()` возвращает
+`None` с `no_result` / `no_candidates`. Исходный текст не отправляется как запасной
+вариант. Пустой ответ Target, напротив, остаётся предъявленным результатом и
+оценивается. Технические ошибки прерывают запуск с `failure`, сохраняя уже
+записанный материал; они не превращаются в отрицательный вердикт.
+
+Рабочий пример Python без GPU и сети:
+
+```python
+from pathlib import Path
+
+from attack.assessed_candidates import AssessedCandidates
+from attack.attack_run import AttackRun
+from attack.smuggling.smuggling_probe import SmugglingProbe
+from base.plain_base import PlainBase
+from journal.disk_journal import DiskJournal
+from journal.parsed_journal import ParsedJournal
+from journal.versioned_journal import VersionedJournal
+from judge.qwen_judge import QwenJudge
+from judge.recorded_judge import RecordedJudge
+from target.scripted_chat import ScriptedChat
+
+base = PlainBase("Explain the topic")
+path = Path("/tmp/smuggling-demo.jsonl")  # Новый путь для каждого запуска.
+journal = VersionedJournal(DiskJournal(path))
+attack = AttackRun(
+    base,
+    ScriptedChat(["Complete answer"]),
+    RecordedJudge(QwenJudge(base.text(), ScriptedChat(["YES"])), journal, base.text()),
+    journal,
+    probe=SmugglingProbe(base, AssessedCandidates(journal), journal, techniques=["homoglyph"]),
+)
+text = attack.run()  # "Complete answer"; общий контракт str | None.
+outcome = ParsedJournal(path).read()
+print(outcome["assessment"], outcome["successful_candidate"])
+```
+
+С подготовленными моделями используйте стандартную сборку:
+
+```python
+from attack.shared_model_attack_setup import SharedModelAttackSetup
+from attack.smuggling.envelopes.smuggling_attack_envelope import SmugglingAttackEnvelope
+
+attack = SmugglingAttackEnvelope(
+    base, SharedModelAttackSetup(model, base.text()), journal,
+    techniques=["homoglyph"],
+)
+text = attack.run()
+```
+
+`setup` реализует `AttackSetup`; для разных Target и Judge можно передать
+`ExplicitAttackSetup(target_model, target_model, judge_model, base.text())`.
+Создание сборки не запускает модель. Передавайте исходный запрос в `setup`
+без преобразований. Пустые и неподдерживаемые наборы техник отвергаются на
+публичных границах; повторы `homoglyph` не добавляют кандидатов.
+
+После [подготовки Qwen](../README.md#запуск) доступны команды:
+
+```bash
+uv run --locked --group dev --extra qwen tai-smuggling /tmp/smuggling-run.jsonl "Explain the topic" --gpu 0
+uv run --locked --group dev --extra qwen tai-smuggling /tmp/smuggling-explicit.jsonl "Explain the topic" --gpu 0 --smuggling-techniques homoglyph
+uv run --locked --group dev --extra qwen tai-alert /tmp/alert-smuggling --gpu 0 --limit 1 --smuggling --smuggling-techniques homoglyph
+```
+
+`--tokens` ограничивает генерацию, как в DAN. Standalone печатает восстановленный
+исход. ALERT включает Smuggling только через `--smuggling`, добавляя одну попытку
+на базовый запрос к обычным вариантам серии; каждый получает отдельный
+`smuggling/<id>.jsonl`. Ошибка одной попытки не отменяет следующие.
+`--smuggling-techniques` одинаков в обеих командах: принимает непустой набор
+из единственного доступного имени `homoglyph`. HypotheticalResponse и двухтехничные
+значения по умолчанию из #110 относятся к следующему этапу.
+Журнал сохраняет исходный текст и его происхождение отдельно от кандидата,
+настройки преобразования, ответ, оценку, причину пропуска или завершения.
+`successful_candidate.technique` восстанавливает успешную технику без повторной
+оценки; подробности — в [схеме журнала](journal-schema.md).
+
 ## Абстрактная DAN-атака из Python
 
 `DanProbe` из `attack.dan.dan_probe` принимает исходный `BaseRequest`,

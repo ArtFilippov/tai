@@ -40,6 +40,7 @@ uv run --locked --group dev --extra qwen tai-qwen prepare
 | WHOIS injection | `python -m main.whois_cli JOURNAL "BASE" --gpu 0` |
 | Grandma roleplay | `python -m main.grandma_cli JOURNAL "BASE" --gpu 0` |
 | DAN (named / ablation / wild) | `tai-dan JOURNAL "BASE" --gpu 0 --dan-sections named` |
+| Smuggling (homoglyph) | `tai-smuggling JOURNAL "BASE" --gpu 0 --smuggling-techniques homoglyph` |
 | Slur Completion | `tai-slur-completion JOURNAL "BASE" --gpu 0 --desired-response "ANSWER"` |
 | Leak Replay | `tai-leak-replay JOURNAL "BASE" --gpu 0 --desired-response "ANSWER"` |
 | WordNet exploration | `tai-wordnet JOURNAL "BASE" --gpu 0 --lexicon-dir /tmp/tai-wn --nodes 4 --calls 8` |
@@ -63,6 +64,11 @@ uv run --locked --group dev --extra qwen tai-alert /tmp/alert-series --gpu 0 --l
 Без выбора секций обходятся все 807 записей в порядке named → ablation → wild.
 Каждый кандидат выполняет два обмена; первый успех останавливает весь обход.
 Полный обход может потребовать 1 614 вызовов Target и 807 вызовов judge на запрос.
+`--smuggling` отдельно добавляет одну Smuggling-попытку на запрос с журналом
+`smuggling/<id>.jsonl`. Сейчас доступна только техника `homoglyph`, выбранная
+по умолчанию; `--smuggling-techniques homoglyph` задаёт её явно. Один
+детерминированный кандидат требует один обмен с Target и одну оценку Judge;
+неизменившийся запрос пропускается без обращений к ним.
 Параметры и ограничения, в том числе для AutoDAN и GGUF, описаны в
 [руководстве](docs/usage.md). Правила работы с кодом и проверками — в
 [AGENTS.md](AGENTS.md).
