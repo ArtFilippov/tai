@@ -121,7 +121,7 @@ def main() -> None:
     )
     dan_options(parser)
     _ = parser.add_argument(
-        "--smuggling", action="store_true", help="include request-bound Homoglyph Smuggling"
+        "--smuggling", action="store_true", help="include request-bound Hypothetical/Homoglyph Smuggling"
     )
     smuggling_options(parser)
     _ = parser.add_argument(
@@ -210,7 +210,7 @@ def launch(arguments: Namespace) -> None:
     )
     smuggling_techniques(
         getattr(
-            arguments, "smuggling_techniques", ("homoglyph",)
+            arguments, "smuggling_techniques", ("hypothetical", "homoglyph")
         )
     )
     if not getattr(
@@ -563,7 +563,7 @@ def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[B
             arguments, "smuggling", False
         ):
             selection = getattr(
-                arguments, "smuggling_techniques", ("homoglyph",)
+                arguments, "smuggling_techniques", ("hypothetical", "homoglyph")
             )
             attacks.append(lambda base: SmugglingAttackEnvelope( base, ExplicitAttackSetup(attacker, target, target, base.text()), journal(directory / "smuggling" / f"{base.metadata()['id']}.jsonl"), techniques=selection ))
         return [attack for index, attack in enumerate(attacks) if index != THREATEN_JSON or not arguments.no_threaten_json]

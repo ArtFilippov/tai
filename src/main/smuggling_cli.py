@@ -1,4 +1,4 @@
-"""Standalone deterministic Smuggling against an explicit base request."""
+"""Standalone request-bound hypothetical and homoglyph Smuggling."""
 
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
@@ -17,7 +17,7 @@ from target.qwen_snapshot_utils import snapshot
 
 def main() -> None:
     """Run one recoverable Smuggling attempt with explicit local GPU setup."""
-    parser = ArgumentParser(description="Request-bound Homoglyph Smuggling adaptation")
+    parser = ArgumentParser(description="Request-bound Hypothetical/Homoglyph Smuggling adaptation")
     _ = parser.add_argument(
         "journal", type=Path
     )

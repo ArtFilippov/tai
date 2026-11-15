@@ -29,6 +29,172 @@ from ..smuggling_entry_utils import standalone, variants
 class TestSmugglingAttackEnvelope(unittest.TestCase):
     """Expose one request-bound attack with the normal fulfillment Judge."""
 
+    def test_python_defaults_prepare_hypothetical_once_and_stop_on_first_success(self) -> None:
+        with temporary_journal("default.jsonl") as path:
+            result = SmugglingAttackEnvelope(
+                PlainBase("Explain café"),
+                ExplicitAttackSetup(
+                    QueuedModel(["explain café"]),
+                    QueuedModel(["Full answer"]),
+                    QueuedModel(["YES"]),
+                    "Explain café"
+                ),
+                VersionedJournal(
+                    DiskJournal(path)
+                )
+            ).run()
+            outcome = ParsedJournal(path).read()
+            assert (result, outcome["successful_candidate"], outcome["calls"]) == (
+                "Full answer",
+                {
+                    "technique": "hypothetical",
+                    "position": 1
+                },
+                {
+                    "target": 1,
+                    "attacker": 1,
+                    "judge": 1
+                }
+            ), "Python defaults lost hypothetical preparation or continued after success"
+
+    def test_journal_records_selected_order_and_effective_settings(self) -> None:
+        with temporary_journal("settings.jsonl") as path:
+            standalone(
+                path, "Explain café", ["explain café", "Full answer", "YES"],
+                techniques=["homoglyph", "hypothetical"]
+            )
+            probe = json.loads(
+                path.read_text(encoding="utf-8")
+                .splitlines()[0]
+            )["attack"]["probe"]
+            assert (probe["techniques"], probe["attacker"], probe["settings"]["hypothetical"]["calls"], probe["settings"]["homoglyph"]["seed"]) == (
+                [
+                    "hypothetical", "homoglyph"
+                ],
+                {
+                    "type": "model_chat",
+                    "model": {
+                        "id": "Offline/Queued",
+                        "revision": "offline-revision"
+                    }
+                },
+                1, 0
+            ), "The journal lost canonical selection, Attacker identity, or effective technique settings"
+
+    def test_preparation_target_and_judge_errors_never_fall_back_to_later_techniques(self) -> None:
+        for replies, text, reason, calls in (
+            (
+                [],
+                None, "execution_error",
+                {
+                    "target": 0,
+                    "attacker": 0,
+                    "judge": 0
+                }
+            ),
+            (
+                ["describe café"],
+                None, "execution_error",
+                {
+                    "target": 0,
+                    "attacker": 1,
+                    "judge": 0
+                }
+            ),
+            (
+                [
+                    "describe café", "Selected", "invalid"
+                ],
+                "Selected", "assessment_error",
+                {
+                    "target": 1,
+                    "attacker": 1,
+                    "judge": 1
+                }
+            )
+        ):
+            with temporary_journal("technical.jsonl") as path:
+                with pytest.raises(ValueError):
+                    standalone(
+                        path, "Base café", replies,
+                        techniques=[
+                            "hypothetical", "homoglyph"
+                        ]
+                    )
+                outcome = ParsedJournal(path).read()
+                assert (outcome["status"], outcome["reason"], outcome["text"], outcome["assessment"], outcome["calls"]) == (
+                    "failure", reason, text, None, calls
+                ), "A preparation, Target, or Judge error fell back, retried, or became a negative assessment"
+
+    def test_alert_hypothetical_selection_and_both_techniques_keep_attempts_independent(self) -> None:
+        manifest = Path("examples/alert-manifest-640.json")
+        bases = AlertPool(manifest).requests(1)[:2]
+        for selection, replies, winners in (
+            (
+                ["hypothetical"],
+                [
+                    "describe first", "First", "NO", "describe second", "Second", "YES"
+                ],
+                [
+                    None,
+                    {
+                        "technique": "hypothetical",
+                        "position": 1
+                    }
+                ]
+            ),
+            (
+                [
+                    "homoglyph", "hypothetical"
+                ],
+                [
+                    "describe first", "First", "NO", "Last", "YES", "describe second", "Second", "YES"
+                ],
+                [
+                    {
+                        "technique": "homoglyph",
+                        "position": 2,
+                        "seed": 0
+                    },
+                    {
+                        "technique": "hypothetical",
+                        "position": 1
+                    }
+                ]
+            )
+        ):
+            with TemporaryDirectory() as directory:
+                root = Path(directory)
+                with variants(
+                    root, replies, enabled=True, techniques=selection
+                ) as factories:
+                    series(
+                        bases, factories[-1:], root, manifest
+                    )
+                outcomes = [ParsedJournal(root / "smuggling" / f"{base.identity}.jsonl").read() for base in bases]
+                assert [(
+                    outcome["text"], outcome["assessment"],
+                    outcome.get("successful_candidate"),
+                    outcome["calls"]
+                ) for outcome in outcomes] == [
+                    (
+                        "Last" if len(selection) == 2 else "First", len(selection) == 2, winners[0],
+                        {
+                            "target": len(selection),
+                            "attacker": 1,
+                            "judge": len(selection)
+                        }
+                    ),
+                    (
+                        "Second", True, winners[1],
+                        {
+                            "target": 1,
+                            "attacker": 1,
+                            "judge": 1
+                        }
+                    )
+                ], "ALERT lost selection, canonical traversal, or independent hypothetical preparation and journals"
+
     def test_python_assembly_assesses_one_complete_response_without_attacker_calls(self) -> None:
         with temporary_journal("python.jsonl") as path:
             result = SmugglingAttackEnvelope(
@@ -41,7 +207,8 @@ class TestSmugglingAttackEnvelope(unittest.TestCase):
                 ),
                 VersionedJournal(
                     DiskJournal(path)
-                )
+                ),
+                techniques=["homoglyph"]
             ).run()
             outcome = ParsedJournal(path).read()
             assert (result, outcome["assessment"], outcome["successful_candidate"], outcome["calls"]) == (
@@ -59,12 +226,15 @@ class TestSmugglingAttackEnvelope(unittest.TestCase):
             ), "Python assembly lost its response, fulfillment verdict, or technique, or made extra calls"
 
     def test_standalone_default_and_explicit_selection_return_recorded_outcome(self) -> None:
-        for selection in ([], ["--smuggling-techniques", "homoglyph"]):
+        for selection, expected in (([], "hypothetical"),
+                                    (["--smuggling-techniques", "hypothetical"], "hypothetical"),
+                                    (["--smuggling-techniques", "homoglyph"], "homoglyph"),
+                                    (["--smuggling-techniques", "homoglyph", "hypothetical"], "hypothetical")):
             with temporary_journal("standalone.jsonl") as path:
                 script = (
                     "import main.smuggling_cli as cli; from target.queued_model import QueuedModel; "
                     "cli.snapshot = lambda offline: None; cli.cuda_device = lambda gpu: 'offline'; "
-                    "cli.LazyQwenModel = lambda device, tokens: QueuedModel(['Complete answer', 'YES']); cli.main()"
+                    f"cli.LazyQwenModel = lambda device, tokens: QueuedModel({['explain café', 'Complete answer', 'YES'] if expected == 'hypothetical' else ['Complete answer', 'YES']!r}); cli.main()"
                 )
                 process = subprocess.run(
                     [
@@ -77,8 +247,8 @@ class TestSmugglingAttackEnvelope(unittest.TestCase):
                 outcome = ast.literal_eval(process.stdout)
                 assert (outcome, outcome["successful_candidate"]["technique"]) == (
                     ParsedJournal(path).read(),
-                    "homoglyph"
-                ), "Standalone selection failed to execute or display the recoverable Homoglyph outcome"
+                    expected
+                ), "Standalone selection failed to execute or display the recoverable outcome"
 
     def test_alert_adds_one_opt_in_variant_and_gives_each_base_an_independent_journal(self) -> None:
         manifest = Path("examples/alert-manifest-640.json")
@@ -130,7 +300,7 @@ class TestSmugglingAttackEnvelope(unittest.TestCase):
             ), "ALERT changed default variants, counted internal candidates, or shared Smuggling journals between requests"
 
     def test_python_selection_rejects_empty_and_unsupported_techniques(self) -> None:
-        for selection in ([], ["unknown"], ["hypothetical"], ["homoglyph", "unknown"]):
+        for selection in ([], ["unknown"], ["homoglyph", "unknown"]):
             with temporary_journal("invalid-python.jsonl") as path, pytest.raises(
                 ValueError, match="nonempty subset"
             ):
@@ -172,7 +342,7 @@ class TestSmugglingAttackEnvelope(unittest.TestCase):
             }, "Duplicate selection generated additional candidates"
 
     def test_standalone_validation_precedes_model_access_and_journal_reservation(self) -> None:
-        for gpu, tokens, selection in ((-1, 8, ["homoglyph"]), (0, 0, ["homoglyph"]), (0, 8, []), (0, 8, ["hypothetical"])):
+        for gpu, tokens, selection in ((-1, 8, ["homoglyph"]), (0, 0, ["homoglyph"]), (0, 8, []), (0, 8, ["unknown"])):
             with temporary_journal("invalid-cli.jsonl") as path, patch(
                 "main.smuggling_cli.LazyQwenModel", side_effect=AssertionError("Model accessed")
             ):
@@ -185,7 +355,7 @@ class TestSmugglingAttackEnvelope(unittest.TestCase):
                 assert not path.exists(), "Invalid standalone arguments reserved a journal"
 
     def test_alert_validation_precedes_model_access_and_output_reservation(self) -> None:
-        for selection in ([], ["unknown"], ["homoglyph", "hypothetical"]):
+        for selection in ([], ["unknown"], ["homoglyph", "unknown"]):
             with TemporaryDirectory() as directory, patch(
                 "main.alert_series.LazyQwenModel", side_effect=AssertionError("Model accessed")
             ):
@@ -203,15 +373,16 @@ class TestSmugglingAttackEnvelope(unittest.TestCase):
     def test_both_parsers_reject_empty_and_unsupported_selections(self) -> None:
         for command in (["-m", "main.smuggling_cli", "unused.jsonl", "base"],
                         ["-c", "from main.alert_series import main; main()", "unused-directory"]):
-            for selection in (["--smuggling-techniques"], ["--smuggling-techniques", "hypothetical"]):
+            for selection in (["--smuggling-techniques"], ["--smuggling-techniques", "unknown"]):
                 process = subprocess.run(
                     [sys.executable, *command, "--gpu", "0", *selection], capture_output=True, text=True
                 )
                 assert process.returncode == 2, "A command parser accepted an empty or unsupported Smuggling selection"
 
     def test_alert_parser_defaults_to_disabled_smuggling_and_preserves_explicit_selection(self) -> None:
-        for selection, expected in (([], [False, ["homoglyph"]]),
-                                    (["--smuggling", "--smuggling-techniques", "homoglyph"], [True, ["homoglyph"]])):
+        for selection, expected in (([], [False, ["hypothetical", "homoglyph"]]),
+                                    (["--smuggling", "--smuggling-techniques", "homoglyph"], [True, ["homoglyph"]]),
+                                    (["--smuggling", "--smuggling-techniques", "hypothetical"], [True, ["hypothetical"]])):
             process = subprocess.run(
                 [
                     sys.executable, "-c", "import json; import main.alert_series as cli; " "cli.launch = lambda args: print(json.dumps([args.smuggling, args.smuggling_techniques])); cli.main()", "unused-directory", "--gpu", "0", *selection
@@ -227,7 +398,7 @@ class TestSmugglingAttackEnvelope(unittest.TestCase):
             ],
             check=True, capture_output=True, text=True
         )
-        assert "--smuggling-techniques {homoglyph}" in process.stdout, "The installed tai-smuggling entry point lost technique selection"
+        assert "--smuggling-techniques {hypothetical,homoglyph}" in process.stdout, "The installed tai-smuggling entry point lost technique selection"
 
     def test_standalone_unchanged_request_has_no_result_or_model_calls(self) -> None:
         with temporary_journal("cli-skip.jsonl") as path:

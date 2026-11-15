@@ -46,13 +46,15 @@ def variants(directory: Path, replies: list[str], *, enabled: bool,
         yield factories
 
 
-def standalone(path: Path, base: str, replies: list[str]) -> None:
+def standalone(path: Path, base: str, replies: list[str], *,
+               techniques: Sequence[str] = ("homoglyph",)) -> None:
     """Run the standalone assembly with history-free scripted generation.
 
     Args:
         path (Path): Independent journal destination.
         base (str): Exact original request.
         replies (list[str]): Target and Judge replies in call order.
+        techniques (Sequence[str], default=("homoglyph",)): Public technique selection.
     """
     with patch(
         "main.smuggling_cli.LazyQwenModel", return_value=QueuedModel(replies)
@@ -63,6 +65,6 @@ def standalone(path: Path, base: str, replies: list[str]) -> None:
     ):
         launch(
             Namespace(
-                journal=path, base=base, gpu=0, tokens=73, smuggling_techniques=["homoglyph"]
+                journal=path, base=base, gpu=0, tokens=73, smuggling_techniques=techniques
             )
         )

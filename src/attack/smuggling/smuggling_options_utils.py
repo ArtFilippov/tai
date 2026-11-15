@@ -1,4 +1,4 @@
-"""Shared single-technique Smuggling selection at command boundaries."""
+"""Shared Smuggling selection at command boundaries."""
 
 from argparse import ArgumentParser
 from collections.abc import Sequence
@@ -11,8 +11,8 @@ def options(parser: ArgumentParser) -> None:
         parser (ArgumentParser): Command parser receiving Smuggling options.
     """
     _ = parser.add_argument(
-        "--smuggling-techniques", nargs="+", choices=("homoglyph",), default=["homoglyph"],
-        help="Smuggling techniques (default: homoglyph; only homoglyph is available in this milestone)"
+        "--smuggling-techniques", nargs="+", choices=("hypothetical", "homoglyph"), default=["hypothetical", "homoglyph"],
+        help="Smuggling techniques (default and execution order: hypothetical, then homoglyph)"
     )
 
 
@@ -25,5 +25,5 @@ def techniques(selection: Sequence[str]) -> None:
     Raises:
         ValueError: If selection is empty or contains unsupported techniques.
     """
-    if not selection or set(selection) != {"homoglyph"}:
-        raise ValueError("Smuggling techniques must be a nonempty subset of homoglyph")
+    if not selection or not set(selection) <= {"hypothetical", "homoglyph"}:
+        raise ValueError("Smuggling techniques must be a nonempty subset of hypothetical, homoglyph")
