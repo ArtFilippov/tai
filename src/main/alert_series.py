@@ -115,7 +115,7 @@ def main() -> None:
         "--false-assertion", action="store_true", help="include refusal-only FalseAssertion adaptation"
     )
     _ = parser.add_argument(
-        "--dan", action="store_true", help="include request-bound named DAN"
+        "--dan", action="store_true", help="include request-bound DAN"
     )
     dan_options(parser)
     _ = parser.add_argument(
@@ -199,7 +199,7 @@ def launch(arguments: Namespace) -> None:
         raise ValueError("Invalid GPU, turn, token or port limit")
     dan_sections(
         getattr(
-            arguments, "dan_sections", ("named",)
+            arguments, "dan_sections", ("named", "ablation", "wild")
         )
     )
     if not getattr(
@@ -547,7 +547,7 @@ def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[B
         if getattr(
             arguments, "dan", False
         ):
-            attacks.append(lambda base: DanAttackEnvelope( base, ExplicitAttackSetup(attacker, target, target, base.text()), journal(directory / "dan" / f"{base.metadata()['id']}.jsonl"), sections=getattr(arguments, "dan_sections", ("named",)), ))
+            attacks.append(lambda base: DanAttackEnvelope( base, ExplicitAttackSetup(attacker, target, target, base.text()), journal(directory / "dan" / f"{base.metadata()['id']}.jsonl"), sections=getattr(arguments, "dan_sections", ("named", "ablation", "wild")), ))
         return [attack for index, attack in enumerate(attacks) if index != THREATEN_JSON or not arguments.no_threaten_json]
 
     model = LazyQwenModel(

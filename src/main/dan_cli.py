@@ -1,4 +1,4 @@
-"""Standalone named DAN attempt against an explicit base request."""
+"""Standalone DAN attempt against an explicit base request."""
 
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
@@ -17,7 +17,7 @@ from target.qwen_snapshot_utils import snapshot
 
 def main() -> None:
     """Run one recoverable DAN traversal with explicit local GPU setup."""
-    parser = ArgumentParser(description="Request-bound named DAN adaptation")
+    parser = ArgumentParser(description="Request-bound DAN adaptation")
     _ = parser.add_argument(
         "journal", type=Path
     )

@@ -40,3 +40,40 @@ print(json.dumps(result))
     )
     content: dict[str, str] = json.loads(result.stdout)
     return content
+
+
+def collection(variant: str, name: str) -> list[str]:
+    """Load and render a complete pinned native collection in an isolated process.
+
+    Args:
+        variant (str): Native garak class name.
+        name (str): Configured Target identity.
+
+    Returns:
+        list[str]: Native prompts without invoking the probe harness.
+    """
+    script = """
+import json
+import sys
+from types import SimpleNamespace
+from importlib.resources import files
+from unittest.mock import patch
+from garak.probes import Probe, dan
+
+with patch.object(dan, 'data_path', files('garak').joinpath('data')), patch.object(Probe, '__init__', return_value=None), patch.object(Probe, 'probe', side_effect=AssertionError('Harness executed')):
+    probe = getattr(dan, sys.argv[1])()
+    prompts = list(probe.prompts)
+    try:
+        probe.probe(SimpleNamespace(name=sys.argv[2]))
+    except AssertionError:
+        pass
+    else:
+        raise RuntimeError('Native formatting did not reach the disconnected harness')
+    print(json.dumps(probe.prompts))
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script, variant, name],
+        check=True, capture_output=True, text=True,
+    )
+    content: list[str] = json.loads(result.stdout)
+    return content

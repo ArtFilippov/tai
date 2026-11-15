@@ -42,6 +42,8 @@ class QwenModel(Model):
                 prompt, return_tensors="pt"
             ).to(self.device)
         )
+        if batch["input_ids"].shape[-1] + self.tokens > self.model.config.max_position_embeddings:
+            raise ValueError("Qwen context size exceeded by the original input and generation allowance")
         with torch.inference_mode():
             output = self.model.generate(
                 **batch,
@@ -74,6 +76,8 @@ class QwenModel(Model):
                 prompt, return_tensors="pt"
             ).to(self.device)
         )
+        if batch["input_ids"].shape[-1] + self.tokens > self.model.config.max_position_embeddings:
+            raise ValueError("Qwen context size exceeded by the original input and generation allowance")
         with torch.inference_mode():
             output = self.model.generate(
                 **batch, max_new_tokens=self.tokens, do_sample=False,

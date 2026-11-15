@@ -12,6 +12,7 @@ import pytest
 
 from prompt_collection.named_dan_prompts import NamedDanPrompts
 from prompt_collection.provided_prompt import ProvidedPrompt
+from prompt_collection.target_dan_text import TargetDanText
 from target.scripted_model import ScriptedModel
 from .dan_reference_utils import reference
 from ..target.test_model import TestModel as OfflineModel
@@ -29,7 +30,7 @@ class TestNamedDanPrompts(unittest.TestCase):
         ):
             prompts = list(
                 NamedDanPrompts(
-                    model, ProvidedPrompt
+                    TargetDanText(model), ProvidedPrompt
                 ).candidates()
             )
             expected = reference(
@@ -57,7 +58,9 @@ class TestNamedDanPrompts(unittest.TestCase):
     def test_identical_variants_remain_distinct_sources(self) -> None:
         prompts = list(
             NamedDanPrompts(
-                ScriptedModel([]),
+                TargetDanText(
+                    ScriptedModel([])
+                ),
                 ProvidedPrompt
             ).candidates()
         )
@@ -84,7 +87,9 @@ class TestNamedDanPrompts(unittest.TestCase):
                 )
                 prompt = next(
                     NamedDanPrompts(
-                        ScriptedModel([]),
+                        TargetDanText(
+                            ScriptedModel([])
+                        ),
                         ProvidedPrompt, directory=path
                     ).candidates()
                 )
@@ -102,7 +107,9 @@ class TestNamedDanPrompts(unittest.TestCase):
                 ):
                     next(
                         NamedDanPrompts(
-                            ScriptedModel([]),
+                            TargetDanText(
+                                ScriptedModel([])
+                            ),
                             ProvidedPrompt, directory=path
                         ).candidates()
                     )
@@ -120,9 +127,10 @@ class TestNamedDanPrompts(unittest.TestCase):
                 "from garak.data import path; "
                 "from prompt_collection.named_dan_prompts import NamedDanPrompts; "
                 "from prompt_collection.provided_prompt import ProvidedPrompt; "
+                "from prompt_collection.target_dan_text import TargetDanText; "
                 "from target.scripted_model import ScriptedModel; "
                 "native = json.loads((path / 'dan' / 'Dan_11_0.json').read_text()); "
-                "candidate = next(NamedDanPrompts(ScriptedModel([]), ProvidedPrompt).candidates()); "
+                "candidate = next(NamedDanPrompts(TargetDanText(ScriptedModel([])), ProvidedPrompt).candidates()); "
                 "print(json.dumps([native, candidate.text()]))"
             )
             result = subprocess.run(
@@ -141,7 +149,9 @@ class TestNamedDanPrompts(unittest.TestCase):
         with TemporaryDirectory() as directory, pytest.raises(FileNotFoundError):
             next(
                 NamedDanPrompts(
-                    ScriptedModel([]),
+                    TargetDanText(
+                        ScriptedModel([])
+                    ),
                     ProvidedPrompt,
                     directory=Path(directory)
                 ).candidates()

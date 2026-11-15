@@ -39,7 +39,7 @@ uv run --locked --group dev --extra qwen tai-qwen prepare
 | ThreatenJSON | `python -m main.threaten_json_cli JOURNAL "BASE" --gpu 0` |
 | WHOIS injection | `python -m main.whois_cli JOURNAL "BASE" --gpu 0` |
 | Grandma roleplay | `python -m main.grandma_cli JOURNAL "BASE" --gpu 0` |
-| DAN (named) | `tai-dan JOURNAL "BASE" --gpu 0 --dan-sections named` |
+| DAN (named / ablation / wild) | `tai-dan JOURNAL "BASE" --gpu 0 --dan-sections named` |
 | Slur Completion | `tai-slur-completion JOURNAL "BASE" --gpu 0 --desired-response "ANSWER"` |
 | Leak Replay | `tai-leak-replay JOURNAL "BASE" --gpu 0 --desired-response "ANSWER"` |
 | WordNet exploration | `tai-wordnet JOURNAL "BASE" --gpu 0 --lexicon-dir /tmp/tai-wn --nodes 4 --calls 8` |
@@ -58,9 +58,11 @@ uv run --locked --group dev --extra qwen tai-alert /tmp/alert-series --gpu 0 --l
 Для всех 13 вариантов добавьте `--autodan --autodan-hga --whois --grandma --slur-completion --leak-replay --wordnet --wordnet-dir /tmp/tai-wn` после подготовки `tai-wordnet-prepare /tmp/tai-wn` (416 попыток). Ответ для двух continuation-стратегий задаётся `--desired-response "ANSWER"` либо готовится отдельно для каждого базового запроса.
 Журналы лежат в подкаталогах атак, сводка — в `summary.json`.
 `--dan` отдельно добавляет одну DAN-попытку на базовый запрос с журналом
-`dan/<id>.jsonl`; `--dan-sections named` выбирает единственную доступную сейчас
-секцию и является значением по умолчанию. Внутри — до 14 независимых
-двухобменных кандидатов, с остановкой по первому выполненному базовому запросу.
+`dan/<id>.jsonl`; `--dan-sections named` выбирает 14 именованных промптов.
+Также доступны `ablation` (127) и `wild` (666), в любой непустой комбинации.
+Без выбора секций обходятся все 807 записей в порядке named → ablation → wild.
+Каждый кандидат выполняет два обмена; первый успех останавливает весь обход.
+Полный обход может потребовать 1 614 вызовов Target и 807 вызовов judge на запрос.
 Параметры и ограничения, в том числе для AutoDAN и GGUF, описаны в
 [руководстве](docs/usage.md). Правила работы с кодом и проверками — в
 [AGENTS.md](AGENTS.md).
