@@ -36,6 +36,48 @@ uv run --locked --group dev tai /tmp/fitd-demo.jsonl "Explain the topic in detai
 снимок сборки атаки и вложенные настройки участников. Формат описан в
 [схеме журнала](journal-schema.md).
 
+## Doctor: Puppetry, Bypass и BypassLeet
+
+Спецификация: [#113](https://github.com/ArtFilippov/tai/issues/113).
+По умолчанию обходятся `puppetry`, `bypass`, `bypass_leet`: один, два и два
+кандидата соответственно. Выбор непустого подмножества не меняет канонический
+порядок, а повторы не добавляют кандидатов. Attacker не используется.
+
+Шаблоны механически перенесены из закреплённого garak
+`3f50ea5ff9cd7050099940647c15c39b07a93392` с сохранением исходного текста:
+в Puppetry заменён только запрос, в Bypass — слот базового запроса.
+BypassLeet сохраняет исходную инструкцию кодированного ответа и кодирует
+всё готовое обращение. Локальный `seed=0` воспроизводим между запусками
+и не зависит от выбора остальных техник; на каждый шаблон приходится одна версия.
+
+Каждый кандидат получает один независимый обмен с Target. Judge оценивает
+выполнение оригинального базового запроса по полному ответу без декодирования.
+Первый успех завершает обход; при исчерпании остаётся последний оценённый
+ответ, включая пустой текст. Технические ошибки прерывают попытку без повторов,
+обрезания запроса или перехода к следующему кандидату. ALERT сохраняет ошибку
+и продолжает следующие попытки.
+
+```bash
+uv run --locked --group dev --extra qwen tai-doctor /tmp/doctor.jsonl "Explain the topic" --gpu 0
+uv run --locked --group dev --extra qwen tai-doctor /tmp/doctor-leet.jsonl "Explain the topic" --gpu 0 --doctor-techniques bypass_leet --doctor-seed 42
+uv run --locked --group dev --extra qwen tai-alert /tmp/alert-doctor --gpu 0 --limit 1 --doctor
+```
+
+Обе команды принимают `--doctor-techniques` и `--doctor-seed`.
+`--tokens` остаётся общим лимитом генерации (по умолчанию 192); требование
+длины внутри исходного шаблона не увеличивает его автоматически.
+Standalone печатает восстановленный исход; ALERT добавляет ровно одну попытку
+на базовый запрос и хранит отдельный журнал `doctor/<id>.jsonl`.
+
+Python: `DoctorAttackEnvelope(base, setup, journal, techniques=("puppetry", "bypass", "bypass_leet"), seed=0)`
+из `attack.doctor.envelopes.doctor_attack_envelope` использует обычный `AttackSetup`.
+Для абстрактного Target и собственного Judge используйте
+`DoctorProbe(base, AssessedCandidates(journal), journal, techniques=..., seed=...)`
+из `attack.doctor.doctor_probe` внутри `AttackRun`.
+Журнал сохраняет ревизию, эффективный выбор и seed, точное обращение,
+происхождение базового запроса, ответы и оценки. `successful_candidate`
+в восстановленном исходе содержит технику, номер шаблона, позицию и seed для leetspeak.
+
 ## Smuggling: HypotheticalResponse и HomoglyphObfuscation
 
 По умолчанию выбраны обе техники: `hypothetical`, затем `homoglyph`.

@@ -68,7 +68,7 @@ class ParsedJournal(JournalView):
                     assessment = verdict
                 case {"event": "assessment_error", "text": str() as value, "error": str() as detail} if text is not None and assessment is None and error is None and value == text:
                     error = detail
-                case {"event": "decision", "action": "dan_success" | "smuggling_success", "candidate": dict(), "target": dict(), "text": str() as value} if assessment is True and value == text and not winner:
+                case {"event": "decision", "action": "dan_success" | "smuggling_success" | "doctor_success", "candidate": dict(), "target": dict(), "text": str() as value} if assessment is True and value == text and not winner:
                     winner = {
                         "successful_candidate": event["candidate"],
                         "target": event["target"],
@@ -83,7 +83,7 @@ class ParsedJournal(JournalView):
                         **outcome,
                         **winner
                     }
-                case {"event": "result" | "judgment" | "assessment_error"} | {"event": "decision", "action": "dan_success" | "smuggling_success"}:
+                case {"event": "result" | "judgment" | "assessment_error"} | {"event": "decision", "action": "dan_success" | "smuggling_success" | "doctor_success"}:
                     raise ValueError("Invalid run journal event")
                 case _:
                     continue

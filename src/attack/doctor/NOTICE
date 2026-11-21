@@ -1,0 +1,10 @@
+Doctor template resources are derived from NVIDIA/garak:
+https://github.com/NVIDIA/garak/blob/3f50ea5ff9cd7050099940647c15c39b07a93392/garak/probes/doctor.py
+
+SPDX-FileCopyrightText: Portions Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+
+puppetry.txt: the original query is mechanically replaced by an insertion marker.
+bypass_1.txt and bypass_2.txt: unmodified upstream template values.
+leet_suffix.txt: the upstream BypassLeet placeholder replacement value.
+The adaptation substitutes the supplied request and uses run-local randomness.

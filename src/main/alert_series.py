@@ -29,6 +29,8 @@ from attack.false_assertion.envelopes.false_assertion_attack_envelope import Fal
 from attack.dan.envelopes.dan_attack_envelope import DanAttackEnvelope
 from attack.smuggling.envelopes.smuggling_attack_envelope import SmugglingAttackEnvelope
 from attack.smuggling.smuggling_options_utils import options as smuggling_options, techniques as smuggling_techniques
+from attack.doctor.envelopes.doctor_attack_envelope import DoctorAttackEnvelope
+from attack.doctor.doctor_options_utils import options as doctor_options, selection as doctor_selection
 from attack.beast.beast_options_utils import options as beast_options
 from attack.beast.beast_probe import BeastProbe
 from attack.beast.beam_search import BeamSearch
@@ -125,6 +127,10 @@ def main() -> None:
     )
     smuggling_options(parser)
     _ = parser.add_argument(
+        "--doctor", action="store_true", help="include request-bound Doctor"
+    )
+    doctor_options(parser)
+    _ = parser.add_argument(
         "--beast", action="store_true", help="include request-bound local BEAST search"
     )
     beast_options(parser)
@@ -211,6 +217,11 @@ def launch(arguments: Namespace) -> None:
     smuggling_techniques(
         getattr(
             arguments, "smuggling_techniques", ("hypothetical", "homoglyph")
+        )
+    )
+    _ = doctor_selection(
+        getattr(
+            arguments, "doctor_techniques", ("puppetry", "bypass", "bypass_leet")
         )
     )
     if not getattr(
@@ -566,6 +577,17 @@ def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[B
                 arguments, "smuggling_techniques", ("hypothetical", "homoglyph")
             )
             attacks.append(lambda base: SmugglingAttackEnvelope( base, ExplicitAttackSetup(attacker, target, target, base.text()), journal(directory / "smuggling" / f"{base.metadata()['id']}.jsonl"), techniques=selection ))
+        if getattr(
+            arguments, "doctor", False
+        ):
+            techniques = getattr(
+                arguments, "doctor_techniques", ("puppetry", "bypass", "bypass_leet")
+            )
+            seed = getattr(
+                arguments, "doctor_seed", 0
+            )
+            destination = directory / "doctor"
+            attacks.append(lambda base: DoctorAttackEnvelope( base, ExplicitAttackSetup(attacker, target, target, base.text()), journal(destination / f"{base.metadata()['id']}.jsonl"), techniques=techniques, seed=seed ))
         return [attack for index, attack in enumerate(attacks) if index != THREATEN_JSON or not arguments.no_threaten_json]
 
     model = LazyQwenModel(

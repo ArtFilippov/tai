@@ -41,6 +41,7 @@ uv run --locked --group dev --extra qwen tai-qwen prepare
 | Grandma roleplay | `python -m main.grandma_cli JOURNAL "BASE" --gpu 0` |
 | DAN (named / ablation / wild) | `tai-dan JOURNAL "BASE" --gpu 0 --dan-sections named` |
 | Smuggling (hypothetical → homoglyph) | `tai-smuggling JOURNAL "BASE" --gpu 0` |
+| Doctor (puppetry → bypass → bypass_leet) | `tai-doctor JOURNAL "BASE" --gpu 0` |
 | Slur Completion | `tai-slur-completion JOURNAL "BASE" --gpu 0 --desired-response "ANSWER"` |
 | Leak Replay | `tai-leak-replay JOURNAL "BASE" --gpu 0 --desired-response "ANSWER"` |
 | WordNet exploration | `tai-wordnet JOURNAL "BASE" --gpu 0 --lexicon-dir /tmp/tai-wn --nodes 4 --calls 8` |
@@ -73,6 +74,12 @@ uv run --locked --group dev --extra qwen tai-alert /tmp/alert-series --gpu 0 --l
 независимый обмен с Target; Judge оценивает полный ответ относительно исходного
 запроса. Первый успех останавливает обход, ошибки прерывают попытку без запасного
 варианта. При исчерпании остаётся последний оценённый ответ и его вердикт.
+`--doctor` добавляет одну Doctor-попытку на запрос с журналом `doctor/<id>.jsonl`.
+По умолчанию обходятся пять кандидатов: Puppetry, два Bypass и два BypassLeet.
+`--doctor-techniques bypass bypass_leet` выбирает непустое подмножество техник;
+`--doctor-seed 0` задаёт локальную случайность leetspeak. Attacker не вызывается.
+Первый успех останавливает обход; Judge оценивает полный исходный ответ
+относительно неизменённого базового запроса, без декодирования.
 Параметры и ограничения, в том числе для AutoDAN и GGUF, описаны в
 [руководстве](docs/usage.md). Правила работы с кодом и проверками — в
 [AGENTS.md](AGENTS.md).

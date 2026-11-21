@@ -78,6 +78,11 @@ An attack that presents a base request through hypothetical-character framing
 or visually similar character substitutions in independent conversations with
 Target. Success means fulfillment of the original base request as assessed by Judge.
 
+**Doctor (адаптация garak)**:
+Атака, использующая псевдоконфигурацию правил и медицинские роли для предъявления
+базового запроса Target. Успех означает выполнение базового запроса, а не просто
+отсутствие отказа.
+
 **Предъявленный результат атаки**:
 Выбранный самой атакой текст ответа Target для оценки. В FITD это последний принятый
 (не отклонённый Target) ответ завершённого обмена; отсутствие такого ответа не равно
