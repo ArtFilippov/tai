@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import override
 
 from target.model import Model
+from target.sampling import Sampling
 
 
 @dataclass(eq=False)
@@ -22,6 +23,14 @@ class ScriptedModel(Model):
         if list(messages) != self.requests.pop(0):
             raise ValueError("Model received a different conversation")
         return "Reply"
+
+    @override
+    def sample(self, messages: Sequence[dict[str, str]], sampling: Sampling) -> str:
+        return self.generate(messages)
+
+    @override
+    def decoding(self, sampling: Sampling) -> dict[str, object]:
+        return sampling.description()
 
     @override
     def prefill(self, messages: Sequence[dict[str, str]], prefix: str) -> str:

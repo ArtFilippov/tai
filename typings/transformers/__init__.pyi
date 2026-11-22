@@ -1,6 +1,6 @@
 """Minimal inference surface of the pinned Transformers release."""
 
-from typing import Self
+from typing import Self, overload
 
 import torch
 
@@ -17,13 +17,22 @@ class AutoTokenizer:
 
 class AutoModelForCausalLM:
     config: PretrainedConfig
+    generation_config: GenerationConfig
     @classmethod
     def from_config(cls, config: object) -> Self: ...
     @classmethod
     def from_pretrained(cls, path: object, *, local_files_only: bool, torch_dtype: object) -> Self: ...
     def to(self, device: torch.device) -> Self: ...
     def eval(self) -> Self: ...
+    @overload
     def generate(self, *, input_ids: torch.Tensor, attention_mask: torch.Tensor, max_new_tokens: int, do_sample: bool, pad_token_id: int) -> torch.Tensor: ...
+    @overload
+    def generate(self, *, input_ids: torch.Tensor, attention_mask: torch.Tensor, generation_config: GenerationConfig, pad_token_id: int) -> torch.Tensor: ...
+
+class GenerationConfig:
+    repetition_penalty: float
+    def update(self, **kwargs: object) -> dict[str, object]: ...
+    def to_dict(self) -> dict[str, object]: ...
 
 class PretrainedConfig:
     max_position_embeddings: int

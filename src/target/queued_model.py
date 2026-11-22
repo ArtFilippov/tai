@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from typing import override
 
 from target.model import Model
+from target.sampling import Sampling
 
 
 class QueuedModel(Model):
@@ -25,6 +26,14 @@ class QueuedModel(Model):
         if not self.replies:
             raise ValueError(self.failure)
         return self.replies.pop(0)
+
+    @override
+    def sample(self, messages: Sequence[dict[str, str]], sampling: Sampling) -> str:
+        return self.generate(messages)
+
+    @override
+    def decoding(self, sampling: Sampling) -> dict[str, object]:
+        return sampling.description()
 
     @override
     def prefill(self, messages: Sequence[dict[str, str]], prefix: str) -> str:

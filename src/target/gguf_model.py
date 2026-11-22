@@ -1,18 +1,19 @@
 """History-free chat completions from a pinned GGUF server."""
 
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import override
 from urllib.request import Request, urlopen
 
 from target.gguf.gguf_asset import GGUFAsset
 from target.gguf.gguf_service import GGUFService
-from target.model import Model
+from target.gguf_chat import GGUFChat
+from target.sampling import Sampling
 
 
 @dataclass(eq=False)
-class GGUFModel(Model):
+class GGUFModel(GGUFChat):
     """Send each complete Attacker conversation to one verified model identity.
 
     Attributes:
@@ -35,6 +36,50 @@ class GGUFModel(Model):
             payload = self.completion(messages)
         except (OSError, ValueError) as exc:
             raise RuntimeError(f"GGUF completion failed at {self.service.address()}: {exc}") from exc
+        return self.response(payload)
+
+    @override
+    def sample(self, messages: Sequence[dict[str, str]], sampling: Sampling) -> str:
+        options = sampling.options()
+        try:
+            payload = self.request(
+                messages,
+                {
+                    "max_tokens": options["max_new_tokens"],
+                    "temperature": options["temperature"],
+                    "top_p": options["top_p"],
+                    "top_k": options["top_k"],
+                    "min_p": 0,
+                    "repeat_penalty": 1,
+                    "seed": sampling.draw()
+                }
+            )
+        except (OSError, ValueError) as exc:
+            raise RuntimeError(f"GGUF completion failed at {self.service.address()}: {exc}") from exc
+        return self.response(payload)
+
+    @override
+    def decoding(self, sampling: Sampling) -> dict[str, object]:
+        return {
+            **sampling.description(),
+            "max_tokens": sampling.options()["max_new_tokens"],
+            "min_p": 0,
+            "repeat_penalty": 1
+        }
+
+    @override
+    def response(self, payload: object) -> str:
+        """Require exactly one complete assistant reply.
+
+        Args:
+            payload (object): Decoded completion response.
+
+        Returns:
+            str: Full unmodified assistant text.
+
+        Raises:
+            ValueError: If the completion is malformed.
+        """
         match payload:
             case {"choices": [{"message": {"content": str() as text}}]}:
                 return text
@@ -59,6 +104,7 @@ class GGUFModel(Model):
             **self.service.settings()
         }
 
+    @override
     def policy(self) -> dict[str, int]:
         """Describe the generation options sent to the GGUF service.
 
@@ -74,6 +120,7 @@ class GGUFModel(Model):
             "repeat_penalty": 1
         }
 
+    @override
     def completion(self, messages: Sequence[dict[str, str]]) -> object:
         """Read one JSON completion from the selected HTTP endpoint.
 
@@ -83,13 +130,29 @@ class GGUFModel(Model):
         Returns:
             object: Decoded response.
         """
+        return self.request(
+            messages,
+            self.policy()
+        )
+
+    @override
+    def request(self, messages: Sequence[dict[str, str]], policy: Mapping[str, int | float]) -> object:
+        """Send explicit per-request decoding options without mutating the service.
+
+        Args:
+            messages (Sequence[dict[str, str]]): Complete conversation.
+            policy (Mapping[str, int | float]): Native generation options.
+
+        Returns:
+            object: Decoded completion response.
+        """
         request = Request(
             f"{self.service.address()}/v1/chat/completions",
             data=json.dumps(
                 {
                     "model": self.file.identity(),
                     "messages": list(messages),
-                    **self.policy(),
+                    **policy,
                     "stream": False
                 }
             ).encode("utf-8"),

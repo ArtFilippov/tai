@@ -43,6 +43,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         data = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         body = {"choices": [{"message": {"content": data["messages"][-1]["content"]}}]}
+        if sys.argv[3] == "policy":
+            body = {"choices": [{"message": {"content": json.dumps(data)}}]}
         if sys.argv[3] == "bad_reply":
             body = {"choices": []}
         self.respond(body)

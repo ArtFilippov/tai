@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from typing import override
 
 from target.model import Model
+from target.sampling import Sampling
 
 
 class ModelEnvelope(Model):
@@ -20,6 +21,16 @@ class ModelEnvelope(Model):
     @override
     def generate(self, messages: Sequence[dict[str, str]]) -> str:
         return self.delegate.generate(messages)
+
+    @override
+    def sample(self, messages: Sequence[dict[str, str]], sampling: Sampling) -> str:
+        return self.delegate.sample(
+            messages, sampling
+        )
+
+    @override
+    def decoding(self, sampling: Sampling) -> dict[str, object]:
+        return self.delegate.decoding(sampling)
 
     @override
     def prefill(self, messages: Sequence[dict[str, str]], prefix: str) -> str:

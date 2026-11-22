@@ -8,6 +8,7 @@ from qraft import cached_property
 from target.model import Model
 from target.model_factory import ModelFactory
 from target.qwen_assets import QwenAssets
+from target.sampling import Sampling
 
 
 class LazyModel(Model):
@@ -31,6 +32,16 @@ class LazyModel(Model):
     @override
     def generate(self, messages: Sequence[dict[str, str]]) -> str:
         return self.delegate.generate(messages)
+
+    @override
+    def sample(self, messages: Sequence[dict[str, str]], sampling: Sampling) -> str:
+        return self.delegate.sample(
+            messages, sampling
+        )
+
+    @override
+    def decoding(self, sampling: Sampling) -> dict[str, object]:
+        return self.delegate.decoding(sampling)
 
     @override
     def prefill(self, messages: Sequence[dict[str, str]], prefix: str) -> str:

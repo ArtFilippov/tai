@@ -1,12 +1,14 @@
 """Pinned offline Transformers inference on one selected CUDA GPU."""
 
 from collections.abc import Sequence
+from copy import deepcopy
 from typing import override
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from target.model import Model
+from target.sampling import Sampling
 
 class QwenModel(Model):
     """One loaded set of pinned weights shared by independent chats."""
@@ -54,6 +56,39 @@ class QwenModel(Model):
         return self.tokenizer.decode(
             output[0][batch["input_ids"].shape[-1]:], skip_special_tokens=True
         )
+
+    @override
+    def sample(self, messages: Sequence[dict[str, str]], sampling: Sampling) -> str:
+        prompt = self.tokenizer.apply_chat_template(
+            list(messages), tokenize=False, add_generation_prompt=True
+        )
+        batch = (
+            self.tokenizer(
+                prompt, return_tensors="pt"
+            ).to(self.device)
+        )
+        if batch["input_ids"].shape[-1] + sampling.options()["max_new_tokens"] > self.model.config.max_position_embeddings:
+            raise ValueError("Qwen context size exceeded by the original input and generation allowance")
+        configuration = deepcopy(self.model.generation_config)
+        if configuration.update(
+            **sampling.options()
+        ):
+            raise ValueError("Unsupported stochastic generation options")
+        with sampling.scope(self.device), torch.inference_mode():
+            output = self.model.generate(
+                **batch, generation_config=configuration, pad_token_id=self.tokenizer.eos_token_id
+            )
+        return self.tokenizer.decode(
+            output[0][batch["input_ids"].shape[-1]:], skip_special_tokens=True
+        )
+
+    @override
+    def decoding(self, sampling: Sampling) -> dict[str, object]:
+        return {
+            **self.model.generation_config.to_dict(),
+            **sampling.description(),
+            "pad_token_id": self.tokenizer.eos_token_id
+        }
 
     @override
     def prefill(self, messages: Sequence[dict[str, str]], prefix: str) -> str:

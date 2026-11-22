@@ -1,0 +1,14 @@
+Phrasing reformulation instructions are transferred verbatim from
+https://github.com/tml-epfl/llm-past-tense/blob/179e305ddeecbfbd4d7c05fab626faf9b2ac5f44/main.py
+by Maksym Andriushchenko and Nicolas Flammarion, accompanying
+"Does Refusal Training in LLMs Generalize to the Past Tense?"
+https://arxiv.org/abs/2407.11969
+The upstream README declares MIT licensing.
+
+The two resources preserve the instructions, including whitespace, dates and
+the unmatched quotation marks in the first examples. {request} substitutes the
+original request in both original f-string interpolation positions.
+
+This is a request-bound adaptation related to NVIDIA/garak's phrasing probes
+(3f50ea5ff9cd7050099940647c15c39b07a93392), not a copy of its fixed corpora,
+Prefix detector, execution harness or benchmark metrics.

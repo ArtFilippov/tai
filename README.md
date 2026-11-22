@@ -42,6 +42,7 @@ uv run --locked --group dev --extra qwen tai-qwen prepare
 | DAN (named / ablation / wild) | `tai-dan JOURNAL "BASE" --gpu 0 --dan-sections named` |
 | Smuggling (hypothetical → homoglyph) | `tai-smuggling JOURNAL "BASE" --gpu 0` |
 | Doctor (puppetry → bypass → bypass_leet) | `tai-doctor JOURNAL "BASE" --gpu 0` |
+| Phrasing (два запуска: past → future) | `tai-phrasing OUTPUT_DIR "BASE" --gpu 0` |
 | Slur Completion | `tai-slur-completion JOURNAL "BASE" --gpu 0 --desired-response "ANSWER"` |
 | Leak Replay | `tai-leak-replay JOURNAL "BASE" --gpu 0 --desired-response "ANSWER"` |
 | WordNet exploration | `tai-wordnet JOURNAL "BASE" --gpu 0 --lexicon-dir /tmp/tai-wn --nodes 4 --calls 8` |
@@ -80,6 +81,14 @@ uv run --locked --group dev --extra qwen tai-alert /tmp/alert-series --gpu 0 --l
 `--doctor-seed 0` задаёт локальную случайность leetspeak. Attacker не вызывается.
 Первый успех останавливает обход; Judge оценивает полный исходный ответ
 относительно неизменённого базового запроса, без декодирования.
+`--phrasing` добавляет две независимые попытки на запрос: `phrasing_past`, затем
+`phrasing_future`, с отдельными журналами в одноимённых подкаталогах. Attacker
+переформулирует исходный запрос по инструкциям исследования, связанным с garak;
+Judge оценивает выполнение исходного запроса. `--phrasing-attempts 20` ограничивает
+число вызовов Attacker на каждое время; дубликаты расходуют этот бюджет и не
+отправляются Target. Первый успех останавливает только текущее время, а ошибка
+past не отменяет future. Отдельная команда принимает новый каталог и создаёт
+`phrasing_past.jsonl` и `phrasing_future.jsonl`.
 Параметры и ограничения, в том числе для AutoDAN и GGUF, описаны в
 [руководстве](docs/usage.md). Правила работы с кодом и проверками — в
 [AGENTS.md](AGENTS.md).

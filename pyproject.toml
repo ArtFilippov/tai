@@ -51,6 +51,7 @@ tai-false-assertion = "main.false_assertion_cli:main"
 tai-dan = "main.dan_cli:main"
 tai-smuggling = "main.smuggling_cli:main"
 tai-doctor = "main.doctor_cli:main"
+tai-phrasing = "main.phrasing_cli:main"
 tai-beast = "main.beast_cli:main"
 tai-wordnet-prepare = "main.wordnet_cli:prepare"
 tai-qwen-observe = "main.qwen_observe:main"
@@ -251,6 +252,12 @@ reportImplicitOverride = "none"
 
 [[tool.pyright.executionEnvironments]]
 root = "src/attack/deletion/envelopes"
+extraPaths = ["src"]
+reportMissingSuperCall = "none"
+reportImplicitOverride = "none"
+
+[[tool.pyright.executionEnvironments]]
+root = "src/attack/phrasing/envelopes"
 extraPaths = ["src"]
 reportMissingSuperCall = "none"
 reportImplicitOverride = "none"

@@ -31,6 +31,9 @@ from attack.smuggling.envelopes.smuggling_attack_envelope import SmugglingAttack
 from attack.smuggling.smuggling_options_utils import options as smuggling_options, techniques as smuggling_techniques
 from attack.doctor.envelopes.doctor_attack_envelope import DoctorAttackEnvelope
 from attack.doctor.doctor_options_utils import options as doctor_options, selection as doctor_selection
+from attack.phrasing.envelopes.phrasing_attack_envelope import PhrasingAttackEnvelope
+from attack.phrasing.configured_phrasing_plan import ConfiguredPhrasingPlan
+from attack.phrasing.phrasing_options_utils import options as phrasing_options, validate as phrasing_validate
 from attack.beast.beast_options_utils import options as beast_options
 from attack.beast.beast_probe import BeastProbe
 from attack.beast.beam_search import BeamSearch
@@ -131,6 +134,10 @@ def main() -> None:
     )
     doctor_options(parser)
     _ = parser.add_argument(
+        "--phrasing", action="store_true", help="include independent past and future Phrasing attempts"
+    )
+    phrasing_options(parser)
+    _ = parser.add_argument(
         "--beast", action="store_true", help="include request-bound local BEAST search"
     )
     beast_options(parser)
@@ -224,6 +231,12 @@ def launch(arguments: Namespace) -> None:
             arguments, "doctor_techniques", ("puppetry", "bypass", "bypass_leet")
         )
     )
+    phrasing_validate(
+        "past",
+        getattr(
+            arguments, "phrasing_attempts", 20
+        )
+    )
     if not getattr(
         arguments, "no_dra", False
     ):
@@ -273,7 +286,10 @@ def launch(arguments: Namespace) -> None:
         arguments, arguments.output_dir
     ) as factories:
         series(
-            bases, factories, arguments.output_dir, arguments.manifest
+            bases, factories, arguments.output_dir, arguments.manifest,
+            phrasing=getattr(
+                arguments, "phrasing", False
+            )
         )
     print(arguments.output_dir / "summary.json")
 
@@ -294,6 +310,7 @@ def planned(bases: Sequence[AlertIdentity], factories: Sequence[Callable[[BaseRe
 def series(
     bases: Sequence[AlertIdentity], factories: Sequence[Callable[[BaseRequest], Attack]],
     directory: Path, manifest: Path,
+    *, phrasing: bool = False,
 ) -> None:
     """Run every factory over the validated requests and save known results.
 
@@ -302,6 +319,7 @@ def series(
         factories (Sequence[Callable[[BaseRequest], Attack]]): Bound attack compositions.
         directory (Path): Reserved output directory for the whole launch.
         manifest (Path): Source manifest.
+        phrasing (bool, default=False): Run the final past/future factories consecutively per request.
     """
     summary = AlertSeries(
         manifest, directory,
@@ -311,20 +329,35 @@ def series(
     )
     summary.save()
     number = 0
+    def attempt(base: BaseRequest, factory: Callable[[BaseRequest], Attack], index: int) -> None:
+        nonlocal number
+        number += 1
+        invoke(
+            base, factory,
+            {
+                "factory": index,
+                "number": number
+            },
+            summary=summary,
+            attempt=RunCapture()
+        )
+
     for index, factory in enumerate(
-        factories, start=1
+        factories[:-2] if phrasing else factories, start=1
     ):
         for base in bases:
-            number += 1
-            invoke(
-                base, factory,
-                {
-                    "factory": index,
-                    "number": number
-                },
-                summary=summary,
-                attempt=RunCapture()
+            attempt(
+                base, factory, index
             )
+    if phrasing:
+        for base in bases:
+            for index, factory in enumerate(
+                factories[-2:],
+                start=len(factories) - 1
+            ):
+                attempt(
+                    base, factory, index
+                )
 
 
 def journal(path: Path) -> Journal:
@@ -588,6 +621,14 @@ def prepare(arguments: Namespace, directory: Path) -> Generator[list[Callable[[B
             )
             destination = directory / "doctor"
             attacks.append(lambda base: DoctorAttackEnvelope( base, ExplicitAttackSetup(attacker, target, target, base.text()), journal(destination / f"{base.metadata()['id']}.jsonl"), techniques=techniques, seed=seed ))
+        if getattr(
+            arguments, "phrasing", False
+        ):
+            attempts = getattr(
+                arguments, "phrasing_attempts", 20
+            )
+            attacks.append(lambda base: PhrasingAttackEnvelope(base, ExplicitAttackSetup(attacker, target, target, base.text()), journal(directory / "phrasing_past" / f"{base.metadata()['id']}.jsonl"), plan=ConfiguredPhrasingPlan("past", attempts)))
+            attacks.append(lambda base: PhrasingAttackEnvelope(base, ExplicitAttackSetup(attacker, target, target, base.text()), journal(directory / "phrasing_future" / f"{base.metadata()['id']}.jsonl"), plan=ConfiguredPhrasingPlan("future", attempts)))
         return [attack for index, attack in enumerate(attacks) if index != THREATEN_JSON or not arguments.no_threaten_json]
 
     model = LazyQwenModel(

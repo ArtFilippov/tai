@@ -1,6 +1,7 @@
 """Exercise GGUF HTTP identity, process ownership and conversation isolation."""
 
 import socket
+import json
 import subprocess
 import os
 import unittest
@@ -15,6 +16,8 @@ from target.gguf.gguf_location import GGUFLocation
 from target.gguf.gguf_server import GGUFServer
 from target.gguf.gguf_server_utils import gguf_server, start
 from target.model_chat import ModelChat
+from target.sampled_model import SampledModel
+from target.seeded_sampling import SeededSampling
 from target.gguf.gguf_file import GGUFFile
 
 from .gguf.gguf_fixture_utils import failed_start, owned, service
@@ -67,6 +70,44 @@ class TestGGUFModel(unittest.TestCase):
                 ),
                 "Hello"
             )
+
+    def test_sampled_requests_advance_seeds_without_changing_greedy_policy(self) -> None:
+        port = self.port()
+        with service(
+            port, "pinned", "policy"
+        ):
+            target = self.model(
+                port, 24
+            )
+            attacker = SampledModel(
+                target,
+                SeededSampling()
+            )
+            messages = [
+                {
+                    "role": "user",
+                    "content": "word"
+                }
+            ]
+            first = json.loads(
+                attacker.generate(messages)
+            )
+            second = json.loads(
+                attacker.generate(messages)
+            )
+            greedy = json.loads(
+                target.generate(messages)
+            )
+            metadata = json.loads(
+                json.dumps(
+                    target.decoding(
+                        SeededSampling()
+                    )
+                )
+            )
+            assert ([first["seed"], second["seed"]], first["max_tokens"], first["temperature"], first["top_k"], greedy["max_tokens"], greedy["temperature"], "seed" in greedy, metadata["repeat_penalty"], metadata["max_tokens"]) == (
+                [1654615998, 1806341205], 150, 1.0, 0, 24, 0, False, 1, 150
+            ), "GGUF sampling repeated a seed, ignored its decoding policy or changed ordinary requests"
 
     def port(self) -> int:
         """Choose a vacant loopback port for a local service.

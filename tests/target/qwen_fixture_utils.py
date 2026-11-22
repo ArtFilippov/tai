@@ -11,13 +11,14 @@ from target.model import Model
 from target.qwen_model import QwenModel
 
 
-def model(directory: Path, *, tokens: int, context: int) -> Model:
+def model(directory: Path, *, tokens: int, context: int, repetition: float = 1.0) -> Model:
     """Assemble the production adapter with a real tokenizer and tiny native model.
 
     Args:
         directory (Path): Temporary tokenizer resource directory.
         tokens (int): Normal generation allowance.
         context (int): Native model context capacity.
+        repetition (float, default=1.0): Inherited native repetition penalty.
 
     Returns:
         Model: Offline production Qwen model with no inference mocks.
@@ -56,15 +57,17 @@ def model(directory: Path, *, tokens: int, context: int) -> Model:
         ),
         encoding="utf-8"
     )
+    weights = AutoModelForCausalLM.from_config(
+        Qwen2Config(
+            vocab_size=4, hidden_size=8, intermediate_size=16, num_hidden_layers=1, num_attention_heads=2, num_key_value_heads=2, max_position_embeddings=context, bos_token_id=2, eos_token_id=1
+        )
+    )
+    weights.generation_config.repetition_penalty = repetition
     return QwenModel(
         torch.device("cpu"),
         tokens,
         AutoTokenizer.from_pretrained(
             directory, local_files_only=True
         ),
-        AutoModelForCausalLM.from_config(
-            Qwen2Config(
-                vocab_size=4, hidden_size=8, intermediate_size=16, num_hidden_layers=1, num_attention_heads=2, num_key_value_heads=2, max_position_embeddings=context, bos_token_id=2, eos_token_id=1
-            )
-        )
+        weights
     )

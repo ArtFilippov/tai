@@ -59,5 +59,6 @@ def result(base: BaseRequest, factory: Callable[[BaseRequest], Attack], entry: d
     """
     with attempt.guard():
         attack = factory(base)
+        with attempt.guard():
+            entry["result"] = attack.run()
         entry["attack"] = attack.description()
-        entry["result"] = attack.run()

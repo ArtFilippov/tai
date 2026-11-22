@@ -1,6 +1,7 @@
 """Composition of a probe, judgment and a durable run journal."""
 
 from dataclasses import dataclass
+from copy import deepcopy
 from typing import override
 
 from attack.attack import Attack
@@ -24,6 +25,7 @@ class AttackRun(Attack):
         journal (Journal): Destination for all run events.
         probe (Probe): Configured attack strategy.
         failures (list[str]): Assessment failures during this run.
+        configurations (list[dict[str, object]]): Effective configuration observed at run start.
     """
 
     base: BaseRequest
@@ -32,6 +34,7 @@ class AttackRun(Attack):
     journal: Journal
     probe: Probe
     failures: list[str]
+    configurations: list[dict[str, object]]
 
     def __init__(self, base: BaseRequest, target: Chat, judge: Judge, journal: Journal,
                   *, probe: Probe) -> None:
@@ -51,24 +54,45 @@ class AttackRun(Attack):
         self.journal = journal
         self.probe = probe
         self.failures: list[str] = []
+        self.configurations: list[dict[str, object]] = []
 
     @override
     def run(self) -> str | None:
-        self.journal.record(
-            {
-                "event": "start",
-                "base": self.base.text(),
-                "base_metadata": dict(
-                    self.base.metadata()
-                ),
-                "attack": self.description()
-            }
-        )
+        started = False
         try:
+            configuration: dict[str, object] = self.description()
+            self.configurations.append(configuration)
+            self.journal.record(
+                {
+                    "event": "start",
+                    "base": self.base.text(),
+                    "base_metadata": dict(
+                        self.base.metadata()
+                    ),
+                    "attack": configuration
+                }
+            )
+            started = True
             outcome = self.probe.execute(
                 self.base.text(), self.target, self.assess
             )
         except Exception as exc:
+            if not started:
+                configuration = {
+                    "type": self.probe.kind(),
+                    "description_error": repr(exc)
+                }
+                self.configurations.append(configuration)
+                self.journal.record(
+                    {
+                        "event": "start",
+                        "base": self.base.text(),
+                        "base_metadata": dict(
+                            self.base.metadata()
+                        ),
+                        "attack": configuration
+                    }
+                )
             if not self.failures:
                 self.journal.record(
                     {
@@ -84,6 +108,15 @@ class AttackRun(Attack):
                 }
             )
             raise
+        if outcome.get("status") == "failure":
+            self.journal.record(
+                {
+                    "event": "execution_error",
+                    "error": outcome.get(
+                        "error", "Attack preparation failed"
+                    )
+                }
+            )
         self.journal.record(
             {
                 "event": "end",
@@ -93,10 +126,18 @@ class AttackRun(Attack):
                 )
             }
         )
+        if outcome.get("status") == "failure":
+            raise ValueError(
+                outcome.get(
+                    "error", "Attack preparation failed"
+                )
+            )
         return outcome.get("text")
 
     @override
     def description(self) -> dict[str, object]:
+        if self.configurations:
+            return deepcopy(self.configurations[-1])
         return {
             "type": self.probe.kind(),
             "target": self.target.description(),

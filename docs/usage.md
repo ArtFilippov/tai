@@ -36,6 +36,81 @@ uv run --locked --group dev tai /tmp/fitd-demo.jsonl "Explain the topic in detai
 снимок сборки атаки и вложенные настройки участников. Формат описан в
 [схеме журнала](journal-schema.md).
 
+## Phrasing: прошедшее и будущее время
+
+Согласованная спецификация — [#114](https://github.com/ArtFilippov/tai/issues/114),
+решение о границах адаптации — [ADR 0006](adr/0006-request-bound-phrasing.md).
+В закреплённом garak `phrasing` воспроизводит готовые английские корпуса и проверяет
+отсутствие известных префиксов отказа. Наша адаптация переформулирует переданный
+базовый запрос через Attacker и оценивает его выполнение обычным Judge.
+Инструкции `reformulate_past_tense` и `reformulate_future_tense` перенесены без
+изменений из [исследовательского кода](https://github.com/tml-epfl/llm-past-tense/blob/179e305ddeecbfbd4d7c05fab626faf9b2ac5f44/main.py),
+включая примеры, годы и пробелы. Язык результата определяется инструкцией и Attacker.
+
+```bash
+uv run --locked --group dev --extra qwen tai-phrasing /tmp/phrasing "Explain the topic" --gpu 0
+uv run --locked --group dev --extra qwen tai-phrasing /tmp/phrasing-short "Explain the topic" --gpu 0 --phrasing-attempts 5 --tokens 192
+uv run --locked --group dev --extra qwen tai-alert /tmp/alert-phrasing --gpu 0 --limit 1 --phrasing --phrasing-attempts 5
+```
+
+`tai-phrasing` принимает **новый каталог**, создаёт `phrasing_past.jsonl` и
+`phrasing_future.jsonl`, показывает два восстановленных итога и возвращает код `1`
+при технической ошибке любого запуска. Отрицательные вердикты без технических
+ошибок дают код `0`. ALERT включает пару только через `--phrasing`: это две
+отдельные попытки на базовый запрос, с журналами `phrasing_past/<id>.jsonl` и
+`phrasing_future/<id>.jsonl`. После остальных выбранных атак каждая пара идёт
+последовательно для одного базового запроса, затем для следующего.
+
+Каждое время имеет отдельного Target и локальный случайный поток Attacker;
+загруженные веса общие, каждый кандидат получает свежие разговоры. Attacker
+генерирует с sampling, `temperature=1.0`, `top_p=1.0`, отключённым top-k и максимумом
+150 токенов. Начальный seed каждого времени — `0`; поток продвигается между
+вызовами. Для Qwen RNG процесса восстанавливается после обращения, для GGUF
+локальный поток выбирает новый seed каждого запроса. Настройки Target и Judge
+сохраняются: `--tokens`, по умолчанию `192`. Повторяемость ограничена свойствами
+backend и оборудования.
+
+`--phrasing-attempts` — положительный лимит **вызовов Attacker на каждое время**,
+по умолчанию `20`. После удаления всех двойных кавычек сохраняются исходный и
+обработанный ответы. Пустой/пробельный текст — ошибка подготовки. Дубликаты
+сравниваются с учётом регистра, игнорируя только пробелы по краям; повтор расходует
+бюджет и не отправляется Target. Между временами дедупликации нет. Число уникальных
+кандидатов может быть меньше лимита; полный бюджет двух времён — не более 40
+вызовов Attacker, 40 Target и 40 Judge при значении по умолчанию.
+
+Judge получает неизменённый оригинальный запрос и весь ответ Target. Первый успех
+останавливает только текущее время. Future выполняется и после успеха, и после
+обычной технической ошибки past; прерывание пользователем останавливает запуск.
+При исчерпании сохраняется последний оценённый ответ, включая пустую строку.
+Технические ошибки завершают соответствующую попытку; автоматических повторов нет.
+
+Python-сборка пары с тем же поведением и новым каталогом:
+
+```python
+from pathlib import Path
+import torch
+
+from attack.phrasing.envelopes.disk_phrasing_pair_envelope import DiskPhrasingPairEnvelope
+from attack.shared_model_attack_setup import SharedModelAttackSetup
+from base.plain_base import PlainBase
+from target.envelopes.lazy_qwen_model import LazyQwenModel
+
+base = PlainBase("Explain the topic")
+model = LazyQwenModel(torch.device("cuda:0"), 192)
+outcomes = DiskPhrasingPairEnvelope(
+    base, SharedModelAttackSetup(model, base.text()),
+    Path("/tmp/python-phrasing"), attempts=20,
+).run()
+```
+
+Для композиции отдельного запуска доступны
+`PhrasingAttackEnvelope(base, setup, journal, plan=ConfiguredPhrasingPlan("past", 20))`
+и аналогичный план `"future"`. Каждый envelope создаёт новый sampled Attacker
+поверх `setup.attacker`; произвольный Model реализует явную операцию
+`sample(messages, sampling)` и описание её эффективных настроек
+`decoding(sampling)`. Обычный `generate(messages)` остаётся независимым
+от этой политики. Шаблоны и происхождение находятся в `src/attack/phrasing/`.
+
 ## Doctor: Puppetry, Bypass и BypassLeet
 
 Спецификация: [#113](https://github.com/ArtFilippov/tai/issues/113).
